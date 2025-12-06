@@ -13,15 +13,44 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 
   if (!user?.role) {
     // Si no hay rol definido, redirige al login
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   if (!allowedRoles.includes(user.role)) {
-    // Si el rol no está permitido, redirige a la ruta alternativa
-    return <Navigate to="/instructor" replace />;
+    // Si el rol no está permitido, redirige a la ruta según rol
+    switch (user.role) {
+      case 'ADMINISTRADOR':
+        return <Navigate to="/admin" replace />;
+      case 'INSTRUCTOR':
+      case 'ALUMNO':
+        return <Navigate to="/instructor" replace />;
+      default:
+        return <Navigate to="/login" replace />;
+    }
   }
 
   return children;
+};
+
+// Componente para redirigir desde la raíz según sesión y rol
+const HomeRedirect = () => {
+  const { user } = useAuth();
+
+  if (!user) {
+    // No hay sesión, ir a login
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirige según el rol
+  switch (user.role) {
+    case 'ADMINISTRADOR':
+      return <Navigate to="/admin" replace />;
+    case 'INSTRUCTOR':
+    case 'ALUMNO':
+      return <Navigate to="/instructor" replace />;
+    default:
+      return <Navigate to="/login" replace />;
+  }
 };
 
 function App() {
@@ -29,7 +58,9 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Login />} />
+          {/* Ruta raíz inteligente */}
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           {/* Rutas privadas */}

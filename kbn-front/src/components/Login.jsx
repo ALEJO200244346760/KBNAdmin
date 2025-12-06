@@ -23,7 +23,7 @@ const Login = () => {
       login(token);
       
       console.log('Login exitoso:', response.data);
-      navigate('/formulario'); // Redirige a la página principal
+      navigate('/AdminDashboard'); // Redirige a la página principal
     } catch (error) {
       console.error('Error en el login:', error.response?.data);
       alert('Error en el inicio de sesión. Verifica tus credenciales.');
