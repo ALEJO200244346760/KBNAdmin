@@ -39,7 +39,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity.csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/administracion/**").hasRole("CARDIOLOGO")
+                        .requestMatchers("/administracion/**").hasRole("ADMINISTRADOR")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exception -> exception

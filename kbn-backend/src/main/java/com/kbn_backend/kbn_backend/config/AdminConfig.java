@@ -30,10 +30,10 @@ public class AdminConfig {
             cardiologo.setPassword(passwordEncoder.encode("admin123"));
             cardiologo.setEmail("admin@example.com");
 
-            Rol cardiologoRole = rolRepository.findByNombre("CARDIOLOGO");
+            Rol cardiologoRole = rolRepository.findByNombre("ADMINISTRADOR");
             if (cardiologoRole == null) {
                 cardiologoRole = new Rol();
-                cardiologoRole.setNombre("CARDIOLOGO");
+                cardiologoRole.setNombre("ADMINISTRADOR");
                 rolRepository.save(cardiologoRole);
             }
 
