@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
       setRoles([]);
       setUser({ nombre: '', apellido: '', role: '' });
     }
-    setLoading(false); // terminamos de cargar la sesión
+    setLoading(false); // sesión cargada
   }, [token]);
 
   const login = (token) => {

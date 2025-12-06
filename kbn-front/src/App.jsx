@@ -1,3 +1,5 @@
+// App.js
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -9,15 +11,13 @@ import UserManagement from './components/UserManagement';
 
 // Componente para rutas privadas con rol
 const PrivateRoute = ({ children, allowedRoles }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (!user?.role) {
-    // Si no hay rol definido, redirige al login
-    return <Navigate to="/login" replace />;
-  }
+  if (loading) return <div className="p-10 text-center">Cargando...</div>;
+
+  if (!user?.role) return <Navigate to="/login" replace />;
 
   if (!allowedRoles.includes(user.role)) {
-    // Si el rol no está permitido, redirige a la ruta según rol
     switch (user.role) {
       case 'ADMINISTRADOR':
         return <Navigate to="/admin" replace />;
@@ -34,14 +34,12 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 
 // Componente para redirigir desde la raíz según sesión y rol
 const HomeRedirect = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (!user) {
-    // No hay sesión, ir a login
-    return <Navigate to="/login" replace />;
-  }
+  if (loading) return <div className="p-10 text-center">Cargando sesión...</div>;
 
-  // Redirige según el rol
+  if (!user?.role) return <Navigate to="/login" replace />;
+
   switch (user.role) {
     case 'ADMINISTRADOR':
       return <Navigate to="/admin" replace />;
