@@ -2,10 +2,8 @@ package com.kbn_backend.kbn_backend.service;
 
 import com.kbn_backend.kbn_backend.exception.ResourceNotFoundException;
 import com.kbn_backend.kbn_backend.model.Rol;
-import com.kbn_backend.kbn_backend.model.Ubicacion;
 import com.kbn_backend.kbn_backend.model.Usuario;
 import com.kbn_backend.kbn_backend.repository.RolRepository;
-import com.kbn_backend.kbn_backend.repository.UbicacionRepository; // Asegúrate de importar el repositorio de Ubicacion
 import com.kbn_backend.kbn_backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,9 +19,6 @@ public class UsuarioService {
 
     @Autowired
     private RolRepository rolRepository;
-
-    @Autowired
-    private UbicacionRepository ubicacionRepository; // Añade esta línea para el repositorio de Ubicacion
 
     public List<Usuario> findAll() {
         return usuarioRepository.findAll();
@@ -65,17 +60,9 @@ public class UsuarioService {
         }
     }
 
-    public Usuario updateUserLocation(Long userId, Ubicacion ubicacion) {
+    public Usuario updateUserLocation(Long userId) {
         Usuario usuario = usuarioRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con ID: " + userId));
-
-        if (ubicacion != null && ubicacion.getId() != null) {
-            Ubicacion existingUbicacion = ubicacionRepository.findById(ubicacion.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Ubicación no encontrada con ID: " + ubicacion.getId()));
-            usuario.setUbicacion(existingUbicacion);
-        } else {
-            throw new RuntimeException("Ubicación inválida");
-        }
 
         return usuarioRepository.save(usuario);
     }

@@ -21,7 +21,4 @@ public class Usuario {
     @ManyToOne
     @JoinColumn(name = "role_id")
     private Rol rol;
-    @OneToOne
-    @JoinColumn(name = "ubicacion_id")
-    private Ubicacion ubicacion;
 }

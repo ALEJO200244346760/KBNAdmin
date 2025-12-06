@@ -1,7 +1,7 @@
 package com.kbn_backend.kbn_backend.config;
 
-import com.backend.rcv.jwt.config.JwtAuthenticationEntryPoint;
-import com.backend.rcv.jwt.config.JwtRequestFilter;
+import com.kbn_backend.kbn_backend.jwt.config.JwtAuthenticationEntryPoint;
+import com.kbn_backend.kbn_backend.jwt.config.JwtRequestFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

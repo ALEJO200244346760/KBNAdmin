@@ -2,10 +2,8 @@ package com.kbn_backend.kbn_backend.jwt.service;
 
 import com.kbn_backend.kbn_backend.dto.UsuarioDto;
 import com.kbn_backend.kbn_backend.model.Rol;
-import com.kbn_backend.kbn_backend.model.Ubicacion;
 import com.kbn_backend.kbn_backend.model.Usuario;
 import com.kbn_backend.kbn_backend.repository.RolRepository;
-import com.kbn_backend.kbn_backend.repository.UbicacionRepository;
 import com.kbn_backend.kbn_backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
@@ -24,9 +22,6 @@ public class JwtUserDetailsService implements org.springframework.security.core.
 
     @Autowired
     private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private UbicacionRepository ubicacionRepository;
 
     @Autowired
     private RolRepository rolRepository;
@@ -59,10 +54,6 @@ public class JwtUserDetailsService implements org.springframework.security.core.
             rolRepository.save(userRole);
         }
         newUsuario.setRol(userRole);
-
-        Ubicacion ubicacion = ubicacionRepository.findById(usuarioDto.getUbicacionId())
-                .orElseThrow(() -> new RuntimeException("Ubicacion no encontrada"));
-        newUsuario.setUbicacion(ubicacion);
 
         return usuarioRepository.save(newUsuario);
     }

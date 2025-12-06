@@ -1,9 +1,9 @@
 package com.kbn_backend.kbn_backend.config;
 
-import com.backend.rcv.model.Rol;
-import com.backend.rcv.model.Usuario;
-import com.backend.rcv.repository.RolRepository;
-import com.backend.rcv.repository.UsuarioRepository;
+import com.kbn_backend.kbn_backend.model.Rol;
+import com.kbn_backend.kbn_backend.model.Usuario;
+import com.kbn_backend.kbn_backend.repository.RolRepository;
+import com.kbn_backend.kbn_backend.repository.UsuarioRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
