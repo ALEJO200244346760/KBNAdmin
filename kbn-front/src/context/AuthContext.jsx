@@ -16,11 +16,8 @@ const decodeToken = (token) => {
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [roles, setRoles] = useState([]);
-  const [user, setUser] = useState({ 
-    nombre: '', 
-    apellido: '', 
-    role: '', 
-  });
+  const [user, setUser] = useState({ nombre: '', apellido: '', role: '' });
+  const [loading, setLoading] = useState(true); // NUEVO: estado de carga
 
   useEffect(() => {
     if (token) {
@@ -35,18 +32,12 @@ export const AuthProvider = ({ children }) => {
       setRoles([]);
       setUser({ nombre: '', apellido: '', role: '' });
     }
+    setLoading(false); // terminamos de cargar la sesión
   }, [token]);
 
   const login = (token) => {
     localStorage.setItem('token', token);
     setToken(token);
-    const decodedToken = decodeToken(token);
-    setRoles(decodedToken?.roles || []);
-    setUser({
-      nombre: decodedToken?.nombre || '',
-      apellido: decodedToken?.apellido || '',
-      role: decodedToken?.role || '',
-    });
   };
 
   const logout = () => {
@@ -57,11 +48,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ token, roles, user, login, logout }}>
+    <AuthContext.Provider value={{ token, roles, user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export { AuthContext };
 export const useAuth = () => useContext(AuthContext);
+export { AuthContext };
