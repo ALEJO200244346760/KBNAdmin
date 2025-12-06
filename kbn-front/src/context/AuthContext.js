@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
     nombre: '', 
     apellido: '', 
     role: '', 
-    ubicacion: '',
   });
 
   useEffect(() => {
@@ -31,11 +30,10 @@ export const AuthProvider = ({ children }) => {
         nombre: decodedToken?.nombre || '',
         apellido: decodedToken?.apellido || '',
         role: decodedToken?.role || '',
-        ubicacion: decodedToken?.ubicacion || '',
       });
     } else {
       setRoles([]);
-      setUser({ nombre: '', apellido: '', role: '', ubicacion: '' });
+      setUser({ nombre: '', apellido: '', role: '' });
     }
   }, [token]);
 
@@ -48,7 +46,6 @@ export const AuthProvider = ({ children }) => {
       nombre: decodedToken?.nombre || '',
       apellido: decodedToken?.apellido || '',
       role: decodedToken?.role || '',
-      ubicacion: decodedToken?.ubicacion || '',
     });
   };
 
@@ -56,7 +53,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     setToken(null);
     setRoles([]);
-    setUser({ nombre: '', apellido: '', role: '', ubicacion: '' });
+    setUser({ nombre: '', apellido: '', role: '' });
   };
 
   return (
