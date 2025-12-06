@@ -12,7 +12,7 @@ const AdminDashboard = () => {
   const fetchClases = async () => {
     try {
       // Ajusta la URL a tu puerto real
-      const response = await fetch('http://localhost:8080/api/clases/listar');
+      const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
       const data = await response.json();
       setClases(data);
       setLoading(false);
@@ -36,7 +36,7 @@ const AdminDashboard = () => {
     if (!asignadoA) return alert("Selecciona una opción primero");
 
     try {
-      const response = await fetch(`http://localhost:8080/api/clases/asignar/${id}`, {
+      const response = await fetch(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ asignadoA })

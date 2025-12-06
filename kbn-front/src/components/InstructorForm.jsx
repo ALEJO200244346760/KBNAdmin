@@ -48,7 +48,7 @@ const InstructorForm = () => {
 
     console.log("Enviando al backend:", payload);
     // Aquí iría tu fetch/axios al backend
-    // await axios.post('http://localhost:8080/api/clases/guardar', payload)...
+    await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload)
   };
 
   return (
