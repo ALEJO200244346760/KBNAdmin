@@ -23,22 +23,31 @@ public class AdminConfig {
 
     @PostConstruct
     public void init() {
-        if (!usuarioRepository.existsByEmail("admin@example.com")) {
-            Usuario cardiologo = new Usuario();
-            cardiologo.setNombre("admin");
-            cardiologo.setApellido("admin");
-            cardiologo.setPassword(passwordEncoder.encode("admin123"));
-            cardiologo.setEmail("admin@example.com");
 
-            Rol cardiologoRole = rolRepository.findByNombre("ADMINISTRADOR");
-            if (cardiologoRole == null) {
-                cardiologoRole = new Rol();
-                cardiologoRole.setNombre("ADMINISTRADOR");
-                rolRepository.save(cardiologoRole);
+        // SOLO crea el admin si no existe
+        if (!usuarioRepository.existsByEmail("admin@example.com")) {
+
+            // 1. Crear/obtener el rol ADMINISTRADOR
+            Rol adminRole = rolRepository.findByNombre("ADMINISTRADOR");
+
+            if (adminRole == null) {
+                adminRole = new Rol();
+                adminRole.setNombre("ADMINISTRADOR");
+                rolRepository.save(adminRole);
             }
 
-            cardiologo.setRol(cardiologoRole);
-            usuarioRepository.save(cardiologo);
+            // 2. Crear usuario admin
+            Usuario admin = new Usuario();
+            admin.setNombre("admin");
+            admin.setApellido("admin");
+            admin.setEmail("admin@example.com");
+            admin.setPassword(passwordEncoder.encode("admin123"));
+            admin.setRol(adminRole);
+
+            // 3. Guardar usuario admin
+            usuarioRepository.save(admin);
+
+            System.out.println("✔ Usuario ADMINISTRADOR creado correctamente");
         }
     }
 }
