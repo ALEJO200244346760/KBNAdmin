@@ -2,6 +2,9 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
 
+/* ---------------------------------------------------
+   Decodificar JWT sin librerías (como ya tenías)
+--------------------------------------------------- */
 const decodeToken = (token) => {
   try {
     const payload = token.split('.')[1];
@@ -13,33 +16,74 @@ const decodeToken = (token) => {
   }
 };
 
+/* ---------------------------------------------------
+   Normalizar roles del backend → roles del frontend
+   ROLE_ADMINISTRADOR → ADMINISTRADOR
+   ROLE_INSTRUCTOR → INSTRUCTOR
+   ROLE_ALUMNO → ALUMNO
+--------------------------------------------------- */
+const normalizeRole = (backendRole) => {
+  if (!backendRole) return null;
+
+  const clean = backendRole.replace("ROLE_", "");
+
+  switch (clean) {
+    case "ADMINISTRADOR":
+      return "ADMINISTRADOR";
+    case "INSTRUCTOR":
+      return "INSTRUCTOR";
+    case "ALUMNO":
+      return "ALUMNO";
+    default:
+      return clean;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [roles, setRoles] = useState([]);
   const [user, setUser] = useState({ nombre: '', apellido: '', role: '' });
-  const [loading, setLoading] = useState(true); // NUEVO: estado de carga
+  const [loading, setLoading] = useState(true);
 
+  /* ---------------------------------------------------
+     Cada vez que token cambie, actualizamos usuario
+  --------------------------------------------------- */
   useEffect(() => {
     if (token) {
-      const decodedToken = decodeToken(token);
-      setRoles(decodedToken?.roles || []);
+      const decoded = decodeToken(token);
+
+      const backendRole = decoded?.roles?.[0] || null;
+      const normalizedRole = normalizeRole(backendRole);
+
+      setRoles(decoded?.roles || []);
       setUser({
-        nombre: decodedToken?.nombre || '',
-        apellido: decodedToken?.apellido || '',
-        role: decodedToken?.role || '',
+        nombre: decoded?.nombre || '',
+        apellido: decoded?.apellido || '',
+        role: normalizedRole || '',
       });
+
+      console.log("🔐 JWT ROLE:", backendRole);
+      console.log("🎭 FRONT ROLE:", normalizedRole);
+
     } else {
       setRoles([]);
       setUser({ nombre: '', apellido: '', role: '' });
     }
-    setLoading(false); // sesión cargada
+
+    setLoading(false);
   }, [token]);
 
+  /* ---------------------------------------------------
+     Login: guardar y activar token
+  --------------------------------------------------- */
   const login = (token) => {
     localStorage.setItem('token', token);
     setToken(token);
   };
 
+  /* ---------------------------------------------------
+     Logout
+  --------------------------------------------------- */
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
