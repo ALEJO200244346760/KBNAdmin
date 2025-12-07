@@ -1,7 +1,7 @@
-// App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import Header from './components/Header'; // <-- importamos
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminDashboard from './components/AdminDashboard';
@@ -55,33 +55,37 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Ruta raíz inteligente */}
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+        {/* HEADER SIEMPRE VISIBLE */}
+        <Header />
 
-          {/* Rutas privadas */}
-          <Route
-            path="/admin"
-            element={
-              <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
-                <AdminDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/instructor"
-            element={
-              <PrivateRoute allowedRoles={['INSTRUCTOR', 'ALUMNO']}>
-                <InstructorForm />
-              </PrivateRoute>
-            }
-          />
+        {/* CONTENIDO */}
+        <div className="pt-16"> {/* espacio para el header fijo */}
+          <Routes>
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
-          <Route path="/reportes" element={<ReporteEstadisticas />} />
-          <Route path="/usuarios" element={<UserManagement />} />
-        </Routes>
+            <Route
+              path="/admin"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
+                  <AdminDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/instructor"
+              element={
+                <PrivateRoute allowedRoles={['INSTRUCTOR', 'ALUMNO']}>
+                  <InstructorForm />
+                </PrivateRoute>
+              }
+            />
+
+            <Route path="/reportes" element={<ReporteEstadisticas />} />
+            <Route path="/usuarios" element={<UserManagement />} />
+          </Routes>
+        </div>
       </BrowserRouter>
     </AuthProvider>
   );
