@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,7 +36,7 @@ public interface ClaseRepository extends JpaRepository<ClaseRegistro, Long> {
             "SUM(CAST(CASE WHEN c.tipo_transaccion = 'INGRESO' AND c.asignado_a = 'JOSE' THEN c.total ELSE '0' END AS DECIMAL)) AS totalAsignadoJose " +
 
             "FROM clases_registros c " +
-            "WHERE c.fecha BETWEEN :fechaInicio AND :fechaFin",
+            "WHERE c.fecha >= :fechaInicio AND c.fecha <= :fechaFin",
             nativeQuery = true)
-    Optional<ReporteKiteDTO> getReporteEntreFechas(LocalDate fechaInicio, LocalDate fechaFin);
+    Optional<ReporteKiteDTO> getReporteEntreFechas(String fechaInicio, String fechaFin);
 }

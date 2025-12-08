@@ -4,18 +4,15 @@ import com.kbn_backend.kbn_backend.model.ClaseRegistro;
 import com.kbn_backend.kbn_backend.repository.ClaseRepository;
 import com.kbn_backend.kbn_backend.dto.ReporteKiteDTO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/clases")
-// @CrossOrigin(origins = "http://localhost:3000") // Descomentar si usas un puerto diferente
 public class ClaseController {
 
     @Autowired
@@ -24,14 +21,21 @@ public class ClaseController {
     // 1. GUARDAR REGISTRO (INGRESO o EGRESO)
     @PostMapping("/guardar")
     public ResponseEntity<ClaseRegistro> guardarClase(@RequestBody ClaseRegistro registro) {
-        // En un registro de INGRESO, 'asignadoA' debe ser null/vacío para que el Admin lo revise.
-        // En un registro de EGRESO, 'asignadoA' debe ser nulo.
 
-        // Si es EGRESO, aseguramos que 'asignadoA' sea nulo
+        // Si es EGRESO, aseguramos que 'asignadoA' sea nulo y revisado = true
         if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
             registro.setAsignadoA(null);
-            registro.setRevisado(true); // Opcional: considerar egresos como revisados automáticamente
+            registro.setRevisado(true);
+        } else {
+            // INGRESO: asignadoA nunca puede estar vacío, poner "NINGUNO" si no hay valor
+            if (registro.getAsignadoA() == null || registro.getAsignadoA().trim().isEmpty()) {
+                registro.setAsignadoA("NINGUNO");
+            }
+            registro.setRevisado(false); // INGRESO pendiente de revisión
         }
+
+        // Ahora guardamos la fecha como String (ya no LocalDate)
+        // No se necesita parseo, solo asegurarse que venga en formato "yyyy-MM-dd"
 
         ClaseRegistro savedRegistro = claseRepository.save(registro);
         return ResponseEntity.ok(savedRegistro);
@@ -53,7 +57,6 @@ public class ClaseController {
                     if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
                         return ResponseEntity.badRequest().body("No se puede asignar ingreso a una transacción de EGRESO.");
                     }
-                    registro.setAsignadoA(asignadoA);
                     registro.setRevisado(true);
                     claseRepository.save(registro);
                     return ResponseEntity.ok("Asignación actualizada correctamente");
@@ -64,15 +67,12 @@ public class ClaseController {
     // 4. GENERAR REPORTE
     @GetMapping("/reporte")
     public ResponseEntity<ReporteKiteDTO> generarReporte(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
+            @RequestParam String fechaInicio,
+            @RequestParam String fechaFin) {
 
+        // Llamamos al repositorio con Strings, ya que la fecha ahora es String
         Optional<ReporteKiteDTO> reporte = claseRepository.getReporteEntreFechas(fechaInicio, fechaFin);
 
-        if (reporte.isPresent()) {
-            return ResponseEntity.ok(reporte.get());
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        return reporte.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
