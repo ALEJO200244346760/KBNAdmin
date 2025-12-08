@@ -88,69 +88,53 @@ const InstructorForm = () => {
   const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // --- Validación del instructor ---
   if (!formData.instructor || formData.instructor.trim() === '') {
     alert("Por favor, selecciona o ingresa el nombre del instructor.");
     return;
   }
 
-  // --- Construir payload base ---
-  let payload = {
-    tipoTransaccion: view, // "INGRESO" o "EGRESO"
-    fecha: formData.fecha, // formato "yyyy-MM-dd", compatible con LocalDate
+  // Convertir todos los campos numéricos a número y campos opcionales a string vacío
+  const payload = {
+    tipoTransaccion: view,
+    fecha: formData.fecha,
     actividad: formData.actividad === 'Otro' ? formData.actividadOtro || 'Otro' : formData.actividad,
-    descripcionActividad: formData.descripcionActividad || null,
+    descripcionActividad: formData.descripcionActividad || '',
     instructor: formData.instructor,
     moneda: formData.moneda || 'USD',
-    detalles: formData.detalles || null,
-    cantidadHoras: view === 'INGRESO' ? String(formData.horas || 0) : '0',
-    tarifaPorHora: view === 'INGRESO' ? String(formData.tarifa || 0) : '0',
-    total: view === 'INGRESO' ? String(formData.total || 0) : '0',
-    gastosAsociados: String(formData.gastos || 0),
-    comision: String(formData.comision || 0),
+    detalles: formData.detalles || '',
+    cantidadHoras: view === 'EGRESO' ? 0 : Number(formData.horas || 0),
+    tarifaPorHora: view === 'EGRESO' ? 0 : Number(formData.tarifa || 0),
+    total: view === 'EGRESO' ? 0 : Number(formData.total || 0),
+    gastosAsociados: Number(formData.gastos || 0),
+    comision: Number(formData.comision || 0),
     formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || 'Otro' : formData.formaPago,
-    detalleFormaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || null : null,
-    vendedor: formData.vendedor || null,
-    asignadoA: formData.asignadoA || 'NINGUNO' // Valores válidos: "IGNA", "JOSE", "NINGUNO"
+    detalleFormaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || '' : '',
+    vendedor: formData.vendedor || '',
+    asignadoA: formData.asignadoA || ''
   };
 
-  // --- Ajustes específicos para EGRESO ---
   if (view === 'EGRESO') {
-    payload = {
-      ...payload,
-      actividad: 'Egreso',
-      cantidadHoras: '0',
-      tarifaPorHora: '0',
-      total: '0',
-      comision: '0',
-      gastosAsociados: String(formData.gastos || 0)
-    };
+    payload.actividad = 'Egreso';
   }
 
   try {
-    // --- Enviar datos al backend ---
     await axios.post(
       'https://kbnadmin-production.up.railway.app/api/clases/guardar',
       payload
     );
 
     alert(`Registro de ${view} guardado con éxito!`);
-
-    // --- Reset del formulario conservando instructor y fecha ---
     setView('INICIO');
     setFormData({ ...initialFormData, fecha: formData.fecha, instructor: formData.instructor });
 
   } catch (error) {
     console.error("Error guardando:", error);
-
-    // --- Mensaje más claro en caso de fallo ---
     const serverMessage = error.response?.data || '';
     alert(
-      `Hubo un error al guardar el registro. ${serverMessage ? 'Detalle: ' + serverMessage : 'Por favor revisa que todos los campos obligatorios estén completos.'}`
+      `Hubo un error al guardar el registro. ${serverMessage ? 'Detalle: ' + serverMessage : 'Revisa los campos obligatorios.'}`
     );
   }
   };
-
 
   // --- Componente del campo Instructor ---
   const InstructorField = () => {
