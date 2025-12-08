@@ -1,4 +1,3 @@
-// src/components/Header.jsx
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -60,27 +59,20 @@ export default function Header() {
           </svg>
         </button>
 
-        {/* Opciones en escritorio */}
+        {/* Opciones escritorio */}
         <nav className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
           {user?.role === "ADMINISTRADOR" && (
-            <Link
-              to="/admin"
-              className="hover:text-blue-600 transition-colors"
-            >
+            <Link to="/admin" className="hover:text-blue-600 transition-colors">
               Panel Admin
             </Link>
           )}
 
-          {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <Link
-              to="/instructor"
-              className="hover:text-blue-600 transition-colors"
-            >
+          {(user?.role === "ADMINISTRADOR" || user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
+            <Link to="/instructor" className="hover:text-blue-600 transition-colors">
               Instructor
             </Link>
           )}
 
-          {/* Si NO hay usuario → mostrar iniciar sesión */}
           {!user && !isLoginPage && (
             <Link
               to="/login"
@@ -90,7 +82,6 @@ export default function Header() {
             </Link>
           )}
 
-          {/* Si hay usuario → cerrar sesión */}
           {user && (
             <button
               onClick={handleLogout}
@@ -106,21 +97,13 @@ export default function Header() {
       {menuOpen && (
         <div className="md:hidden bg-white shadow-md py-3 px-4 space-y-3 text-gray-700 font-medium">
           {user?.role === "ADMINISTRADOR" && (
-            <Link
-              to="/admin"
-              className="block py-1"
-              onClick={() => setMenuOpen(false)}
-            >
+            <Link to="/admin" className="block py-1" onClick={() => setMenuOpen(false)}>
               Panel Admin
             </Link>
           )}
 
-          {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <Link
-              to="/instructor"
-              className="block py-1"
-              onClick={() => setMenuOpen(false)}
-            >
+          {(user?.role === "ADMINISTRADOR" || user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
+            <Link to="/instructor" className="block py-1" onClick={() => setMenuOpen(false)}>
               Instructor
             </Link>
           )}

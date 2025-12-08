@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Header from './components/Header'; // <-- importamos
+import Header from './components/Header';
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminDashboard from './components/AdminDashboard';
@@ -18,6 +18,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   if (!user?.role) return <Navigate to="/login" replace />;
 
   if (!allowedRoles.includes(user.role)) {
+    // Redirige según rol
     switch (user.role) {
       case 'ADMINISTRADOR':
         return <Navigate to="/admin" replace />;
@@ -32,7 +33,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-// Componente para redirigir desde la raíz según sesión y rol
+// Redirección raíz según sesión y rol
 const HomeRedirect = () => {
   const { user, loading } = useAuth();
 
@@ -59,7 +60,7 @@ function App() {
         <Header />
 
         {/* CONTENIDO */}
-        <div className="pt-16"> {/* espacio para el header fijo */}
+        <div className="pt-16"> {/* espacio para header fijo */}
           <Routes>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<Login />} />
@@ -73,10 +74,11 @@ function App() {
                 </PrivateRoute>
               }
             />
+
             <Route
               path="/instructor"
               element={
-                <PrivateRoute allowedRoles={['INSTRUCTOR', 'ALUMNO']}>
+                <PrivateRoute allowedRoles={['ADMINISTRADOR', 'INSTRUCTOR', 'ALUMNO']}>
                   <InstructorForm />
                 </PrivateRoute>
               }
