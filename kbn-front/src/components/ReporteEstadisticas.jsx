@@ -22,17 +22,23 @@ const ReporteEstadisticas = () => {
         fetchClases();
     }, []);
 
+    // ReporteEstadisticas.jsx
+
     const fetchClases = async () => {
         setLoadingClases(true);
         try {
-            // Este endpoint trae TODAS las clases (Ingreso/Egreso)
             const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const data = await response.json();
-            // Filtramos las que son INGRESO y no han sido ASIGNADAS (asignadoA es null/vacío)
-            const pendientes = data
-                .filter(clase => clase.tipoTransaccion === 'INGRESO' && !clase.asignadoA)
-                .map(clase => ({ ...clase, asignadoA: clase.asignadoA || "" }));
             
+            // --- CAMBIO EN LA LÓGICA DE FILTRADO ---
+            const pendientes = data
+                .filter(clase => 
+                    clase.tipoTransaccion === 'INGRESO' && 
+                    (!clase.asignadoA || clase.asignadoA.trim() === '') // La clase es pendiente si es null O si es una cadena vacía
+                )
+                .map(clase => ({ ...clase, asignadoA: clase.asignadoA || "" }));
+            // --- FIN CAMBIO ---
+
             setClasesPendientes(pendientes);
         } catch (error) {
             console.error("Error cargando clases:", error);
