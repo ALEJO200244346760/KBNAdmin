@@ -21,7 +21,8 @@ const ReporteEstadisticas = () => {
         const { fechaInicio, fechaFin } = fechas;
 
         try {
-            const url = `http://localhost:8080/api/clases/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+            // URL corregida para usar el nuevo endpoint de reporte con fechas
+            const url = `https://kbnadmin-production.up.railway.app/api/clases/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
             const response = await fetch(url);
 
             if (response.ok) {
@@ -50,11 +51,15 @@ const ReporteEstadisticas = () => {
         </div>
     );
 
+    const ingresosBrutos = reporte?.totalIngresosBrutos || 0;
+    const gastosAsociados = reporte?.totalGastos || 0; // Gastos asociados al ingreso
+    const egresosOperacionales = reporte?.totalEgresos || 0; // Egreso total de transacciones tipo EGRESO
+    const ingresosNetos = ingresosBrutos - gastosAsociados - egresosOperacionales;
+
     return (
         <div className="max-w-6xl mx-auto mt-10 p-6">
             <h1 className="text-3xl font-bold mb-6 text-gray-800">📈 Reporte de Estadísticas</h1>
             
-            {/* --- SELECCIÓN DE FECHAS --- */}
             <div className="bg-white p-6 rounded-lg shadow mb-8 flex gap-4 items-end">
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Desde</label>
@@ -73,19 +78,17 @@ const ReporteEstadisticas = () => {
                 </button>
             </div>
 
-            {/* --- RESULTADOS DEL REPORTE --- */}
             {reporte && (
-                <div className="space-y-6">
+                <div className="space-y-8">
                     <h2 className="text-2xl font-semibold border-b pb-2 text-gray-800">Resumen Financiero ({fechas.fechaInicio} a {fechas.fechaFin})</h2>
                     
-                    {/* Tarjetas de Ingresos Brutos y Gastos */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <Card title="Ingresos Brutos Totales" value={reporte.totalIngresosBrutos} color="bg-indigo-600" />
-                        <Card title="Gastos Asociados" value={reporte.totalGastos} color="bg-red-500" />
-                        <Card title="Comisiones Totales" value={reporte.totalComisiones} color="bg-yellow-600" />
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <Card title="Ingresos Brutos" value={ingresosBrutos} color="bg-indigo-600" />
+                        <Card title="Gastos Asoc. a Ingreso" value={gastosAsociados} color="bg-orange-500" />
+                        <Card title="Total Egresos Operacionales" value={egresosOperacionales} color="bg-red-500" />
+                        <Card title="SALDO NETO" value={ingresosNetos} color="bg-green-700" />
                     </div>
 
-                    {/* Tarjetas de Asignación de Ingresos */}
                     <h2 className="text-2xl font-semibold border-b pb-2 text-gray-800 pt-4">Asignación de Ingresos (100% de la clase)</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card title="Asignado a IGNA" value={reporte.totalAsignadoIgna} color="bg-blue-500" />
@@ -93,8 +96,8 @@ const ReporteEstadisticas = () => {
                     </div>
 
                     <div className="text-sm pt-4 text-gray-600 border-t mt-6">
-                        <p>Los ingresos no asignados a Igna o Jose (rol 'NINGUNO' / Escuela) se calculan restando estos montos del Ingreso Bruto Total.</p>
-                        <p className="font-bold">Ingresos Escuela (Ninguno): {formatCurrency(reporte.totalIngresosBrutos - reporte.totalAsignadoIgna - reporte.totalAsignadoJose)}</p>
+                        <p>Total Comisiones: {formatCurrency(reporte.totalComisiones)}</p>
+                        <p className="font-bold">Ingresos Escuela (Ninguno): {formatCurrency(ingresosBrutos - reporte.totalAsignadoIgna - reporte.totalAsignadoJose)}</p>
                     </div>
 
                 </div>

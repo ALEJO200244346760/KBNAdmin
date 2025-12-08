@@ -1,7 +1,7 @@
 package com.kbn_backend.kbn_backend.model;
 
 import jakarta.persistence.*;
-import lombok.Data; // Asumo que usas Lombok para getters/setters, si no, créalos manual
+import lombok.Data;
 import java.time.LocalDate;
 
 @Entity
@@ -13,40 +13,42 @@ public class ClaseRegistro {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // --- CAMPO NUEVO PARA INGRESOS/EGRESOS ---
+    @Column(nullable = false)
+    private String tipoTransaccion; // VALORES: "INGRESO" o "EGRESO"
+
     // --- CAMPOS QUE RELLENA EL INSTRUCTOR ---
 
     @Column(nullable = false)
-    private LocalDate fecha; // Se guardará YYYY-MM-DD
+    private LocalDate fecha;
 
     @Column(nullable = false)
-    private String actividad; // Ej: "Clases", "Gastos", "Aula Kite", etc.
+    private String actividad;
 
     @Column(length = 500)
-    private String descripcionActividad; // Si elige "Otro", o detalles extra
+    private String descripcionActividad;
 
-    private String vendedor; // Opcional
+    private String vendedor;
 
     @Column(nullable = false)
-    private String nombreInstructor; // Viene de la sesión, pero editable si es "Otro"
+    private String instructor; // Nombre del instructor, sea auto-llenado o seleccionado por Admin
 
     @Column(columnDefinition = "TEXT")
-    private String detalles; // Ej: "Clase a Santa Teresa"
+    private String detalles;
 
     private Double cantidadHoras;
     private Double tarifaPorHora;
-    private Double total; // Calculado: horas * tarifa
+    private Double total;
 
-    private Double gastosAsociados; // Estadístico (ej: nafta)
-    private Double comision;        // Estadístico
+    private Double gastosAsociados; // Usado para Gastos asociados al Ingreso, o como MONTO total si es EGRESO
+    private Double comision;
 
-    private String formaPago;       // Ej: Efectivo, MP
-    private String detalleFormaPago; // Si elige "Otro"
+    private String formaPago;
+    private String detalleFormaPago;
 
     // --- CAMPOS EXCLUSIVOS DEL ADMINISTRADOR ---
 
-    // Puede ser "IGNA", "JOSE", "NINGUNO". Null al crearse.
-    private String asignadoA;
+    private String asignadoA; // "IGNA", "JOSE", "NINGUNO". Solo aplica a INGRESO.
 
-    // Estado para saber si el admin ya lo revisó
     private boolean revisado = false;
 }

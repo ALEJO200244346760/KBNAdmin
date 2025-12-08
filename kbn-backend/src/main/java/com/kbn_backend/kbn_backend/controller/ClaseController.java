@@ -1,12 +1,13 @@
 package com.kbn_backend.kbn_backend.controller;
 
-import com.kbn_backend.kbn_backend.dto.ReporteKiteDTO;
 import com.kbn_backend.kbn_backend.model.ClaseRegistro;
-import com.kbn_backend.kbn_backend.repository.ClaseRepository; // Asumo que ya creaste la interfaz Repository
+import com.kbn_backend.kbn_backend.repository.ClaseRepository;
+import com.kbn_backend.kbn_backend.dto.ReporteKiteDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -14,58 +15,55 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/clases")
-@CrossOrigin("*") // Ajustar según seguridad
+// @CrossOrigin(origins = "http://localhost:3000") // Descomentar si usas un puerto diferente
 public class ClaseController {
 
     @Autowired
     private ClaseRepository claseRepository;
 
+    // 1. GUARDAR REGISTRO (INGRESO o EGRESO)
     @PostMapping("/guardar")
-    public ResponseEntity<?> crearRegistro(@RequestBody ClaseRegistro registro) {
-        // Validaciones básicas de backend
-        if (registro.getFecha() == null) {
-            registro.setFecha(LocalDate.now());
+    public ResponseEntity<ClaseRegistro> guardarClase(@RequestBody ClaseRegistro registro) {
+        // En un registro de INGRESO, 'asignadoA' debe ser null/vacío para que el Admin lo revise.
+        // En un registro de EGRESO, 'asignadoA' debe ser nulo.
+
+        // Si es EGRESO, aseguramos que 'asignadoA' sea nulo
+        if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
+            registro.setAsignadoA(null);
+            registro.setRevisado(true); // Opcional: considerar egresos como revisados automáticamente
         }
 
-        // Calcular total en backend por seguridad (aunque el front lo haga)
-        if(registro.getCantidadHoras() != null && registro.getTarifaPorHora() != null){
-            registro.setTotal(registro.getCantidadHoras() * registro.getTarifaPorHora());
-        }
-
-        // Aseguramos que los campos de Admin estén vacíos al crear
-        registro.setAsignadoA(null);
-        registro.setRevisado(false);
-
-        ClaseRegistro nuevoRegistro = claseRepository.save(registro);
-        return ResponseEntity.ok(nuevoRegistro);
+        ClaseRegistro savedRegistro = claseRepository.save(registro);
+        return ResponseEntity.ok(savedRegistro);
     }
 
-    // 1. Obtener todas las clases (podrías agregar paginación después)
+    // 2. LISTAR CLASES (Para Admin Dashboard)
     @GetMapping("/listar")
     public ResponseEntity<List<ClaseRegistro>> listarClases() {
-        // Sugerencia: Ordenar por fecha descendente para ver lo más nuevo arriba
-        // return ResponseEntity.ok(claseRepository.findAllByOrderByFechaDesc());
-        // Por ahora usamos findAll simple:
-        return ResponseEntity.ok(claseRepository.findAll());
+        return ResponseEntity.ok(claseRepository.findAllByOrderByFechaDesc());
     }
 
-    // 2. Asignar quién recibe el dinero (Igna/Jose)
+    // 3. ASIGNAR INGRESO (Acción del Admin)
     @PutMapping("/asignar/{id}")
     public ResponseEntity<?> asignarIngreso(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        String asignadoA = payload.get("asignadoA"); // Esperamos "IGNA", "JOSE", "NINGUNO"
+        String asignadoA = payload.get("asignadoA");
 
         return claseRepository.findById(id)
                 .map(registro -> {
+                    if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
+                        return ResponseEntity.badRequest().body("No se puede asignar ingreso a una transacción de EGRESO.");
+                    }
                     registro.setAsignadoA(asignadoA);
-                    registro.setRevisado(true); // Marcamos como revisado
+                    registro.setRevisado(true);
                     claseRepository.save(registro);
                     return ResponseEntity.ok("Asignación actualizada correctamente");
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // 4. GENERAR REPORTE
     @GetMapping("/reporte")
-    public ResponseEntity<?> generarReporte(
+    public ResponseEntity<ReporteKiteDTO> generarReporte(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
 
@@ -74,7 +72,6 @@ public class ClaseController {
         if (reporte.isPresent()) {
             return ResponseEntity.ok(reporte.get());
         } else {
-            // Devolvemos el objeto con ceros si no hay datos, o un mensaje claro
             return ResponseEntity.notFound().build();
         }
     }
