@@ -219,6 +219,15 @@ const InstructorForm = () => {
               />
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Moneda</label>
+            <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+              <option value="BRL">Reales Brasileños (BRL)</option>
+              <option value="USD">Dólares (USD)</option>
+              <option value="ARS">Pesos Argentinos (ARS)</option>
+              <option value="CLP">Pesos Chilenos (CLP)</option>
+            </select>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Concepto / Detalles</label>
@@ -235,16 +244,6 @@ const InstructorForm = () => {
             {formData.formaPago === 'Otro' && (
               <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
             )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Moneda</label>
-            <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
-              <option value="BRL">Reales Brasileños (BRL)</option>
-              <option value="USD">Dólares (USD)</option>
-              <option value="ARS">Pesos Argentinos (ARS)</option>
-              <option value="CLP">Pesos Chilenos (CLP)</option>
-            </select>
           </div>
 
           <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
@@ -328,6 +327,15 @@ const InstructorForm = () => {
             <input type="number" value={formData.total} readOnly className="mt-1 block w-full rounded-md border p-2 bg-white font-bold text-green-600" />
           </div>
           <div>
+          <label className="block text-sm font-medium text-gray-700">Moneda</label>
+          <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+            <option value="BRL">Reales Brasileños (BRL)</option>
+            <option value="USD">Dólares (USD)</option>
+            <option value="ARS">Pesos Argentinos (ARS)</option>
+            <option value="CLP">Pesos Chilenos (CLP)</option>
+          </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700">Gastos</label>
             <input
               type="number"
@@ -365,16 +373,6 @@ const InstructorForm = () => {
           {formData.formaPago === 'Otro' && (
             <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
           )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Moneda</label>
-          <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
-            <option value="BRL">Reales Brasileños (BRL)</option>
-            <option value="USD">Dólares (USD)</option>
-            <option value="ARS">Pesos Argentinos (ARS)</option>
-            <option value="CLP">Pesos Chilenos (CLP)</option>
-          </select>
         </div>
 
         <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
