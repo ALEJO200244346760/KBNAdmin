@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-// import { useAuth } from '../context/AuthContext'; // Descomentar en la implementación final
-// import { Bar, Pie } from 'react-chartjs-2'; // Asumiendo que usarás una librería de gráficos
+// import { useAuth } from '../context/AuthContext'; 
+// import { Bar, Pie } from 'react-chartjs-2'; 
 
 const ReporteEstadisticas = () => {
     // --- LÓGICA DE REPORTE Y FECHAS ---
@@ -14,6 +14,9 @@ const ReporteEstadisticas = () => {
     const [reporte, setReporte] = useState(null);
     const [loadingReporte, setLoadingReporte] = useState(false);
     
+    // --- NUEVO ESTADO PARA EL REPORTE DETALLADO (Listado de Ingresos/Egresos) ---
+    const [ingresosEgresos, setIngresosEgresos] = useState([]);
+    
     // --- LÓGICA DE NOTIFICACIONES/ASIGNACIÓN ---
     const [clasesPendientes, setClasesPendientes] = useState([]);
     const [loadingClases, setLoadingClases] = useState(true);
@@ -22,24 +25,26 @@ const ReporteEstadisticas = () => {
         fetchClases();
     }, []);
 
-    // ReporteEstadisticas.jsx
-
     const fetchClases = async () => {
         setLoadingClases(true);
         try {
             const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const data = await response.json();
             
-            // --- CAMBIO EN LA LÓGICA DE FILTRADO ---
+            // Lógica de filtrado para PENDIENTES (Ingreso y asignadoA es null o cadena vacía)
             const pendientes = data
                 .filter(clase => 
                     clase.tipoTransaccion === 'INGRESO' && 
-                    (!clase.asignadoA || clase.asignadoA.trim() === '') // La clase es pendiente si es null O si es una cadena vacía
+                    (!clase.asignadoA || clase.asignadoA.trim() === '')
                 )
                 .map(clase => ({ ...clase, asignadoA: clase.asignadoA || "" }));
-            // --- FIN CAMBIO ---
 
             setClasesPendientes(pendientes);
+            
+            // Asumiendo que /listar devuelve TODOS los datos, los guardamos para el reporte detallado
+            // Nota: Aquí se deberían filtrar por fecha si el endpoint lo permitiera.
+            setIngresosEgresos(data); 
+
         } catch (error) {
             console.error("Error cargando clases:", error);
         } finally {
@@ -63,8 +68,7 @@ const ReporteEstadisticas = () => {
 
             if (response.ok) {
                 alert("¡Asignado correctamente! La tabla se actualizará.");
-                // Recargar solo las clases pendientes
-                fetchClases(); 
+                fetchClases(); // Recargar datos, incluyendo las notificaciones y la lista detallada
             } else {
                 alert("Error al guardar la asignación.");
             }
@@ -83,17 +87,34 @@ const ReporteEstadisticas = () => {
         const { fechaInicio, fechaFin } = fechas;
 
         try {
-            const url = `https://kbnadmin-production.up.railway.app/api/clases/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
-            const response = await fetch(url);
+            // 1. Obtener el Resumen Financiero
+            const urlReporte = `https://kbnadmin-production.up.railway.app/api/clases/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+            const responseReporte = await fetch(urlReporte);
 
-            if (response.ok) {
-                const data = await response.json();
-                setReporte(data);
-            } else if (response.status === 404) {
-                 alert("No se encontraron datos para el rango de fechas seleccionado.");
+            if (responseReporte.ok) {
+                const dataReporte = await responseReporte.json();
+                setReporte(dataReporte);
+            } else if (responseReporte.status === 404) {
+                 alert("No se encontraron datos de resumen para el rango de fechas seleccionado.");
             } else {
-                alert("Error al cargar el reporte.");
+                alert("Error al cargar el resumen del reporte.");
             }
+            
+            // 2. OBTENER EL DETALLE DE TRANSACCIONES (Simulando un listado filtrado por fecha)
+            // Ya que no tenemos el endpoint /listarPorFecha, por ahora listamos todos 
+            // y filtramos localmente (NO RECOMENDADO para grandes volúmenes):
+            
+            const responseListar = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
+            const allData = await responseListar.json();
+            
+            // Filtro local simple basado en el campo 'fecha' (asumiendo formato YYYY-MM-DD)
+            const filteredData = allData.filter(clase => {
+                const claseDate = clase.fecha;
+                return claseDate >= fechaInicio && claseDate <= fechaFin;
+            });
+            setIngresosEgresos(filteredData);
+
+
         } catch (error) {
             console.error("Error en la solicitud:", error);
         } finally {
@@ -102,7 +123,8 @@ const ReporteEstadisticas = () => {
     };
 
     const formatCurrency = (amount) => {
-        return `$${(amount || 0).toFixed(2)}`;
+        // Aseguramos que el monto sea un número para toFixed
+        return `$${(parseFloat(amount) || 0).toFixed(2)}`;
     };
 
     const Card = ({ title, value, color }) => (
@@ -118,30 +140,7 @@ const ReporteEstadisticas = () => {
     const egresosOperacionales = reporte?.totalEgresos || 0; 
     const ingresosNetos = ingresosBrutos - gastosAsociados - egresosOperacionales;
     
-    // --- DATOS PARA GRÁFICOS (SIMULACIÓN) ---
-    const chartData = {
-        labels: ['Ingresos Brutos', 'Egresos Totales', 'Gastos Asociados', 'Saldo Neto'],
-        datasets: [
-            {
-                label: 'Monto ($)',
-                data: [ingresosBrutos, egresosOperacionales, gastosAsociados, ingresosNetos],
-                backgroundColor: [
-                    'rgba(79, 70, 229, 0.7)', // Indigo
-                    'rgba(239, 68, 68, 0.7)',  // Red
-                    'rgba(245, 158, 11, 0.7)', // Orange
-                    'rgba(16, 185, 129, 0.7)', // Green
-                ],
-                borderColor: [
-                    'rgba(79, 70, 229, 1)',
-                    'rgba(239, 68, 68, 1)',
-                    'rgba(245, 158, 11, 1)',
-                    'rgba(16, 185, 129, 1)',
-                ],
-                borderWidth: 1,
-            },
-        ],
-    };
-
+    // ... (chartData sigue igual)
 
     return (
         <div className="max-w-7xl mx-auto mt-10 p-6">
@@ -165,8 +164,9 @@ const ReporteEstadisticas = () => {
                             <thead className="bg-red-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Fecha</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Instructor (Autor)</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actividad / Detalles</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Instructor</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Detalles</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Total</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Asignar Ingreso a</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Acción</th>
@@ -176,9 +176,10 @@ const ReporteEstadisticas = () => {
                                 {clasesPendientes.map(clase => (
                                     <tr key={clase.id} className="hover:bg-yellow-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha || "-"}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">INGRESO</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{clase.instructor || "-"}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad} ({clase.detalles})</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">{formatCurrency(clase.total)}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">{formatCurrency(clase.total)} ({clase.moneda})</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <select 
                                                 value={clase.asignadoA} 
@@ -227,7 +228,7 @@ const ReporteEstadisticas = () => {
                     disabled={loadingReporte}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors"
                 >
-                    {loadingReporte ? 'Cargando...' : 'Generar Reporte'}
+                    {loadingReporte ? 'Generando...' : 'Generar Reporte'}
                 </button>
             </div>
 
@@ -256,17 +257,50 @@ const ReporteEstadisticas = () => {
 
                     <hr className="my-8" />
                     
+                    <h2 className="text-2xl font-bold mb-6 text-gray-800">📄 Detalle de Transacciones</h2>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto Total</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Moneda</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actividad/Detalles</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asignado A</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {ingresosEgresos.length > 0 ? ingresosEgresos.map(clase => (
+                                    <tr key={clase.id} className={clase.tipoTransaccion === 'INGRESO' ? "hover:bg-green-50" : "hover:bg-red-50"}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha}</td>
+                                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${clase.tipoTransaccion === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {clase.tipoTransaccion}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                                            {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.total || clase.gastosAsociados)}`}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{clase.moneda}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad} ({clase.detalles})</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.asignadoA || 'N/A'}</td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="6" className="text-center p-4 text-gray-500">No hay transacciones en el rango de fechas seleccionado.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+
+                    <hr className="my-8" />
+                    
                     {/* --- SECCIÓN DE GRÁFICOS (Implementación simulada) --- */}
                     <h2 className="text-2xl font-bold mb-6 text-gray-800">📈 Gráficos de Estadísticas</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* <div className="bg-white p-6 rounded-lg shadow-md h-96">
-                            <h3 className="text-lg font-semibold mb-4">Resumen de Flujo de Caja</h3>
-                            <Bar data={chartData} options={{ maintainAspectRatio: false }} />
-                        </div>
-                        <div className="bg-white p-6 rounded-lg shadow-md h-96">
-                            <h3 className="text-lg font-semibold mb-4">Distribución de Ingresos</h3>
-                            <Pie data={{ labels: ['Igna', 'Jose', 'Escuela'], datasets: [{ data: [reporte.totalAsignadoIgna, reporte.totalAsignadoJose, ingresosBrutos - reporte.totalAsignadoIgna - reporte.totalAsignadoJose], backgroundColor: ['#3b82f6', '#10b981', '#4f46e5'] }] }} options={{ maintainAspectRatio: false }}/>
-                        </div> */}
+                        {/* [Gráficos] */}
                         <div className="bg-gray-100 p-8 rounded-lg text-center h-64 flex items-center justify-center">
                             [Aquí iría el gráfico de barras de Ingresos vs Egresos]
                         </div>
