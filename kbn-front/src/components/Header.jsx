@@ -11,7 +11,9 @@ export default function Header() {
   const isLoginPage = location.pathname === "/login";
 
   const handleLogout = async () => {
+    // Ejecuta la función de logout del contexto
     await logout();
+    // Redirige a login
     navigate("/login", { replace: true });
   };
 
@@ -54,12 +56,18 @@ export default function Header() {
             <button onClick={() => goTo("/instructor")} className="hover:text-blue-600 transition-colors">Instructor</button>
           )}
 
+          {/* Botón Iniciar sesión si no hay usuario y no estamos en login */}
           {!user && !isLoginPage && (
-            <button onClick={() => goTo("/login")} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Iniciar sesión</button>
+            <button onClick={() => goTo("/login")} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+              Iniciar sesión
+            </button>
           )}
 
+          {/* Botón Cerrar sesión si hay usuario */}
           {user && (
-            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition">Cerrar sesión</button>
+            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition">
+              Cerrar sesión
+            </button>
           )}
         </nav>
       </div>
