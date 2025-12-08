@@ -86,64 +86,71 @@ const InstructorForm = () => {
 
   // --- Envío del formulario ---
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!formData.instructor || formData.instructor.trim() === '') {
-      alert("Por favor, selecciona o ingresa el nombre del instructor.");
-      return;
-    }
+  // --- Validación del instructor ---
+  if (!formData.instructor || formData.instructor.trim() === '') {
+    alert("Por favor, selecciona o ingresa el nombre del instructor.");
+    return;
+  }
 
-    // --- Construir payload base ---
-    let payload = {
-      tipoTransaccion: view,
-      fecha: formData.fecha, // "yyyy-MM-dd", compatible con LocalDate
-      actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
-      descripcionActividad: '', // puedes llenar esto si quieres
-      instructor: formData.instructor,
-      moneda: formData.moneda || 'USD',
-      detalles: formData.detalles || '',
-      cantidadHoras: String(formData.horas || 0),
-      tarifaPorHora: String(formData.tarifa || 0),
-      total: String(formData.total || 0),
-      gastosAsociados: String(formData.gastos || 0),
-      comision: String(formData.comision || 0),
-      formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
-      detalleFormaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : '',
-      vendedor: formData.vendedor || '',
-      asignadoA: '' // si aplica para ADMIN, puedes completarlo
-    };
-
-    // --- Ajustes para EGRESO ---
-    if (view === 'EGRESO') {
-      payload = {
-        ...payload,
-        cantidadHoras: '0',
-        tarifaPorHora: '0',
-        total: '0',
-        comision: '0',
-        actividad: 'Egreso',
-        gastosAsociados: String(formData.gastos || 0)
-      };
-    }
-
-    try {
-      await axios.post(
-        'https://kbnadmin-production.up.railway.app/api/clases/guardar',
-        payload
-      );
-
-      alert(`Registro de ${view} guardado con éxito!`);
-
-      // Reset form conservando instructor y fecha
-      setView('INICIO');
-      setFormData({ ...initialFormData, fecha: formData.fecha, instructor: formData.instructor });
-    } catch (error) {
-      console.error("Error guardando:", error);
-      alert(
-        "Hubo un error al guardar el registro. Por favor revisa que todos los campos obligatorios estén completos."
-      );
-    }
+  // --- Construir payload base ---
+  let payload = {
+    tipoTransaccion: view, // "INGRESO" o "EGRESO"
+    fecha: formData.fecha, // formato "yyyy-MM-dd", compatible con LocalDate
+    actividad: formData.actividad === 'Otro' ? formData.actividadOtro || 'Otro' : formData.actividad,
+    descripcionActividad: formData.descripcionActividad || null,
+    instructor: formData.instructor,
+    moneda: formData.moneda || 'USD',
+    detalles: formData.detalles || null,
+    cantidadHoras: view === 'INGRESO' ? String(formData.horas || 0) : '0',
+    tarifaPorHora: view === 'INGRESO' ? String(formData.tarifa || 0) : '0',
+    total: view === 'INGRESO' ? String(formData.total || 0) : '0',
+    gastosAsociados: String(formData.gastos || 0),
+    comision: String(formData.comision || 0),
+    formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || 'Otro' : formData.formaPago,
+    detalleFormaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || null : null,
+    vendedor: formData.vendedor || null,
+    asignadoA: formData.asignadoA || 'NINGUNO' // Valores válidos: "IGNA", "JOSE", "NINGUNO"
   };
+
+  // --- Ajustes específicos para EGRESO ---
+  if (view === 'EGRESO') {
+    payload = {
+      ...payload,
+      actividad: 'Egreso',
+      cantidadHoras: '0',
+      tarifaPorHora: '0',
+      total: '0',
+      comision: '0',
+      gastosAsociados: String(formData.gastos || 0)
+    };
+  }
+
+  try {
+    // --- Enviar datos al backend ---
+    await axios.post(
+      'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+      payload
+    );
+
+    alert(`Registro de ${view} guardado con éxito!`);
+
+    // --- Reset del formulario conservando instructor y fecha ---
+    setView('INICIO');
+    setFormData({ ...initialFormData, fecha: formData.fecha, instructor: formData.instructor });
+
+  } catch (error) {
+    console.error("Error guardando:", error);
+
+    // --- Mensaje más claro en caso de fallo ---
+    const serverMessage = error.response?.data || '';
+    alert(
+      `Hubo un error al guardar el registro. ${serverMessage ? 'Detalle: ' + serverMessage : 'Por favor revisa que todos los campos obligatorios estén completos.'}`
+    );
+  }
+  };
+
 
   // --- Componente del campo Instructor ---
   const InstructorField = () => {
