@@ -10,7 +10,7 @@ const InstructorForm = () => {
 
   const today = new Date().toISOString().split('T')[0];
 
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     tipoTransaccion: 'INGRESO',
     fecha: today,
     actividad: 'Clases',
@@ -26,9 +26,11 @@ const InstructorForm = () => {
     formaPago: 'Efectivo',
     formaPagoOtro: '',
     moneda: 'USD'
-  });
+  };
 
-  // Cargar instructores para administradores
+  const [formData, setFormData] = useState(initialFormData);
+
+  // --- Cargar instructores para administradores ---
   useEffect(() => {
     const fetchInstructors = async () => {
       setLoadingInstructors(true);
@@ -53,19 +55,23 @@ const InstructorForm = () => {
     }
   }, [user]);
 
-  // Calcular total automáticamente
+  // --- Calcular total automáticamente ---
   useEffect(() => {
     if (view === 'INGRESO') {
-      const totalCalc = (parseFloat(formData.horas) || 0) * (parseFloat(formData.tarifa) || 0) - (parseFloat(formData.gastos) || 0);
+      const totalCalc =
+        (parseFloat(formData.horas) || 0) * (parseFloat(formData.tarifa) || 0) -
+        (parseFloat(formData.gastos) || 0);
       setFormData(prev => ({ ...prev, total: totalCalc >= 0 ? totalCalc : 0 }));
     }
   }, [formData.horas, formData.tarifa, formData.gastos, view]);
 
+  // --- Manejo de cambios en inputs ---
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- Selección de vista INGRESO / EGRESO ---
   const handleSelectView = (type) => {
     setFormData(prev => ({
       ...prev,
@@ -78,6 +84,7 @@ const InstructorForm = () => {
     setView(type);
   };
 
+  // --- Envío del formulario ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -110,23 +117,14 @@ const InstructorForm = () => {
       await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
       alert(`Registro de ${view} guardado con éxito!`);
       setView('INICIO');
-      setFormData(prev => ({
-        ...prev,
-        horas: 0,
-        tarifa: 0,
-        total: 0,
-        gastos: 0,
-        comision: 0,
-        actividadOtro: '',
-        formaPagoOtro: '',
-        fecha: today
-      }));
+      setFormData({ ...initialFormData, fecha: today, instructor: formData.instructor });
     } catch (error) {
       console.error("Error guardando:", error);
       alert("Hubo un error al guardar el registro.");
     }
   };
 
+  // --- Componente del campo Instructor ---
   const InstructorField = () => {
     if (user.role === 'ADMINISTRADOR') {
       return (
@@ -165,11 +163,13 @@ const InstructorForm = () => {
     );
   };
 
-  // Vista INICIO
+  // --- VISTA INICIO ---
   if (view === 'INICIO') {
     return (
       <div className="max-w-xl mx-auto bg-white p-10 rounded-lg shadow-2xl mt-20 text-center">
-        <h2 className="text-3xl font-extrabold mb-8 text-indigo-700">¿Qué operación desea registrar?</h2>
+        <h2 className="text-3xl font-extrabold mb-8 text-indigo-700">
+          ¿Qué operación desea registrar?
+        </h2>
         <div className="flex justify-center space-x-6">
           <button
             onClick={() => handleSelectView('INGRESO')}
@@ -190,17 +190,21 @@ const InstructorForm = () => {
     );
   }
 
-  // Formulario EGRESO
+  // --- FORMULARIO EGRESO ---
   if (view === 'EGRESO') {
     return (
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
-        <button onClick={() => setView('INICIO')} className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center">
+        <button
+          onClick={() => setView('INICIO')}
+          className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center"
+        >
           ← Volver a selección
         </button>
         <h2 className="text-2xl font-bold mb-6 text-red-600">💸 Registro de Egreso</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <InstructorField />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Fecha</label>
@@ -225,6 +229,7 @@ const InstructorForm = () => {
               />
             </div>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">Moneda</label>
             <select
@@ -248,7 +253,7 @@ const InstructorForm = () => {
               onChange={handleChange}
               className="mt-1 block w-full rounded-md border p-2 border-gray-300"
               placeholder="Ej: Compra de chalecos o Pago de lancha"
-            ></textarea>
+            />
           </div>
 
           <div>
@@ -285,10 +290,13 @@ const InstructorForm = () => {
     );
   }
 
-  // Formulario INGRESO
+  // --- FORMULARIO INGRESO ---
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
-      <button onClick={() => setView('INICIO')} className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center">
+      <button
+        onClick={() => setView('INICIO')}
+        className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center"
+      >
         ← Volver a selección
       </button>
       <h2 className="text-2xl font-bold mb-6 text-green-600">💰 Nueva Planilla de Ingreso</h2>
@@ -353,7 +361,7 @@ const InstructorForm = () => {
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border p-2 border-gray-300"
             placeholder="Ej: Clase a José"
-          ></textarea>
+          />
         </div>
 
         {/* Cant. Horas, Tarifa, TOTAL */}
