@@ -36,15 +36,15 @@ public class ClaseRegistro {
     @Column(columnDefinition = "TEXT")
     private String detalles;
 
-    private Double cantidadHoras;
-    private Double tarifaPorHora;
-    private Double total;
+    private String cantidadHoras;     // Antes Double
+    private String tarifaPorHora;     // Antes Double
+    private String total;             // Antes Double
 
     @Column(nullable = false)
     private String moneda; // Valores posibles: "ARS", "CLP", "USD", "BRL", etc.
 
-    private Double gastosAsociados; // Usado para Gastos asociados al Ingreso, o como MONTO total si es EGRESO
-    private Double comision;
+    private String gastosAsociados;   // Antes Double
+    private String comision;          // Antes Double
 
     private String formaPago;
     private String detalleFormaPago;

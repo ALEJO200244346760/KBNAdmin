@@ -13,28 +13,28 @@ import java.util.Optional;
 @Repository
 public interface ClaseRepository extends JpaRepository<ClaseRegistro, Long> {
 
-    // Método para listar (ejemplo, se puede mejorar con paginación)
+    // Método para listar todos los registros ordenados por fecha descendente
     List<ClaseRegistro> findAllByOrderByFechaDesc();
 
     // Consulta CORREGIDA para separar Ingresos y Egresos
     @Query(value = "SELECT " +
             // 1. Total Ingresos Brutos (SOLO suma el 'total' de los INGRESO)
-            "SUM(CASE WHEN c.tipo_transaccion = 'INGRESO' THEN c.total ELSE 0 END) AS totalIngresosBrutos, " +
+            "SUM(CAST(CASE WHEN c.tipo_transaccion = 'INGRESO' THEN c.total ELSE '0' END AS DECIMAL)) AS totalIngresosBrutos, " +
 
             // 2. Gastos Asociados a Ingresos (SOLO suma 'gastos_asociados' de los INGRESO)
-            "SUM(CASE WHEN c.tipo_transaccion = 'INGRESO' THEN c.gastos_asociados ELSE 0 END) AS totalGastos, " +
+            "SUM(CAST(CASE WHEN c.tipo_transaccion = 'INGRESO' THEN c.gastos_asociados ELSE '0' END AS DECIMAL)) AS totalGastos, " +
 
             // 3. Suma total de Egresos (Suma 'gastos_asociados' de los EGRESO)
-            "SUM(CASE WHEN c.tipo_transaccion = 'EGRESO' THEN c.gastos_asociados ELSE 0 END) AS totalEgresos, " +
+            "SUM(CAST(CASE WHEN c.tipo_transaccion = 'EGRESO' THEN c.gastos_asociados ELSE '0' END AS DECIMAL)) AS totalEgresos, " +
 
             // 4. Comisiones (SOLO suma 'comision' de los INGRESO)
-            "SUM(CASE WHEN c.tipo_transaccion = 'INGRESO' THEN c.comision ELSE 0 END) AS totalComisiones, " +
+            "SUM(CAST(CASE WHEN c.tipo_transaccion = 'INGRESO' THEN c.comision ELSE '0' END AS DECIMAL)) AS totalComisiones, " +
 
             // 5. Asignado Igna (SOLO suma 'total' de los INGRESO asignados a IGNA)
-            "SUM(CASE WHEN c.tipo_transaccion = 'INGRESO' AND c.asignado_a = 'IGNA' THEN c.total ELSE 0 END) AS totalAsignadoIgna, " +
+            "SUM(CAST(CASE WHEN c.tipo_transaccion = 'INGRESO' AND c.asignado_a = 'IGNA' THEN c.total ELSE '0' END AS DECIMAL)) AS totalAsignadoIgna, " +
 
             // 6. Asignado Jose (SOLO suma 'total' de los INGRESO asignados a JOSE)
-            "SUM(CASE WHEN c.tipo_transaccion = 'INGRESO' AND c.asignado_a = 'JOSE' THEN c.total ELSE 0 END) AS totalAsignadoJose " +
+            "SUM(CAST(CASE WHEN c.tipo_transaccion = 'INGRESO' AND c.asignado_a = 'JOSE' THEN c.total ELSE '0' END AS DECIMAL)) AS totalAsignadoJose " +
 
             "FROM clases_registros c " +
             "WHERE c.fecha BETWEEN :fechaInicio AND :fechaFin",
