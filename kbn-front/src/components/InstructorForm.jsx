@@ -88,34 +88,31 @@ const InstructorForm = () => {
   const handleSubmit = async (e) => {
   e.preventDefault();
 
+  // Validación mínima
   if (!formData.instructor || formData.instructor.trim() === '') {
     alert("Por favor, selecciona o ingresa el nombre del instructor.");
     return;
   }
 
-  // Convertir todos los campos numéricos a número y campos opcionales a string vacío
+  // Construir payload: TODO como string
   const payload = {
-    tipoTransaccion: view,
-    fecha: formData.fecha,
-    actividad: formData.actividad === 'Otro' ? formData.actividadOtro || 'Otro' : formData.actividad,
-    descripcionActividad: formData.descripcionActividad || '',
-    instructor: formData.instructor,
-    moneda: formData.moneda || 'USD',
-    detalles: formData.detalles || '',
-    cantidadHoras: view === 'EGRESO' ? 0 : Number(formData.horas || 0),
-    tarifaPorHora: view === 'EGRESO' ? 0 : Number(formData.tarifa || 0),
-    total: view === 'EGRESO' ? 0 : Number(formData.total || 0),
-    gastosAsociados: Number(formData.gastos || 0),
-    comision: Number(formData.comision || 0),
-    formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || 'Otro' : formData.formaPago,
-    detalleFormaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro || '' : '',
-    vendedor: formData.vendedor || '',
-    asignadoA: formData.asignadoA || ''
+    tipoTransaccion: String(view),
+    fecha: String(formData.fecha || ''), // TODO como string
+    actividad: String(formData.actividad === 'Otro' ? (formData.actividadOtro || 'Otro') : formData.actividad),
+    descripcionActividad: String(formData.descripcionActividad || ''),
+    instructor: String(formData.instructor),
+    moneda: String(formData.moneda || 'USD'),
+    detalles: String(formData.detalles || ''),
+    cantidadHoras: String(view === 'EGRESO' ? '0' : formData.horas || '0'),
+    tarifaPorHora: String(view === 'EGRESO' ? '0' : formData.tarifa || '0'),
+    total: String(view === 'EGRESO' ? '0' : formData.total || '0'),
+    gastosAsociados: String(formData.gastos || '0'),
+    comision: String(formData.comision || '0'),
+    formaPago: String(formData.formaPago === 'Otro' ? (formData.formaPagoOtro || 'Otro') : formData.formaPago),
+    detalleFormaPago: String(formData.formaPago === 'Otro' ? (formData.formaPagoOtro || '') : ''),
+    vendedor: String(formData.vendedor || ''),
+    asignadoA: String(formData.asignadoA || '')
   };
-
-  if (view === 'EGRESO') {
-    payload.actividad = 'Egreso';
-  }
 
   try {
     await axios.post(
@@ -124,6 +121,8 @@ const InstructorForm = () => {
     );
 
     alert(`Registro de ${view} guardado con éxito!`);
+
+    // Reset form conservando instructor y fecha
     setView('INICIO');
     setFormData({ ...initialFormData, fecha: formData.fecha, instructor: formData.instructor });
 
@@ -134,7 +133,8 @@ const InstructorForm = () => {
       `Hubo un error al guardar el registro. ${serverMessage ? 'Detalle: ' + serverMessage : 'Revisa los campos obligatorios.'}`
     );
   }
-  };
+};
+
 
   // --- Componente del campo Instructor ---
   const InstructorField = () => {

@@ -20,7 +20,7 @@ public class ClaseRegistro {
     // --- CAMPOS QUE RELLENA EL INSTRUCTOR ---
 
     @Column(nullable = false)
-    private LocalDate fecha;
+    private String fecha;
 
     @Column(nullable = false)
     private String actividad;
