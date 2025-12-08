@@ -3,10 +3,10 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 const InstructorForm = () => {
-  const { user } = useAuth(); // Usuario logueado real
+  const { user } = useAuth(); // Usuario logueado
   const [view, setView] = useState('INICIO');
-
-  const availableInstructors = ['Igna', 'Jose', 'Otro Instructor']; // Lista real para admin
+  const [availableInstructors, setAvailableInstructors] = useState([]);
+  const [loadingInstructors, setLoadingInstructors] = useState(false);
 
   const [formData, setFormData] = useState({
     tipoTransaccion: 'INGRESO',
@@ -26,12 +26,29 @@ const InstructorForm = () => {
     moneda: 'USD'
   });
 
-  // Asignar instructor según rol del usuario
+  // Cargar instructores desde backend si es ADMIN
   useEffect(() => {
-    if (user.role === 'INSTRUCTOR') {
+    const fetchInstructors = async () => {
+      setLoadingInstructors(true);
+      try {
+        const res = await axios.get('https://kbnadmin-production.up.railway.app/api/usuario');
+        const names = res.data.map(u => `${u.nombre} ${u.apellido}`);
+        setAvailableInstructors(names);
+
+        if (names.length > 0 && user.role === 'ADMINISTRADOR') {
+          setFormData(prev => ({ ...prev, instructor: names[0] }));
+        }
+      } catch (err) {
+        console.error('Error fetching instructors:', err);
+      } finally {
+        setLoadingInstructors(false);
+      }
+    };
+
+    if (user.role === 'ADMINISTRADOR') {
+      fetchInstructors();
+    } else if (user.role === 'INSTRUCTOR') {
       setFormData(prev => ({ ...prev, instructor: `${user.nombre} ${user.apellido}` }));
-    } else if (user.role === 'ADMIN' && availableInstructors.length > 0) {
-      setFormData(prev => ({ ...prev, instructor: availableInstructors[0] }));
     }
   }, [user]);
 
@@ -97,7 +114,9 @@ const InstructorForm = () => {
         tarifa: 0,
         total: 0,
         gastos: 0,
-        comision: 0
+        comision: 0,
+        actividadOtro: '',
+        formaPagoOtro: ''
       }));
     } catch (error) {
       console.error("Error guardando:", error);
@@ -105,23 +124,26 @@ const InstructorForm = () => {
     }
   };
 
-  // Campo de instructor dinámico
   const InstructorField = () => {
-    if (user.role === 'ADMIN') {
+    if (user.role === 'ADMINISTRADOR') {
       return (
         <div>
           <label className="block text-sm font-bold text-gray-700">Instructor (Realizó la Operación)</label>
-          <select
-            name="instructor"
-            value={formData.instructor}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border p-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          >
-            <option value="">-- Seleccionar Instructor --</option>
-            {availableInstructors.map((name, index) => (
-              <option key={index} value={name}>{name}</option>
-            ))}
-          </select>
+          {loadingInstructors ? (
+            <p>Cargando instructores...</p>
+          ) : (
+            <select
+              name="instructor"
+              value={formData.instructor}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            >
+              <option value="">-- Seleccionar Instructor --</option>
+              {availableInstructors.map((name, index) => (
+                <option key={index} value={name}>{name}</option>
+              ))}
+            </select>
+          )}
         </div>
       );
     }
@@ -262,7 +284,7 @@ const InstructorForm = () => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Detalles</label>
-          <textarea name="detalles" rows="2" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" placeholder="Ej: Clase a Santa Teresa"></textarea>
+          <textarea name="detalles" rows="2" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" placeholder="Ej: Clase a José"></textarea>
         </div>
 
         <div className="grid grid-cols-3 gap-4 bg-green-50 p-4 rounded-md">
