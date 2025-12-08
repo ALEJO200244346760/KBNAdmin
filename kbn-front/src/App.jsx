@@ -18,7 +18,6 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   if (!user?.role) return <Navigate to="/login" replace />;
 
   if (!allowedRoles.includes(user.role)) {
-    // Redirige según rol
     switch (user.role) {
       case 'ADMINISTRADOR':
         return <Navigate to="/admin" replace />;
@@ -38,7 +37,6 @@ const HomeRedirect = () => {
   const { user, loading } = useAuth();
 
   if (loading) return <div className="p-10 text-center">Cargando sesión...</div>;
-
   if (!user?.role) return <Navigate to="/login" replace />;
 
   switch (user.role) {
@@ -56,11 +54,8 @@ function App() {
   return (
     <AuthProvider>
       <HashRouter>
-        {/* HEADER SIEMPRE VISIBLE */}
         <Header />
-
-        {/* CONTENIDO */}
-        <div className="pt-16">{/* espacio para header fijo */}
+        <div className="pt-16">
           <Routes>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<Login />} />
@@ -75,7 +70,6 @@ function App() {
                 </PrivateRoute>
               }
             />
-
             <Route
               path="/reportes"
               element={
