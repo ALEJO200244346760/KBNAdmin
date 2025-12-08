@@ -25,24 +25,23 @@ const ReporteEstadisticas = () => {
         fetchClases();
     }, []);
 
+    // ReporteEstadisticas.jsx
     const fetchClases = async () => {
         setLoadingClases(true);
         try {
             const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const data = await response.json();
             
-            // Lógica de filtrado para PENDIENTES (Ingreso y asignadoA es null o cadena vacía)
+            // --- FILTRO ACTUALIZADO PARA INCLUIR "NINGUNO" ---
             const pendientes = data
                 .filter(clase => 
                     clase.tipoTransaccion === 'INGRESO' && 
-                    (!clase.asignadoA || clase.asignadoA.trim() === '')
+                    (!clase.asignadoA || clase.asignadoA.trim() === '' || clase.asignadoA.toUpperCase() === 'NINGUNO')
                 )
                 .map(clase => ({ ...clase, asignadoA: clase.asignadoA || "" }));
+            // --- FIN FILTRO ACTUALIZADO ---
 
             setClasesPendientes(pendientes);
-            
-            // Asumiendo que /listar devuelve TODOS los datos, los guardamos para el reporte detallado
-            // Nota: Aquí se deberían filtrar por fecha si el endpoint lo permitiera.
             setIngresosEgresos(data); 
 
         } catch (error) {
