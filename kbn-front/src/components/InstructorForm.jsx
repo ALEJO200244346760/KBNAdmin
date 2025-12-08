@@ -1,42 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; 
-// import { useAuth } from '../context/AuthContext'; // Descomentar en la implementación final
+import axios from 'axios';
+// import { useAuth } from '../context/AuthContext'; // Descomentar en implementación real
 
 const InstructorForm = () => {
   // SIMULACIÓN DE DATOS DE USUARIO LOGUEADO Y LISTA DE INSTRUCTORES
-  // En la implementación real, usa un hook de contexto (ej: useAuth) para obtener el rol y el nombre.
-  const userRole = 'ADMIN'; // Establecer 'ADMIN' o 'INSTRUCTOR' para probar el flujo.
-  const currentUsername = 'Admin Master'; 
+  const userRole = 'ADMIN'; // 'ADMIN' o 'INSTRUCTOR' para pruebas
+  const currentUsername = 'Admin Master';
   const availableInstructors = ['Instructor Logueado', 'Igna', 'Jose', 'Otro Instructor'];
   // FIN SIMULACIÓN
 
-  const [view, setView] = useState('INICIO'); 
-  
+  const [view, setView] = useState('INICIO');
+
   const [formData, setFormData] = useState({
-    tipoTransaccion: 'INGRESO', 
+    tipoTransaccion: 'INGRESO',
     fecha: new Date().toISOString().split('T')[0],
     actividad: 'Clases',
     actividadOtro: '',
     vendedor: '',
-    instructor: '', 
+    instructor: '',
     detalles: '',
     horas: 0,
     tarifa: 0,
     total: 0,
-    gastos: 0, 
+    gastos: 0,
     comision: 0,
     formaPago: 'Efectivo',
-    formaPagoOtro: ''
+    formaPagoOtro: '',
+    moneda: 'ARS'
   });
 
+  // Asignar instructor según rol
   useEffect(() => {
     if (userRole === 'INSTRUCTOR') {
-        setFormData(prev => ({...prev, instructor: currentUsername}));
+      setFormData(prev => ({ ...prev, instructor: currentUsername }));
     } else if (userRole === 'ADMIN' && availableInstructors.length > 0) {
-        setFormData(prev => ({...prev, instructor: availableInstructors[0]}));
+      setFormData(prev => ({ ...prev, instructor: availableInstructors[0] }));
     }
   }, [userRole, currentUsername, availableInstructors]);
 
+  // Calcular total automáticamente al cambiar horas o tarifa
   useEffect(() => {
     if (view === 'INGRESO') {
       const totalCalc = (parseFloat(formData.horas) || 0) * (parseFloat(formData.tarifa) || 0);
@@ -46,102 +48,99 @@ const InstructorForm = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleSelectView = (type) => {
-      setFormData(prev => ({ 
-          ...prev, 
-          tipoTransaccion: type,
-          horas: type === 'EGRESO' ? 0 : prev.horas, 
-          tarifa: type === 'EGRESO' ? 0 : prev.tarifa,
-          total: type === 'EGRESO' ? 0 : prev.total,
-          gastos: type === 'INGRESO' ? 0 : prev.gastos 
-      }));
-      setView(type);
-  }
+    setFormData(prev => ({
+      ...prev,
+      tipoTransaccion: type,
+      horas: type === 'EGRESO' ? 0 : prev.horas,
+      tarifa: type === 'EGRESO' ? 0 : prev.tarifa,
+      total: type === 'EGRESO' ? 0 : prev.total,
+      gastos: type === 'INGRESO' ? 0 : prev.gastos
+    }));
+    setView(type);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     // Validación básica: instructor obligatorio
     if (!formData.instructor || formData.instructor.trim() === '') {
-        alert("Por favor, selecciona o ingresa el nombre del instructor.");
-        return;
+      alert("Por favor, selecciona o ingresa el nombre del instructor.");
+      return;
     }
 
-    // Construcción del payload a enviar al backend
+    // Preparar payload
     let payload = {
-        ...formData,
-        tipoTransaccion: view, // Asegura que sea INGRESO o EGRESO
-        // Para egresos, limpiamos campos de ingreso
-        ...(view === 'EGRESO' && {
-            horas: 0,
-            tarifa: 0,
-            total: 0,
-            comision: 0,
-            actividad: 'Egreso'
-        }),
-        // Si la actividad o forma de pago es "Otro", usamos el valor especificado por el usuario
-        actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
-        formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
-        moneda: formData.moneda || 'ARS' // Default: Pesos Argentinos si no se selecciona
+      ...formData,
+      tipoTransaccion: view,
+      actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
+      formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
     };
 
-    // Para EGRESOS, asignamos el monto de gastosAsociados
+    // Ajustes específicos para EGRESO
     if (view === 'EGRESO') {
-        payload.gastosAsociados = parseFloat(formData.gastos) || 0;
+      payload = {
+        ...payload,
+        horas: 0,
+        tarifa: 0,
+        total: 0,
+        comision: 0,
+        actividad: 'Egreso',
+        gastosAsociados: parseFloat(formData.gastos) || 0
+      };
     }
-
-    console.log(`Enviando ${view} al backend:`, payload);
 
     try {
-        const response = await axios.post(
-            'https://kbnadmin-production.up.railway.app/api/clases/guardar',
-            payload
-        );
-        alert(`Registro de ${view} guardado con éxito!`);
-        setView('INICIO'); // Volver a la pantalla de inicio
+      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
+      alert(`Registro de ${view} guardado con éxito!`);
+      setView('INICIO');
+      // Reset opcional de formData
+      setFormData(prev => ({ ...prev, horas: 0, tarifa: 0, total: 0, gastos: 0, comision: 0 }));
     } catch (error) {
-        console.error("Error guardando:", error);
-        alert("Hubo un error al guardar el registro.");
+      console.error("Error guardando:", error);
+      alert("Hubo un error al guardar el registro.");
     }
-};
+  };
 
+  // Campo de instructor dinámico según rol
   const InstructorField = () => {
     if (userRole === 'ADMIN') {
-        return (
-            <div>
-                <label className="block text-sm font-bold text-gray-700">Instructor (Realizó la Operación)</label>
-                <select 
-                    name="instructor" 
-                    value={formData.instructor} 
-                    onChange={handleChange} 
-                    className="mt-1 block w-full rounded-md border p-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                    <option value="">-- Seleccionar Instructor --</option>
-                    {availableInstructors.map((name, index) => (
-                        <option key={index} value={name}>{name}</option>
-                    ))}
-                </select>
-            </div>
-        );
-    }
-    
-    return (
+      return (
         <div>
-            <label className="block text-sm font-medium text-gray-700">Instructor</label>
-            <input 
-                type="text" 
-                name="instructor" 
-                value={formData.instructor} 
-                readOnly 
-                className="mt-1 block w-full rounded-md border p-2 bg-gray-100 text-gray-500 cursor-not-allowed" 
-            />
+          <label className="block text-sm font-bold text-gray-700">Instructor (Realizó la Operación)</label>
+          <select
+            name="instructor"
+            value={formData.instructor}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border p-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="">-- Seleccionar Instructor --</option>
+            {availableInstructors.map((name, index) => (
+              <option key={index} value={name}>{name}</option>
+            ))}
+          </select>
         </div>
+      );
+    }
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Instructor</label>
+        <input
+          type="text"
+          name="instructor"
+          value={formData.instructor}
+          readOnly
+          className="mt-1 block w-full rounded-md border p-2 bg-gray-100 text-gray-500 cursor-not-allowed"
+        />
+      </div>
     );
   };
 
+  // Vista de selección inicial
   if (view === 'INICIO') {
     return (
       <div className="max-w-xl mx-auto bg-white p-10 rounded-lg shadow-2xl mt-20 text-center">
@@ -166,82 +165,76 @@ const InstructorForm = () => {
     );
   }
 
+  // Vista EGRESO
   if (view === 'EGRESO') {
     return (
-        <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
-            <button onClick={() => setView('INICIO')} className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center">
-                ← Volver a selección
-            </button>
-            <h2 className="text-2xl font-bold mb-6 text-red-600">💸 Registro de Egreso</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-                
-                <InstructorField />
+      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
+        <button onClick={() => setView('INICIO')} className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center">
+          ← Volver a selección
+        </button>
+        <h2 className="text-2xl font-bold mb-6 text-red-600">💸 Registro de Egreso</h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Fecha</label>
-                      <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700">Monto del Egreso</label>
-                        <input 
-                            type="number" 
-                            name="gastos" 
-                            value={formData.gastos}
-                            onChange={handleChange} 
-                            className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-red-600 font-bold" 
-                            placeholder="Monto a descontar"
-                        />
-                    </div>
-                </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <InstructorField />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Concepto / Detalles</label>
-                  <textarea name="detalles" rows="3" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" placeholder="Ej: Compra de chalecos o Pago de lancha"></textarea>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Fecha</label>
+              <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700">Monto del Egreso</label>
+              <input
+                type="number"
+                name="gastos"
+                value={formData.gastos}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-red-600 font-bold"
+                placeholder="Monto a descontar"
+              />
+            </div>
+          </div>
 
-                <div>
-                   <label className="block text-sm font-medium text-gray-700">Forma de Pago</label>
-                   <select name="formaPago" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
-                     <option value="Efectivo">Efectivo</option>
-                     <option value="Transferencia">Transferencia</option>
-                     <option value="USD">USD</option>
-                     <option value="Otro">Otro...</option>
-                   </select>
-                   {formData.formaPago === 'Otro' && (
-                     <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
-                   )}
-                </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Concepto / Detalles</label>
+            <textarea name="detalles" rows="3" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" placeholder="Ej: Compra de chalecos o Pago de lancha"></textarea>
+          </div>
 
-                <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
-                  Registrar Egreso
-                </button>
-            </form>
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Forma de Pago</label>
+            <select name="formaPago" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+              <option value="Efectivo">Efectivo</option>
+              <option value="Transferencia">Transferencia</option>
+              <option value="USD">USD</option>
+              <option value="Otro">Otro...</option>
+            </select>
+            {formData.formaPago === 'Otro' && (
+              <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
+            )}
+          </div>
+
+          <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+            Registrar Egreso
+          </button>
+        </form>
+      </div>
     );
   }
 
+  // Vista INGRESO
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
       <button onClick={() => setView('INICIO')} className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center">
         ← Volver a selección
       </button>
       <h2 className="text-2xl font-bold mb-6 text-green-600">💰 Nueva Planilla de Ingreso</h2>
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        
         <InstructorField />
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Fecha</label>
-          <input 
-            type="date" 
-            name="fecha" 
-            value={formData.fecha} 
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2"
-          />
+          <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -263,8 +256,8 @@ const InstructorForm = () => {
         </div>
 
         <div>
-            <label className="block text-sm font-medium text-gray-700">Vendedor (Opcional)</label>
-            <input type="text" name="vendedor" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" />
+          <label className="block text-sm font-medium text-gray-700">Vendedor (Opcional)</label>
+          <input type="text" name="vendedor" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" />
         </div>
 
         <div>
@@ -285,15 +278,6 @@ const InstructorForm = () => {
             <label className="block text-sm font-bold text-green-800">TOTAL</label>
             <input type="number" value={formData.total} readOnly className="mt-1 block w-full rounded-md border p-2 bg-white font-bold text-green-600" />
           </div>
-          <div>
-          <label className="block text-sm font-medium text-gray-700">Moneda</label>
-          <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
-            <option value="ARS">Pesos Argentinos (ARS)</option>
-            <option value="CLP">Pesos Chilenos (CLP)</option>
-            <option value="BRL">Reales Brasileños (BRL)</option>
-            <option value="USD">Dólares (USD)</option>
-          </select>
-        </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -308,23 +292,32 @@ const InstructorForm = () => {
         </div>
 
         <div>
-           <label className="block text-sm font-medium text-gray-700">Forma de Pago</label>
-           <select name="formaPago" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
-             <option value="Efectivo">Efectivo</option>
-             <option value="MercadoPago">MercadoPago</option>
-             <option value="Transferencia">Transferencia</option>
-             <option value="USD">USD</option>
-             <option value="Otro">Otro...</option>
-           </select>
-           {formData.formaPago === 'Otro' && (
-             <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
-           )}
+          <label className="block text-sm font-medium text-gray-700">Forma de Pago</label>
+          <select name="formaPago" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+            <option value="Efectivo">Efectivo</option>
+            <option value="MercadoPago">MercadoPago</option>
+            <option value="Transferencia">Transferencia</option>
+            <option value="USD">USD</option>
+            <option value="Otro">Otro...</option>
+          </select>
+          {formData.formaPago === 'Otro' && (
+            <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Moneda</label>
+          <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+            <option value="BRL">Reales Brasileños (BRL)</option>
+            <option value="USD">Dólares (USD)</option>
+            <option value="ARS">Pesos Argentinos (ARS)</option>
+            <option value="CLP">Pesos Chilenos (CLP)</option>
+          </select>
         </div>
 
         <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
           Guardar Ingreso
         </button>
-
       </form>
     </div>
   );
