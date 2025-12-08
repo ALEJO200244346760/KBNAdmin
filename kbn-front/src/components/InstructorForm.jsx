@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-// import { useAuth } from '../context/AuthContext'; // Descomentar en implementación real
+import { useAuth } from '../context/AuthContext';
 
 const InstructorForm = () => {
-  // SIMULACIÓN DE DATOS DE USUARIO LOGUEADO Y LISTA DE INSTRUCTORES
-  const userRole = 'ADMIN'; // 'ADMIN' o 'INSTRUCTOR' para pruebas
-  const currentUsername = 'Admin Master';
-  const availableInstructors = ['Instructor Logueado', 'Igna', 'Jose', 'Otro Instructor'];
-  // FIN SIMULACIÓN
-
+  const { user } = useAuth(); // Usuario logueado real
   const [view, setView] = useState('INICIO');
+
+  const availableInstructors = ['Igna', 'Jose', 'Otro Instructor']; // Lista real para admin
 
   const [formData, setFormData] = useState({
     tipoTransaccion: 'INGRESO',
@@ -26,17 +23,17 @@ const InstructorForm = () => {
     comision: 0,
     formaPago: 'Efectivo',
     formaPagoOtro: '',
-    moneda: 'ARS'
+    moneda: 'USD'
   });
 
-  // Asignar instructor según rol
+  // Asignar instructor según rol del usuario
   useEffect(() => {
-    if (userRole === 'INSTRUCTOR') {
-      setFormData(prev => ({ ...prev, instructor: currentUsername }));
-    } else if (userRole === 'ADMIN' && availableInstructors.length > 0) {
+    if (user.role === 'INSTRUCTOR') {
+      setFormData(prev => ({ ...prev, instructor: `${user.nombre} ${user.apellido}` }));
+    } else if (user.role === 'ADMIN' && availableInstructors.length > 0) {
       setFormData(prev => ({ ...prev, instructor: availableInstructors[0] }));
     }
-  }, [userRole, currentUsername, availableInstructors]);
+  }, [user]);
 
   // Calcular total automáticamente al cambiar horas o tarifa
   useEffect(() => {
@@ -66,13 +63,11 @@ const InstructorForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validación básica: instructor obligatorio
     if (!formData.instructor || formData.instructor.trim() === '') {
       alert("Por favor, selecciona o ingresa el nombre del instructor.");
       return;
     }
 
-    // Preparar payload
     let payload = {
       ...formData,
       tipoTransaccion: view,
@@ -80,7 +75,6 @@ const InstructorForm = () => {
       formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
     };
 
-    // Ajustes específicos para EGRESO
     if (view === 'EGRESO') {
       payload = {
         ...payload,
@@ -97,17 +91,23 @@ const InstructorForm = () => {
       await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
       alert(`Registro de ${view} guardado con éxito!`);
       setView('INICIO');
-      // Reset opcional de formData
-      setFormData(prev => ({ ...prev, horas: 0, tarifa: 0, total: 0, gastos: 0, comision: 0 }));
+      setFormData(prev => ({
+        ...prev,
+        horas: 0,
+        tarifa: 0,
+        total: 0,
+        gastos: 0,
+        comision: 0
+      }));
     } catch (error) {
       console.error("Error guardando:", error);
       alert("Hubo un error al guardar el registro.");
     }
   };
 
-  // Campo de instructor dinámico según rol
+  // Campo de instructor dinámico
   const InstructorField = () => {
-    if (userRole === 'ADMIN') {
+    if (user.role === 'ADMIN') {
       return (
         <div>
           <label className="block text-sm font-bold text-gray-700">Instructor (Realizó la Operación)</label>
@@ -140,7 +140,7 @@ const InstructorForm = () => {
     );
   };
 
-  // Vista de selección inicial
+  // Vista inicial
   if (view === 'INICIO') {
     return (
       <div className="max-w-xl mx-auto bg-white p-10 rounded-lg shadow-2xl mt-20 text-center">
@@ -165,7 +165,7 @@ const InstructorForm = () => {
     );
   }
 
-  // Vista EGRESO
+  // Formulario EGRESO
   if (view === 'EGRESO') {
     return (
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
@@ -221,7 +221,7 @@ const InstructorForm = () => {
     );
   }
 
-  // Vista INGRESO
+  // Formulario INGRESO
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
       <button onClick={() => setView('INICIO')} className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center">
@@ -261,8 +261,8 @@ const InstructorForm = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Detalles (Ej: Clase a Santa Teresa)</label>
-          <textarea name="detalles" rows="2" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300"></textarea>
+          <label className="block text-sm font-medium text-gray-700">Detalles</label>
+          <textarea name="detalles" rows="2" onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300" placeholder="Ej: Clase a Santa Teresa"></textarea>
         </div>
 
         <div className="grid grid-cols-3 gap-4 bg-green-50 p-4 rounded-md">
@@ -315,7 +315,7 @@ const InstructorForm = () => {
           </select>
         </div>
 
-        <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+        <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
           Guardar Ingreso
         </button>
       </form>
