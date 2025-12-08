@@ -31,7 +31,7 @@ const InstructorForm = () => {
     const fetchInstructors = async () => {
       setLoadingInstructors(true);
       try {
-        const res = await axios.get('https://kbnadmin-production.up.railway.app/api/usuario');
+        const res = await axios.get('https://kbnadmin-production.up.railway.app/usuario');
         const names = res.data.map(u => `${u.nombre} ${u.apellido}`);
         setAvailableInstructors(names);
 
