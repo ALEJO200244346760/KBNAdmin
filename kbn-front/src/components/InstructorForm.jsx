@@ -85,11 +85,13 @@ const InstructorForm = () => {
       return;
     }
 
+    // Construir payload
     let payload = {
       ...formData,
       tipoTransaccion: view,
       actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
       formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
+      detalleFormaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : ''
     };
 
     if (view === 'EGRESO') {
@@ -233,6 +235,16 @@ const InstructorForm = () => {
             {formData.formaPago === 'Otro' && (
               <input type="text" placeholder="Detalle forma de pago" name="formaPagoOtro" onChange={handleChange} className="mt-2 block w-full rounded-md border p-2 border-gray-300" />
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Moneda</label>
+            <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+              <option value="BRL">Reales Brasileños (BRL)</option>
+              <option value="USD">Dólares (USD)</option>
+              <option value="ARS">Pesos Argentinos (ARS)</option>
+              <option value="CLP">Pesos Chilenos (CLP)</option>
+            </select>
           </div>
 
           <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
