@@ -40,6 +40,9 @@ public class ClaseRegistro {
     private Double tarifaPorHora;
     private Double total;
 
+    @Column(nullable = false)
+    private String moneda; // Valores posibles: "ARS", "CLP", "USD", "BRL", etc.
+
     private Double gastosAsociados; // Usado para Gastos asociados al Ingreso, o como MONTO total si es EGRESO
     private Double comision;
 

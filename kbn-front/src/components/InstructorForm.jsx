@@ -63,43 +63,50 @@ const InstructorForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    // Validación básica: instructor obligatorio
     if (!formData.instructor || formData.instructor.trim() === '') {
         alert("Por favor, selecciona o ingresa el nombre del instructor.");
         return;
     }
-    
+
+    // Construcción del payload a enviar al backend
     let payload = {
         ...formData,
-        tipoTransaccion: view, // Aseguramos el tipo
-        // Para egresos, limpiamos campos de ingreso.
-        ...(view === 'EGRESO' && { 
-            horas: 0, 
-            tarifa: 0, 
-            total: 0, 
-            comision: 0, 
-            actividad: 'Egreso' 
-        }), 
-        
+        tipoTransaccion: view, // Asegura que sea INGRESO o EGRESO
+        // Para egresos, limpiamos campos de ingreso
+        ...(view === 'EGRESO' && {
+            horas: 0,
+            tarifa: 0,
+            total: 0,
+            comision: 0,
+            actividad: 'Egreso'
+        }),
+        // Si la actividad o forma de pago es "Otro", usamos el valor especificado por el usuario
         actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
-        formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago
+        formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
+        moneda: formData.moneda || 'ARS' // Default: Pesos Argentinos si no se selecciona
     };
-    
+
+    // Para EGRESOS, asignamos el monto de gastosAsociados
     if (view === 'EGRESO') {
-        payload.gastosAsociados = parseFloat(formData.gastos) || 0; 
+        payload.gastosAsociados = parseFloat(formData.gastos) || 0;
     }
-    
+
     console.log(`Enviando ${view} al backend:`, payload);
-    
+
     try {
-        const response = await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
+        const response = await axios.post(
+            'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+            payload
+        );
         alert(`Registro de ${view} guardado con éxito!`);
-        setView('INICIO'); 
+        setView('INICIO'); // Volver a la pantalla de inicio
     } catch (error) {
         console.error("Error guardando:", error);
         alert("Hubo un error al guardar el registro.");
     }
-  };
+};
 
   const InstructorField = () => {
     if (userRole === 'ADMIN') {
@@ -278,6 +285,15 @@ const InstructorForm = () => {
             <label className="block text-sm font-bold text-green-800">TOTAL</label>
             <input type="number" value={formData.total} readOnly className="mt-1 block w-full rounded-md border p-2 bg-white font-bold text-green-600" />
           </div>
+          <div>
+          <label className="block text-sm font-medium text-gray-700">Moneda</label>
+          <select name="moneda" value={formData.moneda} onChange={handleChange} className="mt-1 block w-full rounded-md border p-2 border-gray-300">
+            <option value="ARS">Pesos Argentinos (ARS)</option>
+            <option value="CLP">Pesos Chilenos (CLP)</option>
+            <option value="BRL">Reales Brasileños (BRL)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
+        </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
