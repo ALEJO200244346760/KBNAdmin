@@ -1,113 +1,142 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 // import { useAuth } from '../context/AuthContext'; // Descomentar en la implementación final
 
 const AdminDashboard = () => {
-  // const { user } = useAuth(); // Descomentar y usar para obtener el token/usuario
-  const [clases, setClases] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // if (!user) return <div className="p-10 text-center">Cargando sesión...</div>;
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchClases();
+    fetchData();
   }, []);
 
-  const fetchClases = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
-      const data = await response.json();
-      setClases(data.map(clase => ({ ...clase, asignadoA: clase.asignadoA || "" })));
-    } catch (error) {
-      console.error("Error cargando clases:", error);
+      // Endpoint para listar todos los usuarios
+      const usersResponse = await axios.get('https://kbnadmin-production.up.railway.app/usuario');
+      setUsuarios(usersResponse.data);
+      
+      // Endpoint para listar todos los roles (necesario para la edición)
+      const rolesResponse = await axios.get('https://kbnadmin-production.up.railway.app/administracion/roles');
+      setRoles(rolesResponse.data);
+      
+    } catch (err) {
+      console.error("Error cargando datos de administración:", err);
+      setError("Error al cargar usuarios o roles. Verifique el backend.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAssignmentChange = (id, nuevoValor) => {
-    setClases(prev => prev.map(clase => clase.id === id ? { ...clase, asignadoA: nuevoValor } : clase));
+  const handleRoleChange = (userId, newRoleId) => {
+    setUsuarios(prev => prev.map(user => 
+      user.id === userId 
+      ? { ...user, rol: roles.find(r => r.id === parseInt(newRoleId)) }
+      : user
+    ));
   };
+  
+  const getRoleName = (rolObj) => {
+      // Asume que el objeto 'rol' en el usuario tiene una propiedad 'nombre'
+      return rolObj ? rolObj.nombre : 'SIN ROL';
+  }
 
-  const guardarAsignacion = async (id, asignadoA) => {
-    if (!asignadoA) return alert("Selecciona una opción primero");
+  const guardarEdicion = async (userId) => {
+    const userToUpdate = usuarios.find(u => u.id === userId);
+    if (!userToUpdate || !userToUpdate.rol.nombre) {
+        alert("El usuario o el rol no son válidos.");
+        return;
+    }
 
     try {
-      const response = await fetch(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, {
-        method: 'PUT',
-        headers: { 
-            'Content-Type': 'application/json' 
-            // Añadir Authorization header aquí si se implementa JWT
-        },
-        body: JSON.stringify({ asignadoA })
-      });
+        // Endpoint: PUT /administracion/users/{userId}/roles
+        const response = await axios.put(`https://kbnadmin-production.up.railway.app/administracion/users/${userId}/roles`, {
+            rol: userToUpdate.rol.nombre // Enviamos el nombre del rol
+        });
 
-      if (response.ok) {
-        alert("¡Asignado correctamente!");
-        fetchClases();
-      } else {
-        alert("Error al guardar");
-      }
-    } catch (error) {
-      console.error("Error:", error);
+        if (response.status === 200) {
+            alert(`Rol de ${userToUpdate.nombre} actualizado a ${userToUpdate.rol.nombre}.`);
+            fetchData(); // Recargar datos
+        }
+    } catch (err) {
+        console.error("Error al guardar rol:", err);
+        alert("Error al actualizar el rol. Verifique el servidor.");
     }
   };
+  
+  const eliminarUsuario = async (userId, userName) => {
+      if (!window.confirm(`¿Estás seguro de eliminar el usuario ${userName}?`)) {
+          return;
+      }
+      
+      try {
+          // Endpoint: DELETE /administracion/users/{id}
+          await axios.delete(`https://kbnadmin-production.up.railway.app/administracion/users/${userId}`);
+          alert(`Usuario ${userName} eliminado.`);
+          fetchData(); 
+      } catch (err) {
+          console.error("Error al eliminar usuario:", err);
+          alert("Error al eliminar el usuario.");
+      }
+  }
 
-  if (loading) return <div className="p-10 text-center">Cargando panel...</div>;
+
+  if (loading) return <div className="p-10 text-center text-indigo-600">Cargando panel de administración de usuarios...</div>;
+  if (error) return <div className="p-10 text-center text-red-600">Error: {error}</div>;
 
   return (
     <div className="max-w-7xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Panel de Administración</h1>
-
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">⚙️ Panel de Gestión de Usuarios</h1>
+      
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Instructor</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actividad</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total/Monto</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asignar Ingreso</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apellido</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol Actual</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {clases.length > 0 ? clases.map(clase => (
-              <tr key={clase.id} className={clase.revisado ? "bg-green-50" : "bg-white"}>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${clase.tipoTransaccion === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
-                    {clase.tipoTransaccion}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha || "-"}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{clase.instructor || "-"}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad || "-"}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">
-                    {clase.tipoTransaccion === 'INGRESO' ? `$${clase.total || 0}` : `-$${clase.gastosAsociados || 0}`}
-                </td>
+            {usuarios.length > 0 ? usuarios.map(usuario => (
+              <tr key={usuario.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{usuario.nombre}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{usuario.apellido}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{usuario.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <select 
-                    value={clase.asignadoA} 
-                    onChange={(e) => handleAssignmentChange(clase.id, e.target.value)}
-                    disabled={clase.tipoTransaccion === 'EGRESO'}
-                    className="block w-full py-2 px-3 border border-gray-300"
+                    value={usuario.rol ? usuario.rol.id : ''} 
+                    onChange={(e) => handleRoleChange(usuario.id, e.target.value)}
+                    className="block w-32 py-2 px-3 border border-gray-300 rounded text-sm"
                   >
-                    <option value="" disabled>Seleccionar...</option>
-                    <option value="IGNA">IGNA</option>
-                    <option value="JOSE">JOSE</option>
-                    <option value="NINGUNO">NINGUNO (Escuela)</option>
+                    <option value="" disabled>Actual: {getRoleName(usuario.rol)}</option>
+                    {roles.map(rol => (
+                        <option key={rol.id} value={rol.id}>{rol.nombre}</option>
+                    ))}
                   </select>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                   <button 
-                    onClick={() => guardarAsignacion(clase.id, clase.asignadoA)}
-                    className="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded text-sm transition-colors"
+                    onClick={() => guardarEdicion(usuario.id)}
+                    className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-3 py-1 rounded text-xs border border-indigo-200"
                   >
-                    Confirmar
+                    Guardar Rol
+                  </button>
+                   <button 
+                    onClick={() => eliminarUsuario(usuario.id, usuario.nombre)}
+                    className="text-red-600 hover:text-red-900 bg-red-50 px-3 py-1 rounded text-xs border border-red-200"
+                  >
+                    Eliminar
                   </button>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan="7" className="text-center p-4 text-gray-500">No hay clases registradas aún.</td>
+                <td colSpan="5" className="text-center p-4 text-gray-500">No hay usuarios registrados.</td>
               </tr>
             )}
           </tbody>
