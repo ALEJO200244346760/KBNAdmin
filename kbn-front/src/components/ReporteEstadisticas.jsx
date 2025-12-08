@@ -14,32 +14,34 @@ const ReporteEstadisticas = () => {
     const [reporte, setReporte] = useState(null);
     const [loadingReporte, setLoadingReporte] = useState(false);
     
-    // --- NUEVO ESTADO PARA EL REPORTE DETALLADO (Listado de Ingresos/Egresos) ---
+    // --- ESTADOS PARA DATOS Y UI ---
     const [ingresosEgresos, setIngresosEgresos] = useState([]);
-    
-    // --- LÓGICA DE NOTIFICACIONES/ASIGNACIÓN ---
     const [clasesPendientes, setClasesPendientes] = useState([]);
     const [loadingClases, setLoadingClases] = useState(true);
+    const [expandedId, setExpandedId] = useState(null); // Nuevo estado para detalle expandido
 
     useEffect(() => {
         fetchClases();
     }, []);
+    
+    // Función para alternar el detalle expandido
+    const toggleDetails = (id) => {
+        setExpandedId(prevId => prevId === id ? null : id);
+    };
 
-    // ReporteEstadisticas.jsx
     const fetchClases = async () => {
         setLoadingClases(true);
         try {
             const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const data = await response.json();
             
-            // --- FILTRO ACTUALIZADO PARA INCLUIR "NINGUNO" ---
+            // FILTRO PENDIENTES (Ingreso y asignadoA es null, vacío o 'NINGUNO')
             const pendientes = data
                 .filter(clase => 
                     clase.tipoTransaccion === 'INGRESO' && 
                     (!clase.asignadoA || clase.asignadoA.trim() === '' || clase.asignadoA.toUpperCase() === 'NINGUNO')
                 )
                 .map(clase => ({ ...clase, asignadoA: clase.asignadoA || "" }));
-            // --- FIN FILTRO ACTUALIZADO ---
 
             setClasesPendientes(pendientes);
             setIngresosEgresos(data); 
@@ -67,7 +69,7 @@ const ReporteEstadisticas = () => {
 
             if (response.ok) {
                 alert("¡Asignado correctamente! La tabla se actualizará.");
-                fetchClases(); // Recargar datos, incluyendo las notificaciones y la lista detallada
+                fetchClases(); 
             } else {
                 alert("Error al guardar la asignación.");
             }
@@ -99,14 +101,10 @@ const ReporteEstadisticas = () => {
                 alert("Error al cargar el resumen del reporte.");
             }
             
-            // 2. OBTENER EL DETALLE DE TRANSACCIONES (Simulando un listado filtrado por fecha)
-            // Ya que no tenemos el endpoint /listarPorFecha, por ahora listamos todos 
-            // y filtramos localmente (NO RECOMENDADO para grandes volúmenes):
-            
+            // 2. OBTENER EL DETALLE DE TRANSACCIONES Y FILTRAR POR FECHA (Localmente)
             const responseListar = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const allData = await responseListar.json();
             
-            // Filtro local simple basado en el campo 'fecha' (asumiendo formato YYYY-MM-DD)
             const filteredData = allData.filter(clase => {
                 const claseDate = clase.fecha;
                 return claseDate >= fechaInicio && claseDate <= fechaFin;
@@ -122,7 +120,6 @@ const ReporteEstadisticas = () => {
     };
 
     const formatCurrency = (amount) => {
-        // Aseguramos que el monto sea un número para toFixed
         return `$${(parseFloat(amount) || 0).toFixed(2)}`;
     };
 
@@ -151,6 +148,7 @@ const ReporteEstadisticas = () => {
                     🔔 Clases Pendientes de Asignación ({clasesPendientes.length})
                 </h2>
                 
+                {/* (La tabla de Pendientes permanece igual) */}
                 {loadingClases ? (
                     <p className="text-center text-gray-500">Cargando notificaciones...</p>
                 ) : clasesPendientes.length === 0 ? (
@@ -210,7 +208,7 @@ const ReporteEstadisticas = () => {
             
             <hr className="my-10" />
 
-            {/* --- SECCIÓN DE GENERACIÓN DE REPORTE Y ESTADÍSTICAS --- */}
+            {/* --- SECCIÓN DE GENERACIÓN DE REPORTE Y ESTADÍSTICAS (Resumen) --- */}
             <h2 className="text-2xl font-bold mb-6 text-gray-800">🔍 Generador de Reporte Financiero</h2>
             
             <div className="bg-white p-6 rounded-lg shadow-md mb-8 flex gap-4 items-end">
@@ -248,15 +246,11 @@ const ReporteEstadisticas = () => {
                         <Card title="Asignado a IGNA" value={reporte.totalAsignadoIgna} color="bg-blue-500" />
                         <Card title="Asignado a JOSE" value={reporte.totalAsignadoJose} color="bg-green-600" />
                     </div>
-
-                    <div className="text-sm pt-4 text-gray-600 border-t mt-6">
-                        <p>Total Comisiones: {formatCurrency(reporte.totalComisiones)}</p>
-                        <p className="font-bold">Ingresos Escuela (Ninguno): {formatCurrency(ingresosBrutos - reporte.totalAsignadoIgna - reporte.totalAsignadoJose)}</p>
-                    </div>
-
+                    
                     <hr className="my-8" />
                     
-                    <h2 className="text-2xl font-bold mb-6 text-gray-800">📄 Detalle de Transacciones</h2>
+                    {/* --- SECCIÓN DE DETALLE DE TRANSACCIONES --- */}
+                    <h2 className="text-2xl font-bold mb-6 text-gray-800">📄 Detalle de Transacciones Filtradas</h2>
                     
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
@@ -264,39 +258,77 @@ const ReporteEstadisticas = () => {
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto Total</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actividad</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto Neto</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Moneda</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actividad/Detalles</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asignado A</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {ingresosEgresos.length > 0 ? ingresosEgresos.map(clase => (
-                                    <tr key={clase.id} className={clase.tipoTransaccion === 'INGRESO' ? "hover:bg-green-50" : "hover:bg-red-50"}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha}</td>
-                                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${clase.tipoTransaccion === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
-                                            {clase.tipoTransaccion}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
-                                            {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.total || clase.gastosAsociados)}`}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{clase.moneda}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad} ({clase.detalles})</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.asignadoA || 'N/A'}</td>
-                                    </tr>
+                                    <React.Fragment key={clase.id}>
+                                        <tr className={clase.tipoTransaccion === 'INGRESO' ? "hover:bg-green-50" : "hover:bg-red-50"}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha}</td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${clase.tipoTransaccion === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
+                                                {clase.tipoTransaccion}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                                                {/* Mostrar el total para INGRESO y el total/gastos para EGRESO */}
+                                                {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.total || clase.gastosAsociados)}`}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{clase.moneda}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.asignadoA || 'N/A'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                <button
+                                                    onClick={() => toggleDetails(clase.id)}
+                                                    className="text-indigo-600 hover:text-indigo-900 font-medium text-xs bg-indigo-100 px-3 py-1 rounded"
+                                                >
+                                                    {expandedId === clase.id ? 'Ocultar Detalle' : 'Ver Detalle'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {/* Fila de detalles extendidos (aparece solo si expandedId coincide) */}
+                                        {expandedId === clase.id && (
+                                            <tr className="bg-gray-50">
+                                                <td colSpan="7" className="px-6 py-4 text-sm text-gray-700 border-t border-gray-200">
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-2">
+                                                        {clase.tipoTransaccion === 'INGRESO' && (
+                                                            <>
+                                                                <p className="font-semibold">Horas: <span className="font-normal">{clase.cantidadHoras || 'N/A'}</span></p>
+                                                                <p className="font-semibold">Tarifa/h: <span className="font-normal">{formatCurrency(clase.tarifaPorHora)}</span></p>
+                                                                <p className="font-semibold">Gastos Asoc.: <span className="font-normal">{formatCurrency(clase.gastosAsociados)}</span></p>
+                                                                <p className="font-semibold">Comisión: <span className="font-normal">{formatCurrency(clase.comision)}</span></p>
+                                                            </>
+                                                        )}
+                                                        {clase.tipoTransaccion === 'EGRESO' && (
+                                                            <>
+                                                                <p className="font-semibold">Descripción Egreso: <span className="font-normal">{clase.detalles || 'N/A'}</span></p>
+                                                                <p className="font-semibold">Forma Pago: <span className="font-normal">{clase.formaPago || 'N/A'}</span></p>
+                                                                <p className="font-semibold">Vendedor/Proveedor: <span className="font-normal">{clase.vendedor || 'N/A'}</span></p>
+                                                                {/* Para egresos, el campo gastosAsociados puede actuar como un detalle extra si total es el monto principal */}
+                                                                <p className="font-semibold">Costo Principal: <span className="font-normal">{formatCurrency(clase.total || clase.gastosAsociados)}</span></p> 
+                                                            </>
+                                                        )}
+                                                        <p className="font-semibold">Autor: <span className="font-normal">{clase.instructor || 'N/A'}</span></p>
+                                                        <p className="font-semibold">Forma de Pago: <span className="font-normal">{clase.formaPago || 'N/A'}</span></p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 )) : (
                                     <tr>
-                                        <td colSpan="6" className="text-center p-4 text-gray-500">No hay transacciones en el rango de fechas seleccionado.</td>
+                                        <td colSpan="7" className="text-center p-4 text-gray-500">No hay transacciones en el rango de fechas seleccionado.</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
-
-
-                    <hr className="my-8" />
                     
-                    {/* --- SECCIÓN DE GRÁFICOS (Implementación simulada) --- */}
+                    {/* --- SECCIÓN DE GRÁFICOS --- */}
+                    <hr className="my-8" />
                     <h2 className="text-2xl font-bold mb-6 text-gray-800">📈 Gráficos de Estadísticas</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* [Gráficos] */}
