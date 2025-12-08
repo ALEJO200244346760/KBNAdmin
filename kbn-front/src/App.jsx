@@ -9,7 +9,7 @@ import InstructorForm from './components/InstructorForm';
 import ReporteEstadisticas from './components/ReporteEstadisticas';
 import UserManagement from './components/UserManagement';
 
-// Componente para rutas privadas con rol
+// Componente para rutas privadas según rol
 const PrivateRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
@@ -21,7 +21,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
     // Redirige según rol
     switch (user.role) {
       case 'ADMINISTRADOR':
-        return <Navigate to="/reportes" replace />;
+        return <Navigate to="/admin" replace />;
       case 'INSTRUCTOR':
       case 'ALUMNO':
         return <Navigate to="/instructor" replace />;
@@ -43,7 +43,7 @@ const HomeRedirect = () => {
 
   switch (user.role) {
     case 'ADMINISTRADOR':
-      return <Navigate to="/reportes" replace />;
+      return <Navigate to="/admin" replace />; // PANEL ADMIN como página principal
     case 'INSTRUCTOR':
     case 'ALUMNO':
       return <Navigate to="/instructor" replace />;
@@ -68,6 +68,15 @@ function App() {
 
             {/* ADMINISTRADOR */}
             <Route
+              path="/admin"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
+                  <AdminDashboard />
+                </PrivateRoute>
+              }
+            />
+
+            <Route
               path="/reportes"
               element={
                 <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
@@ -87,7 +96,6 @@ function App() {
             />
 
             <Route path="/usuarios" element={<UserManagement />} />
-            <Route path="/admin" element={<AdminDashboard />} />
           </Routes>
         </div>
       </HashRouter>
