@@ -61,14 +61,21 @@ export default function Header() {
 
         {/* Opciones escritorio */}
         <nav className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
+          {/* ADMIN solo ve Estadísticas */}
           {user?.role === "ADMINISTRADOR" && (
-            <Link to="/admin" className="hover:text-blue-600 transition-colors">
-              Panel Admin
+            <Link
+              to="/reportes"
+              className="hover:text-blue-600 transition-colors"
+            >
+              Estadísticas
             </Link>
           )}
 
-          {(user?.role === "ADMINISTRADOR" || user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <Link to="/instructor" className="hover:text-blue-600 transition-colors">
+          {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
+            <Link
+              to="/instructor"
+              className="hover:text-blue-600 transition-colors"
+            >
               Instructor
             </Link>
           )}
@@ -97,13 +104,21 @@ export default function Header() {
       {menuOpen && (
         <div className="md:hidden bg-white shadow-md py-3 px-4 space-y-3 text-gray-700 font-medium">
           {user?.role === "ADMINISTRADOR" && (
-            <Link to="/admin" className="block py-1" onClick={() => setMenuOpen(false)}>
-              Panel Admin
+            <Link
+              to="/reportes"
+              className="block py-1"
+              onClick={() => setMenuOpen(false)}
+            >
+              Estadísticas
             </Link>
           )}
 
-          {(user?.role === "ADMINISTRADOR" || user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <Link to="/instructor" className="block py-1" onClick={() => setMenuOpen(false)}>
+          {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
+            <Link
+              to="/instructor"
+              className="block py-1"
+              onClick={() => setMenuOpen(false)}
+            >
               Instructor
             </Link>
           )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Login from './components/Login';
@@ -21,7 +21,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
     // Redirige según rol
     switch (user.role) {
       case 'ADMINISTRADOR':
-        return <Navigate to="/admin" replace />;
+        return <Navigate to="/reportes" replace />;
       case 'INSTRUCTOR':
       case 'ALUMNO':
         return <Navigate to="/instructor" replace />;
@@ -43,7 +43,7 @@ const HomeRedirect = () => {
 
   switch (user.role) {
     case 'ADMINISTRADOR':
-      return <Navigate to="/admin" replace />;
+      return <Navigate to="/reportes" replace />;
     case 'INSTRUCTOR':
     case 'ALUMNO':
       return <Navigate to="/instructor" replace />;
@@ -55,40 +55,42 @@ const HomeRedirect = () => {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         {/* HEADER SIEMPRE VISIBLE */}
         <Header />
 
         {/* CONTENIDO */}
-        <div className="pt-16"> {/* espacio para header fijo */}
+        <div className="pt-16">{/* espacio para header fijo */}
           <Routes>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
+            {/* ADMINISTRADOR */}
             <Route
-              path="/admin"
+              path="/reportes"
               element={
                 <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
-                  <AdminDashboard />
+                  <ReporteEstadisticas />
                 </PrivateRoute>
               }
             />
 
+            {/* INSTRUCTOR / ALUMNO / ADMIN también puede ver InstructorForm */}
             <Route
               path="/instructor"
               element={
-                <PrivateRoute allowedRoles={['ADMINISTRADOR', 'INSTRUCTOR', 'ALUMNO']}>
+                <PrivateRoute allowedRoles={['ADMINISTRADOR','INSTRUCTOR','ALUMNO']}>
                   <InstructorForm />
                 </PrivateRoute>
               }
             />
 
-            <Route path="/reportes" element={<ReporteEstadisticas />} />
             <Route path="/usuarios" element={<UserManagement />} />
+            <Route path="/admin" element={<AdminDashboard />} />
           </Routes>
         </div>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }
