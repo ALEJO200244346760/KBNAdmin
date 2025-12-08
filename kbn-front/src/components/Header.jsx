@@ -61,25 +61,29 @@ export default function Header() {
 
         {/* Opciones escritorio */}
         <nav className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
-          {/* ADMIN solo ve Estadísticas */}
+          {/* ADMINISTRADOR */}
           {user?.role === "ADMINISTRADOR" && (
-            <Link
-              to="/reportes"
-              className="hover:text-blue-600 transition-colors"
-            >
-              Estadísticas
-            </Link>
+            <>
+              <Link to="/admin" className="hover:text-blue-600 transition-colors">
+                Panel Admin
+              </Link>
+              <Link to="/instructor" className="hover:text-blue-600 transition-colors">
+                Instructor
+              </Link>
+              <Link to="/reportes" className="hover:text-blue-600 transition-colors">
+                Estadísticas
+              </Link>
+            </>
           )}
 
+          {/* INSTRUCTOR / ALUMNO */}
           {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <Link
-              to="/instructor"
-              className="hover:text-blue-600 transition-colors"
-            >
+            <Link to="/instructor" className="hover:text-blue-600 transition-colors">
               Instructor
             </Link>
           )}
 
+          {/* Si NO hay usuario → mostrar iniciar sesión */}
           {!user && !isLoginPage && (
             <Link
               to="/login"
@@ -89,6 +93,7 @@ export default function Header() {
             </Link>
           )}
 
+          {/* Si hay usuario → cerrar sesión */}
           {user && (
             <button
               onClick={handleLogout}
@@ -103,22 +108,24 @@ export default function Header() {
       {/* Menú móvil */}
       {menuOpen && (
         <div className="md:hidden bg-white shadow-md py-3 px-4 space-y-3 text-gray-700 font-medium">
+          {/* ADMINISTRADOR */}
           {user?.role === "ADMINISTRADOR" && (
-            <Link
-              to="/reportes"
-              className="block py-1"
-              onClick={() => setMenuOpen(false)}
-            >
-              Estadísticas
-            </Link>
+            <>
+              <Link to="/admin" className="block py-1" onClick={() => setMenuOpen(false)}>
+                Panel Admin
+              </Link>
+              <Link to="/instructor" className="block py-1" onClick={() => setMenuOpen(false)}>
+                Instructor
+              </Link>
+              <Link to="/reportes" className="block py-1" onClick={() => setMenuOpen(false)}>
+                Estadísticas
+              </Link>
+            </>
           )}
 
+          {/* INSTRUCTOR / ALUMNO */}
           {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <Link
-              to="/instructor"
-              className="block py-1"
-              onClick={() => setMenuOpen(false)}
-            >
+            <Link to="/instructor" className="block py-1" onClick={() => setMenuOpen(false)}>
               Instructor
             </Link>
           )}
