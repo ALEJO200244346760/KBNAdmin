@@ -88,7 +88,6 @@ const InstructorForm = () => {
   const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // Validación mínima
   if (!formData.instructor || formData.instructor.trim() === '') {
     alert("Por favor, selecciona o ingresa el nombre del instructor.");
     return;
@@ -111,7 +110,7 @@ const InstructorForm = () => {
     formaPago: String(formData.formaPago === 'Otro' ? (formData.formaPagoOtro || 'Otro') : formData.formaPago),
     detalleFormaPago: String(formData.formaPago === 'Otro' ? (formData.formaPagoOtro || '') : ''),
     vendedor: String(formData.vendedor || ''),
-    asignadoA: String(formData.asignadoA || '')
+    asignadoA: "NINGUNO" // Siempre NINGUNO, nunca ""
   };
 
   try {
