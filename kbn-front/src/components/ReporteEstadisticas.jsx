@@ -357,46 +357,176 @@ const ReporteEstadisticas = () => {
             </div>
 
             {/* --- SECCIÓN 4: GRÁFICOS Y ESTADÍSTICAS --- */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-8">
-                {/* Nota: Los gráficos simples agregan todo a USD. Para multi-moneda se requeriría conversión */}
-                <div className="bg-white p-6 rounded-xl shadow-md">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Distribución Ingresos (Global)</h3>
-                    <div className="h-64 flex justify-center">
-                        <Doughnut 
+            {/* --- SECCIÓN 4: GRÁFICOS Y ESTADÍSTICAS --- */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-10">
+
+                {/* 🎯 1. Distribución por Instructor */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">
+                        Distribución de Ingresos por Instructor
+                    </h3>
+                    <div className="h-72 flex justify-center">
+                        <Doughnut
                             data={{
                                 labels: ['Igna', 'Jose'],
                                 datasets: [{
                                     data: [
-                                        asignados.filter(i => i.asignadoA === 'IGNA').reduce((acc, curr) => acc + parseFloat(curr.total||0), 0),
-                                        asignados.filter(i => i.asignadoA === 'JOSE').reduce((acc, curr) => acc + parseFloat(curr.total||0), 0)
+                                        asignados.filter(i => i.asignadoA === 'IGNA').reduce((acc, c) => acc + Number(c.total || 0), 0),
+                                        asignados.filter(i => i.asignadoA === 'JOSE').reduce((acc, c) => acc + Number(c.total || 0), 0),
                                     ],
-                                    backgroundColor: ['#3b82f6', '#10b981'],
+                                    backgroundColor: ['#2563eb', '#16a34a'],
+                                    borderWidth: 2,
+                                    hoverOffset: 10,
                                 }]
-                            }} 
-                            options={{ maintainAspectRatio: false }} 
+                            }}
+                            options={{
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'bottom' } }
+                            }}
                         />
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-md">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Ingresos vs Egresos (Global)</h3>
-                    <div className="h-64">
-                         <Bar 
+                {/* 📉 2. Ingresos vs Egresos */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">
+                        Comparación de Ingresos vs Egresos
+                    </h3>
+                    <div className="h-72">
+                        <Bar
                             data={{
                                 labels: ['Ingresos', 'Egresos'],
                                 datasets: [{
-                                    label: 'Monto Estimado',
+                                    label: 'Monto total',
                                     data: [
-                                        asignados.reduce((acc, curr) => acc + parseFloat(curr.total||0), 0),
-                                        egresos.reduce((acc, curr) => acc + (parseFloat(curr.gastosAsociados)||parseFloat(curr.total)||0), 0)
+                                        asignados.reduce((acc, c) => acc + Number(c.total || 0), 0),
+                                        egresos.reduce((acc, c) => acc + (Number(c.gastosAsociados) || Number(c.total) || 0), 0)
                                     ],
-                                    backgroundColor: ['#4f46e5', '#ef4444'],
+                                    backgroundColor: ['#4f46e5', '#dc2626'],
+                                    borderRadius: 8,
                                 }]
-                            }} 
-                            options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} 
+                            }}
+                            options={{
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } }
+                            }}
                         />
                     </div>
                 </div>
+
+                {/* 🧾 3. Gastos por Actividad */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border xl:col-span-2">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">
+                        Gastos por Actividad
+                    </h3>
+
+                    <div className="h-80">
+                        <Bar
+                            data={{
+                                labels: Object.keys(
+                                    egresos.reduce((acc, e) => {
+                                        const act = e.actividad || 'Otros';
+                                        acc[act] = (acc[act] || 0) + (Number(e.gastosAsociados) || Number(e.total) || 0);
+                                        return acc;
+                                    }, {})
+                                ),
+                                datasets: [{
+                                    label: 'Gasto total',
+                                    data: Object.values(
+                                        egresos.reduce((acc, e) => {
+                                            const act = e.actividad || 'Otros';
+                                            acc[act] = (acc[act] || 0) + (Number(e.gastosAsociados) || Number(e.total) || 0);
+                                            return acc;
+                                        }, {})
+                                    ),
+                                    backgroundColor: '#f87171',
+                                    borderRadius: 6,
+                                }]
+                            }}
+                            options={{
+                                maintainAspectRatio: false,
+                                indexAxis: 'y',
+                                plugins: { legend: { display: false } }
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* 🎨 4. Ingresos por Actividad */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">
+                        Ingresos por Actividad
+                    </h3>
+                    <div className="h-72 flex justify-center">
+                        <Doughnut
+                            data={{
+                                labels: Object.keys(
+                                    asignados.reduce((acc, c) => {
+                                        const act = c.actividad || 'Sin actividad';
+                                        acc[act] = (acc[act] || 0) + Number(c.total || 0);
+                                        return acc;
+                                    }, {})
+                                ),
+                                datasets: [{
+                                    data: Object.values(
+                                        asignados.reduce((acc, c) => {
+                                            const act = c.actividad || 'Sin actividad';
+                                            acc[act] = (acc[act] || 0) + Number(c.total || 0);
+                                            return acc;
+                                        }, {})
+                                    ),
+                                    backgroundColor: [
+                                        '#3b82f6', '#10b981', '#fbbf24',
+                                        '#ef4444', '#8b5cf6', '#ec4899'
+                                    ],
+                                    hoverOffset: 10
+                                }]
+                            }}
+                            options={{
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'bottom' } }
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* 📈 5. Ingresos por Mes (Línea temporal) */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">
+                        Ingresos por Mes
+                    </h3>
+
+                    <div className="h-72">
+                        <Bar
+                            data={{
+                                labels: Object.keys(
+                                    asignados.reduce((acc, c) => {
+                                        const mes = c.fecha?.slice(0, 7) || 'Fecha inválida'; // YYYY-MM
+                                        acc[mes] = (acc[mes] || 0) + Number(c.total || 0);
+                                        return acc;
+                                    }, {})
+                                ),
+                                datasets: [{
+                                    label: 'Ingresos ($)',
+                                    data: Object.values(
+                                        asignados.reduce((acc, c) => {
+                                            const mes = c.fecha?.slice(0, 7);
+                                            acc[mes] = (acc[mes] || 0) + Number(c.total || 0);
+                                            return acc;
+                                        }, {})
+                                    ),
+                                    backgroundColor: '#2563eb',
+                                    borderRadius: 6,
+                                }]
+                            }}
+                            options={{
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'bottom' } }
+                            }}
+                        />
+                    </div>
+                </div>
+
             </div>
         </div>
     );
