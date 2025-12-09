@@ -358,42 +358,41 @@ const ReporteEstadisticas = () => {
 
             {/* --- SECCIÓN 4: GRÁFICOS Y ESTADÍSTICAS --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-8">
-                {/* Nota: Los gráficos simples agregan todo a USD. Para multi-moneda se requeriría conversión */}
+                {/* Gráfico 1: Distribución Igna vs Jose */}
                 <div className="bg-white p-6 rounded-xl shadow-md">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Distribución Ingresos (Global)</h3>
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Distribución de Ingresos</h3>
                     <div className="h-64 flex justify-center">
-                        <Doughnut 
-                            data={{
-                                labels: ['Igna', 'Jose'],
-                                datasets: [{
-                                    data: [
-                                        asignados.filter(i => i.asignadoA === 'IGNA').reduce((acc, curr) => acc + parseFloat(curr.total||0), 0),
-                                        asignados.filter(i => i.asignadoA === 'JOSE').reduce((acc, curr) => acc + parseFloat(curr.total||0), 0)
-                                    ],
-                                    backgroundColor: ['#3b82f6', '#10b981'],
-                                }]
+                        <Doughnut data={chartDataDistribution} options={{ maintainAspectRatio: false }} />
+                    </div>
+                    <div className="mt-4 text-center text-sm text-gray-600">
+                        <p>Igna: {formatCurrency(financials.igna)} | Jose: {formatCurrency(financials.jose)}</p>
+                    </div>
+                </div>
+
+                {/* Gráfico 2: Flujo de Caja */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Ingresos vs Egresos</h3>
+                    <div className="h-64">
+                         <Bar 
+                            data={chartDataFlow} 
+                            options={{ 
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } }
                             }} 
-                            options={{ maintainAspectRatio: false }} 
                         />
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-md">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Ingresos vs Egresos (Global)</h3>
+                {/* Gráfico 3: Gastos por Actividad (Barra Horizontal o Pie) */}
+                <div className="bg-white p-6 rounded-xl shadow-md lg:col-span-2">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Desglose de Gastos</h3>
                     <div className="h-64">
-                         <Bar 
-                            data={{
-                                labels: ['Ingresos', 'Egresos'],
-                                datasets: [{
-                                    label: 'Monto Estimado',
-                                    data: [
-                                        asignados.reduce((acc, curr) => acc + parseFloat(curr.total||0), 0),
-                                        egresos.reduce((acc, curr) => acc + (parseFloat(curr.gastosAsociados)||parseFloat(curr.total)||0), 0)
-                                    ],
-                                    backgroundColor: ['#4f46e5', '#ef4444'],
-                                }]
-                            }} 
-                            options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} 
+                        <Bar 
+                            data={chartDataExpenses}
+                            options={{
+                                maintainAspectRatio: false,
+                                indexAxis: 'y', // Barra horizontal
+                            }}
                         />
                     </div>
                 </div>
