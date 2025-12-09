@@ -192,7 +192,7 @@ const ReporteEstadisticas = () => {
                             className="bg-indigo-600 text-white p-3 rounded-lg shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2 h-full"
                             title="Ver otras monedas"
                         >
-                            <span>🌐</span> Other
+                            <span>🌐</span> Otras
                         </button>
                         
                         {/* Dropdown de Otras Monedas */}
