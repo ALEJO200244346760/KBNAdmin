@@ -52,8 +52,7 @@ const ReporteEstadisticas = () => {
                 .map(clase => ({ ...clase, asignadoA: clase.asignadoA || "NINGUNO" })); // Asegurar que el select tenga un valor
 
             setClasesPendientes(pendientes);
-            setIngresosEgresos(data); 
-
+            // setIngresosEgresos(data); // No establecer aquí, para no confundir con el reporte
         } catch (error) {
             console.error("Error cargando clases:", error);
         } finally {
@@ -62,7 +61,6 @@ const ReporteEstadisticas = () => {
     };
 
     const handleAssignmentChange = (id, nuevoValor) => {
-        // Actualiza el valor del select localmente
         setClasesPendientes(prev => prev.map(clase => clase.id === id ? { ...clase, asignadoA: nuevoValor } : clase));
     };
 
@@ -78,12 +76,13 @@ const ReporteEstadisticas = () => {
 
             if (response.ok) {
                 alert(`¡Asignado correctamente a ${asignadoA}!`);
-                
-                // --- CORRECCIÓN CLAVE ---
-                // Removemos la clase de la lista de pendientes inmediatamente
                 setClasesPendientes(prev => prev.filter(clase => clase.id !== id));
-                // Volvemos a cargar toda la data para asegurar que el Reporte Financiero esté actualizado
-                fetchClases(); 
+                // Recargar el reporte completo para actualizar el resumen (si ya estaba generado)
+                if (reporte) {
+                    generarReporte();
+                } else {
+                    fetchClases();
+                }
             } else {
                 alert("Error al guardar la asignación. Intenta de nuevo.");
             }
@@ -116,15 +115,19 @@ const ReporteEstadisticas = () => {
                 alert("Error al cargar el resumen del reporte.");
             }
             
-            // 2. OBTENER EL DETALLE DE TRANSACCIONES Y FILTRAR POR FECHA (Localmente)
+            // 2. OBTENER EL DETALLE DE TRANSACCIONES Y FILTRAR POR FECHA
             const responseListar = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const allData = await responseListar.json();
             
             const filteredData = allData.filter(clase => {
                 const claseDate = clase.fecha;
+                // Si la fecha de la clase es igual o posterior a la fecha de inicio
+                // Y la fecha de la clase es igual o anterior a la fecha fin
                 return claseDate >= fechaInicio && claseDate <= fechaFin;
             });
             setIngresosEgresos(filteredData);
+            // DEBUG: Mostrar en consola cuántas transacciones se encontraron
+            console.log(`Reporte generado: ${filteredData.length} transacciones encontradas entre ${fechaInicio} y ${fechaFin}`);
 
 
         } catch (error) {
@@ -160,10 +163,12 @@ const ReporteEstadisticas = () => {
     // --- Componente de Detalle para EGRESOS (Usado en tabla de Detalles) ---
     const EgresoDetails = ({ clase }) => (
         <>
+            {/* CORRECCIÓN: Usar clase.detalles para la descripción del egreso */}
             <p className="font-semibold">Descripción Egreso: <span className="font-normal">{clase.detalles || 'N/A'}</span></p>
             <p className="font-semibold">Forma Pago: <span className="font-normal">{clase.formaPago || 'N/A'}</span></p>
             <p className="font-semibold">Vendedor/Proveedor: <span className="font-normal">{clase.vendedor || 'N/A'}</span></p>
-            <p className="font-semibold text-red-600">Costo Principal: <span className="font-normal">{formatCurrency(clase.total || clase.gastosAsociados)}</span></p> 
+            {/* CORRECCIÓN: Usar gastosAsociados si total es 0 */}
+            <p className="font-semibold text-red-600">Costo Principal: <span className="font-normal">{formatCurrency(clase.gastosAsociados || clase.total)}</span></p> 
         </>
     );
     
@@ -271,7 +276,8 @@ const ReporteEstadisticas = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
-                    {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.total || clase.gastosAsociados)}`}
+                    {/* CORRECCIÓN: Usar gastosAsociados si es EGRESO y total es 0 */}
+                    {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.gastosAsociados || clase.total)}`}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{clase.moneda}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.asignadoA || 'N/A'}</td>
@@ -289,7 +295,9 @@ const ReporteEstadisticas = () => {
             <li className={`md:hidden shadow-md rounded-lg p-4 mb-4 ${clase.tipoTransaccion === 'INGRESO' ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
                 <div className="flex justify-between items-center mb-2">
                     <span className="font-bold text-lg text-gray-800">{clase.tipoTransaccion}</span>
-                    <span className="font-bold text-xl">{clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.total || clase.gastosAsociados)}`}</span>
+                    <span className="font-bold text-xl">
+                        {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.gastosAsociados || clase.total)}`}
+                    </span>
                 </div>
                 <p className="text-sm text-gray-700 mb-2">**Fecha:** {clase.fecha} | **Actividad:** {clase.actividad}</p>
                 <p className="text-sm text-gray-700 mb-2">**Asignado a:** {clase.asignadoA || 'N/A'} | **Moneda:** {clase.moneda}</p>
