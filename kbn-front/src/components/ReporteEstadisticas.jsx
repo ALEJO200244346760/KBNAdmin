@@ -1,430 +1,410 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title
+} from 'chart.js';
+import { Doughnut, Bar } from 'react-chartjs-2';
+
+// Registro de componentes de gráficos
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
 const ReporteEstadisticas = () => {
-    // --- LÓGICA DE REPORTE Y FECHAS ---
-    const today = new Date().toISOString().split('T')[0];
-    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-
-    const [fechas, setFechas] = useState({
-        fechaInicio: firstDayOfMonth,
-        fechaFin: today,
-    });
-    const [reporte, setReporte] = useState(null);
-    const [loadingReporte, setLoadingReporte] = useState(false);
+    // --- ESTADOS ---
+    const [allData, setAllData] = useState([]);
+    const [loading, setLoading] = useState(true);
     
-    // --- ESTADOS PARA DATOS Y UI ---
-    const [ingresosEgresos, setIngresosEgresos] = useState([]);
-    const [clasesPendientes, setClasesPendientes] = useState([]);
-    const [loadingClases, setLoadingClases] = useState(true);
-    const [expandedId, setExpandedId] = useState(null); 
-    const [expandedPendingId, setExpandedPendingId] = useState(null); 
+    // Listas separadas para facilitar renderizado
+    const [pendientes, setPendientes] = useState([]);
+    const [egresos, setEgresos] = useState([]);
+    const [asignados, setAsignados] = useState([]);
+    
+    // Estado para expansión de detalles (funciona para todas las listas)
+    const [expandedId, setExpandedId] = useState(null);
 
+    // --- EFECTOS ---
     useEffect(() => {
-        fetchClases();
+        fetchData();
     }, []);
-    
-    const toggleDetails = (id, type) => {
-        if (type === 'PENDING') {
-            setExpandedPendingId(prevId => prevId === id ? null : id);
-        } else {
-            setExpandedId(prevId => prevId === id ? null : id);
-        }
-    };
 
-    const formatCurrency = (amount) => {
-        return `$${(parseFloat(amount) || 0).toFixed(2)}`;
-    };
-
-    const fetchClases = async () => {
-        setLoadingClases(true);
+    // --- LOGICA DE DATOS ---
+    const fetchData = async () => {
+        setLoading(true);
         try {
             const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
             const data = await response.json();
             
-            // FILTRO PENDIENTES
-            const pendientes = data
-                .filter(clase => 
-                    clase.tipoTransaccion === 'INGRESO' && 
-                    (!clase.asignadoA || clase.asignadoA.trim() === '' || clase.asignadoA.toUpperCase() === 'NINGUNO')
-                )
-                .map(clase => ({ ...clase, asignadoA: "NINGUNO" })); // Inicializamos el select en NINGUNO
+            // Procesamiento de datos
+            const listPendientes = [];
+            const listEgresos = [];
+            const listAsignados = [];
 
-            setClasesPendientes(pendientes);
-            setIngresosEgresos(data); 
+            data.forEach(item => {
+                if (item.tipoTransaccion === 'EGRESO') {
+                    listEgresos.push(item);
+                } else if (item.tipoTransaccion === 'INGRESO') {
+                    // Lógica para determinar si está pendiente (Null, Vacio o "NINGUNO")
+                    if (!item.asignadoA || item.asignadoA.trim() === '' || item.asignadoA.toUpperCase() === 'NINGUNO') {
+                        // Aseguramos que el select tenga un valor controlable
+                        item.asignadoA = "NINGUNO"; 
+                        listPendientes.push(item);
+                    } else {
+                        listAsignados.push(item);
+                    }
+                }
+            });
+
+            setAllData(data);
+            setPendientes(listPendientes);
+            setEgresos(listEgresos);
+            setAsignados(listAsignados);
 
         } catch (error) {
-            console.error("Error cargando clases:", error);
+            console.error("Error al cargar datos:", error);
         } finally {
-            setLoadingClases(false);
+            setLoading(false);
         }
     };
 
-    const handleAssignmentChange = (id, nuevoValor) => {
-        setClasesPendientes(prev => prev.map(clase => clase.id === id ? { ...clase, asignadoA: nuevoValor } : clase));
+    // --- CALCULOS FINANCIEROS (Memoizados para rendimiento) ---
+    const financials = useMemo(() => {
+        let totalIngresos = 0;
+        let totalEgresos = 0;
+        let totalIgna = 0;
+        let totalJose = 0;
+
+        // Sumar Ingresos (Asignados y Pendientes)
+        [...pendientes, ...asignados].forEach(item => {
+            totalIngresos += parseFloat(item.total) || 0;
+            if (item.asignadoA === 'IGNA') totalIgna += parseFloat(item.total) || 0;
+            if (item.asignadoA === 'JOSE') totalJose += parseFloat(item.total) || 0;
+        });
+
+        // Sumar Egresos (Usando gastosAsociados si total es 0, segun tu logica de backend)
+        egresos.forEach(item => {
+            const monto = parseFloat(item.gastosAsociados) || parseFloat(item.total) || 0;
+            totalEgresos += monto;
+        });
+
+        return {
+            ingresos: totalIngresos,
+            egresos: totalEgresos,
+            balance: totalIngresos - totalEgresos,
+            igna: totalIgna,
+            jose: totalJose
+        };
+    }, [pendientes, egresos, asignados]);
+
+    // --- PREPARACIÓN DE DATOS PARA GRÁFICOS ---
+    const chartDataDistribution = {
+        labels: ['Igna', 'Jose', 'Sin Asignar/Escuela'],
+        datasets: [{
+            data: [financials.igna, financials.jose, financials.ingresos - financials.igna - financials.jose],
+            backgroundColor: ['#3b82f6', '#10b981', '#9ca3af'],
+            hoverOffset: 4
+        }]
     };
 
-    const guardarAsignacion = async (id, asignadoA) => {
-        if (!asignadoA || asignadoA === 'NINGUNO') return alert("Selecciona IGNA o JOSE para asignar el ingreso.");
+    const chartDataFlow = {
+        labels: ['Ingresos Totales', 'Egresos Totales'],
+        datasets: [{
+            label: 'Flujo de Caja',
+            data: [financials.ingresos, financials.egresos],
+            backgroundColor: ['#4f46e5', '#ef4444'],
+        }]
+    };
 
-        console.log("Enviando asignación:", { asignadoA }); // Verificar en consola del navegador
+    // Agrupar egresos por actividad para el gráfico
+    const expensesByActivity = egresos.reduce((acc, curr) => {
+        const monto = parseFloat(curr.gastosAsociados) || parseFloat(curr.total) || 0;
+        const label = curr.actividad || 'Otros';
+        acc[label] = (acc[label] || 0) + monto;
+        return acc;
+    }, {});
 
+    const chartDataExpenses = {
+        labels: Object.keys(expensesByActivity),
+        datasets: [{
+            label: 'Gastos por Actividad',
+            data: Object.values(expensesByActivity),
+            backgroundColor: ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'],
+        }]
+    };
+
+    // --- ACCIONES ---
+    const toggleDetails = (id) => {
+        setExpandedId(prev => prev === id ? null : id);
+    };
+
+    const formatCurrency = (val) => `$${(parseFloat(val) || 0).toFixed(2)}`;
+
+    // Manejo de Asignación en Pendientes
+    const handlePendienteChange = (id, val) => {
+        setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
+    };
+
+    const saveAssignment = async (id, asignadoA) => {
+        if (!asignadoA || asignadoA === 'NINGUNO') return alert("Selecciona un instructor válido.");
         try {
-            const response = await fetch(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, {
+            const res = await fetch(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ asignadoA: asignadoA }) // Envia explicitamente { "asignadoA": "IGNA" }
+                body: JSON.stringify({ asignadoA })
             });
-
-            if (response.ok) {
-                alert(`¡Asignado correctamente a ${asignadoA}!`);
-                setClasesPendientes(prev => prev.filter(clase => clase.id !== id));
-                // Recargamos todo para asegurar sincronización
-                fetchClases();
-                // Si hay un reporte visible, regenerarlo
-                if(reporte) generarReporte();
-            } else {
-                alert("Error al guardar la asignación. Intenta de nuevo.");
+            if (res.ok) {
+                alert("Asignado correctamente.");
+                fetchData(); // Recargar todo
             }
-        } catch (error) {
-            console.error("Error:", error);
-            alert("Error de conexión al servidor.");
+        } catch (e) {
+            alert("Error de conexión");
         }
     };
 
-    const handleChange = (e) => {
-        setFechas({ ...fechas, [e.target.name]: e.target.value });
-    };
-
-    const generarReporte = async () => {
-        setLoadingReporte(true);
-        setReporte(null);
-        const { fechaInicio, fechaFin } = fechas;
-
+    const handleDelete = async (id) => {
+        if(!window.confirm("¿Seguro que deseas eliminar este registro? Esta acción no se puede deshacer.")) return;
+        
         try {
-            // 1. REPORTES
-            const urlReporte = `https://kbnadmin-production.up.railway.app/api/clases/reporte?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
-            const responseReporte = await fetch(urlReporte);
-
-            if (responseReporte.ok) {
-                const dataReporte = await responseReporte.json();
-                setReporte(dataReporte);
-            } else if (responseReporte.status === 404) {
-                 alert("No se encontraron datos de resumen para el rango de fechas seleccionado.");
-            }
-            
-            // 2. LISTADO DETALLADO
-            // Usamos una nueva llamada para asegurar datos frescos
-            const responseListar = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
-            const allData = await responseListar.json();
-            
-            const filteredData = allData.filter(clase => {
-                const claseDate = clase.fecha;
-                return claseDate >= fechaInicio && claseDate <= fechaFin;
-            });
-            setIngresosEgresos(filteredData);
-
-        } catch (error) {
-            console.error("Error en la solicitud:", error);
-        } finally {
-            setLoadingReporte(false);
+             // Asumo que tienes un endpoint DELETE /api/clases/{id}. Si no, hay que crearlo en SpringBoot.
+             // const res = await fetch(`https://kbnadmin-production.up.railway.app/api/clases/${id}`, { method: 'DELETE' });
+             // if(res.ok) { alert("Eliminado"); fetchData(); }
+             alert("Funcionalidad de eliminar simulada (Requiere endpoint DELETE en backend)");
+        } catch (e) {
+            console.error(e);
         }
     };
 
-    const Card = ({ title, value, color }) => (
-        <div className={`p-5 rounded-lg shadow-md ${color}`}>
-            <p className="text-sm font-medium text-gray-50 uppercase">{title}</p>
-            <p className="text-3xl font-extrabold text-white">{formatCurrency(value)}</p>
+    const handleEdit = (id) => {
+        alert(`Funcionalidad de editar ID: ${id}. Aquí podrías abrir un modal con el formulario pre-cargado.`);
+    };
+
+
+    // --- RENDERIZADO DE FILAS (REUTILIZABLE) ---
+    const RenderDetails = ({ item }) => (
+        <div className="bg-gray-50 p-4 rounded-b-lg border-t border-gray-200 text-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
+            <div>
+                <span className="font-bold text-gray-700">Descripción:</span> {item.detalles || '-'}
+            </div>
+            <div>
+                <span className="font-bold text-gray-700">Vendedor:</span> {item.vendedor || '-'}
+            </div>
+            <div>
+                <span className="font-bold text-gray-700">Forma Pago:</span> {item.formaPago || '-'}
+            </div>
+            {item.tipoTransaccion === 'INGRESO' && (
+                <>
+                    <div><span className="font-bold text-gray-700">Horas:</span> {item.cantidadHoras}</div>
+                    <div><span className="font-bold text-gray-700">Tarifa:</span> {formatCurrency(item.tarifaPorHora)}</div>
+                    <div><span className="font-bold text-gray-700">Comisión:</span> {formatCurrency(item.comision)}</div>
+                    <div><span className="font-bold text-gray-700">Gastos Asoc:</span> {formatCurrency(item.gastosAsociados)}</div>
+                </>
+            )}
+             {item.tipoTransaccion === 'EGRESO' && (
+                <div><span className="font-bold text-gray-700">Detalle Pago:</span> {item.detalleFormaPago || '-'}</div>
+            )}
+             <div><span className="font-bold text-gray-700">Creado por:</span> {item.instructor}</div>
         </div>
     );
-    
-    const ingresosBrutos = reporte?.totalIngresosBrutos || 0;
-    const gastosAsociados = reporte?.totalGastos || 0; 
-    const egresosOperacionales = reporte?.totalEgresos || 0; 
-    const ingresosNetos = ingresosBrutos - gastosAsociados - egresosOperacionales;
 
-    const IngresoDetails = ({ clase }) => (
-        <>
-            <p className="font-semibold">Horas: <span className="font-normal">{clase.cantidadHoras || 'N/A'}</span></p>
-            <p className="font-semibold">Tarifa/h: <span className="font-normal">{formatCurrency(clase.tarifaPorHora)}</span></p>
-            <p className="font-semibold text-orange-600">Gastos Asoc.: <span className="font-normal">{formatCurrency(clase.gastosAsociados)}</span></p>
-            <p className="font-semibold">Comisión: <span className="font-normal">{formatCurrency(clase.comision)}</span></p>
-        </>
-    );
-
-    const EgresoDetails = ({ clase }) => (
-        <>
-            <p className="font-semibold">Descripción Egreso: <span className="font-normal">{clase.detalles || 'N/A'}</span></p>
-            <p className="font-semibold">Forma Pago: <span className="font-normal">{clase.formaPago || 'N/A'}</span></p>
-            <p className="font-semibold">Vendedor/Proveedor: <span className="font-normal">{clase.vendedor || 'N/A'}</span></p>
-            <p className="font-semibold text-red-600">Costo Principal: <span className="font-normal">{formatCurrency(clase.gastosAsociados || clase.total)}</span></p> 
-        </>
-    );
-    
-    // --- Renderizado Pendientes ---
-    const RenderPendingRow = ({ clase }) => (
-        <React.Fragment key={clase.id}>
-            <tr className="hidden md:table-row hover:bg-yellow-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha || "-"}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">INGRESO</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{clase.instructor || "-"}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad} ({clase.detalles})</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">{formatCurrency(clase.total)} ({clase.moneda})</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                    <select 
-                        value={clase.asignadoA} 
-                        onChange={(e) => handleAssignmentChange(clase.id, e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 rounded"
-                    >
-                        <option value="NINGUNO">NINGUNO (Escuela)</option>
-                        <option value="IGNA">IGNA</option>
-                        <option value="JOSE">JOSE</option>
-                    </select>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap flex gap-2">
-                    <button 
-                        onClick={() => guardarAsignacion(clase.id, clase.asignadoA)}
-                        className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs transition-colors disabled:opacity-50"
-                        disabled={clase.asignadoA === 'NINGUNO' || !clase.asignadoA}
-                    >
-                        Asignar
-                    </button>
-                    <button
-                        onClick={() => toggleDetails(clase.id, 'PENDING')}
-                        className="text-indigo-600 hover:text-indigo-900 font-medium text-xs bg-indigo-100 px-3 py-1 rounded"
-                    >
-                        {expandedPendingId === clase.id ? 'Ocultar' : 'Detalle'}
-                    </button>
-                </td>
-            </tr>
-            
-            <li className="md:hidden bg-white shadow-md rounded-lg p-4 mb-4 border border-red-200">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-red-700 text-lg">PENDIENTE: {clase.fecha}</span>
-                    <span className="font-bold text-green-600">{formatCurrency(clase.total)}</span>
-                </div>
-                <p className="text-sm text-gray-700">**Actividad:** {clase.actividad}</p>
-                <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700">Asignar a:</label>
-                    <select 
-                        value={clase.asignadoA} 
-                        onChange={(e) => handleAssignmentChange(clase.id, e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 rounded text-sm mt-1"
-                    >
-                        <option value="NINGUNO">NINGUNO</option>
-                        <option value="IGNA">IGNA</option>
-                        <option value="JOSE">JOSE</option>
-                    </select>
-                </div>
-                <div className="flex gap-2 mt-3">
-                    <button 
-                        onClick={() => guardarAsignacion(clase.id, clase.asignadoA)}
-                        className="flex-1 text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm disabled:opacity-50"
-                        disabled={clase.asignadoA === 'NINGUNO' || !clase.asignadoA}
-                    >
-                        Asignar
-                    </button>
-                    <button
-                        onClick={() => toggleDetails(clase.id, 'PENDING')}
-                        className="flex-1 text-indigo-600 font-medium text-sm bg-indigo-100 px-3 py-1 rounded"
-                    >
-                        {expandedPendingId === clase.id ? 'Ocultar' : 'Detalle'}
-                    </button>
-                </div>
-            </li>
-            
-            {(expandedPendingId === clase.id) && (
-                <tr className="bg-red-50/50">
-                    <td colSpan="7" className="px-6 py-4 text-sm text-gray-700 border-t border-red-200">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-2">
-                            <IngresoDetails clase={clase} />
-                            <p className="font-semibold">Vendedor: <span className="font-normal">{clase.vendedor || 'N/A'}</span></p>
-                            <p className="font-semibold col-span-full">Detalle: <span className="font-normal">{clase.detalles}</span></p>
-                        </div>
-                    </td>
-                </tr>
-            )}
-        </React.Fragment>
-    );
-
-    // --- Renderizado Reporte Detalle ---
-    const RenderReporteRow = ({ clase }) => (
-        <React.Fragment key={clase.id}>
-            <tr className={clase.tipoTransaccion === 'INGRESO' ? "hidden md:table-row hover:bg-green-50" : "hidden md:table-row hover:bg-red-50"}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.fecha}</td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${clase.tipoTransaccion === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
-                    {clase.tipoTransaccion}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.actividad}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
-                    {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.gastosAsociados || clase.total)}`}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{clase.moneda}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{clase.asignadoA || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button
-                        onClick={() => toggleDetails(clase.id, 'REPORT')}
-                        className="text-indigo-600 hover:text-indigo-900 font-medium text-xs bg-indigo-100 px-3 py-1 rounded"
-                    >
-                        {expandedId === clase.id ? 'Ocultar' : 'Detalle'}
-                    </button>
-                </td>
-            </tr>
-
-            <li className={`md:hidden shadow-md rounded-lg p-4 mb-4 ${clase.tipoTransaccion === 'INGRESO' ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
-                <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-lg text-gray-800">{clase.tipoTransaccion}</span>
-                    <span className="font-bold text-xl">
-                        {clase.tipoTransaccion === 'INGRESO' ? formatCurrency(clase.total) : `-${formatCurrency(clase.gastosAsociados || clase.total)}`}
-                    </span>
-                </div>
-                <p className="text-sm text-gray-700 mb-2">**Fecha:** {clase.fecha}</p>
-                <p className="text-sm text-gray-700 mb-2">**Actividad:** {clase.actividad}</p>
-                <button
-                    onClick={() => toggleDetails(clase.id, 'REPORT')}
-                    className="w-full text-indigo-600 hover:text-indigo-900 font-medium text-sm bg-indigo-100 px-3 py-1 rounded mt-2"
-                >
-                    {expandedId === clase.id ? 'Ocultar' : 'Ver Detalle'}
-                </button>
-            </li>
-
-            {expandedId === clase.id && (
-                <tr className="bg-gray-100">
-                    <td colSpan="7" className="px-6 py-4 text-sm text-gray-700 border-t border-gray-200">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-2">
-                            {clase.tipoTransaccion === 'INGRESO' ? <IngresoDetails clase={clase} /> : <EgresoDetails clase={clase} />}
-                            <p className="font-semibold">Autor: <span className="font-normal">{clase.instructor || 'N/A'}</span></p>
-                            <p className="font-semibold">Forma Pago: <span className="font-normal">{clase.formaPago || 'N/A'}</span></p>
-                            <p className="font-semibold col-span-full">Detalles: <span className="font-normal">{clase.detalles || 'N/A'}</span></p>
-                        </div>
-                    </td>
-                </tr>
-            )}
-        </React.Fragment>
-    );
+    if (loading) return <div className="p-10 text-center text-xl text-indigo-600 font-bold">Cargando datos financieros...</div>;
 
     return (
-        <div className="max-w-7xl mx-auto mt-10 p-4 md:p-6">
-            <h1 className="text-3xl font-bold mb-6 text-indigo-700">📊 Reportes y Notificaciones Administrativas</h1>
+        <div className="max-w-7xl mx-auto p-4 space-y-8 pb-20">
+            
+            {/* --- HEADER Y TOTAL GLOBAL --- */}
+            <div className="flex flex-col md:flex-row justify-between items-center border-b pb-4">
+                <h1 className="text-3xl font-bold text-gray-800">Panel Financiero</h1>
+                <div className="mt-4 md:mt-0 bg-indigo-900 text-white px-6 py-3 rounded-lg shadow-lg text-center">
+                    <p className="text-xs uppercase tracking-widest opacity-75">Saldo Total Neto</p>
+                    <p className="text-3xl font-bold">{formatCurrency(financials.balance)}</p>
+                </div>
+            </div>
 
-            <div className="bg-white p-4 md:p-6 rounded-lg shadow-xl mb-10">
-                <h2 className="text-2xl font-bold mb-4 text-red-600 flex items-center">
-                    🔔 Clases Pendientes de Asignación ({clasesPendientes.length})
-                </h2>
+            {/* --- SECCIÓN 1: PENDIENTES --- */}
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-yellow-500 overflow-hidden">
+                <div className="bg-yellow-50 px-6 py-3 border-b border-yellow-100 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-yellow-800 flex items-center gap-2">
+                        🔔 Pendientes de Asignación <span className="bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded-full">{pendientes.length}</span>
+                    </h2>
+                </div>
                 
-                {loadingClases ? (
-                    <p className="text-center text-gray-500">Cargando notificaciones...</p>
-                ) : clasesPendientes.length === 0 ? (
-                    <p className="p-4 bg-green-50 text-green-700 border-l-4 border-green-500">
-                        ✅ No hay clases de ingreso pendientes de asignar.
-                    </p>
+                {pendientes.length === 0 ? (
+                     <div className="p-6 text-center text-gray-500">✅ No hay clases pendientes.</div>
                 ) : (
-                    <>
-                        <div className="hidden md:block overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-red-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Fecha</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Instructor</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Detalles</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Total</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Asignar Ingreso a</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {clasesPendientes.map(clase => <RenderPendingRow key={clase.id} clase={clase} />)}
-                                </tbody>
-                            </table>
-                        </div>
-                        <ul className="md:hidden">
-                             {clasesPendientes.map(clase => <RenderPendingRow key={clase.id} clase={clase} />)}
-                        </ul>
-                    </>
+                    <div className="divide-y divide-gray-100">
+                        {pendientes.map(item => (
+                            <div key={item.id} className="hover:bg-gray-50 transition-colors">
+                                {/* Fila Principal Móvil/Desktop */}
+                                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between md:justify-start md:gap-4 items-baseline">
+                                            <span className="font-bold text-gray-800">{item.fecha}</span>
+                                            <span className="text-green-600 font-bold">{formatCurrency(item.total)}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                            {item.actividad} - {item.instructor}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 w-full md:w-auto">
+                                        <select 
+                                            value={item.asignadoA}
+                                            onChange={(e) => handlePendienteChange(item.id, e.target.value)}
+                                            className="border rounded px-2 py-1 text-sm w-full md:w-32"
+                                        >
+                                            <option value="NINGUNO">Elegir...</option>
+                                            <option value="IGNA">IGNA</option>
+                                            <option value="JOSE">JOSE</option>
+                                        </select>
+                                        <button 
+                                            onClick={() => saveAssignment(item.id, item.asignadoA)}
+                                            className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                                        >
+                                            Guardar
+                                        </button>
+                                        <button 
+                                            onClick={() => toggleDetails(item.id)}
+                                            className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300"
+                                        >
+                                            {expandedId === item.id ? '▲' : '▼'}
+                                        </button>
+                                    </div>
+                                </div>
+                                {expandedId === item.id && <RenderDetails item={item} />}
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
-            
-            <hr className="my-10" />
 
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">🔍 Generador de Reporte Financiero</h2>
-            <div className="bg-white p-4 md:p-6 rounded-lg shadow-md mb-8 flex flex-col md:flex-row gap-4 items-end">
-                <div className="w-full md:w-auto">
-                    <label className="block text-sm font-medium text-gray-700">Desde</label>
-                    <input type="date" name="fechaInicio" value={fechas.fechaInicio} onChange={handleChange} className="mt-1 p-2 border rounded-md w-full" />
+            {/* --- SECCIÓN 2: EGRESOS --- */}
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-red-500 overflow-hidden">
+                <div className="bg-red-50 px-6 py-3 border-b border-red-100">
+                    <h2 className="text-xl font-bold text-red-800">💸 Listado de Egresos</h2>
                 </div>
-                <div className="w-full md:w-auto">
-                    <label className="block text-sm font-medium text-gray-700">Hasta</label>
-                    <input type="date" name="fechaFin" value={fechas.fechaFin} onChange={handleChange} className="mt-1 p-2 border rounded-md w-full" />
-                </div>
-                <button 
-                    onClick={generarReporte}
-                    disabled={loadingReporte}
-                    className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50 transition-colors"
-                >
-                    {loadingReporte ? 'Generando...' : 'Generar Reporte'}
-                </button>
+                {egresos.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">No hay egresos registrados.</div>
+                ) : (
+                     <div className="divide-y divide-gray-100">
+                        {egresos.map(item => {
+                            // Calculamos el monto correcto para mostrar
+                            const monto = parseFloat(item.gastosAsociados) || parseFloat(item.total) || 0;
+                            return (
+                                <div key={item.id} className="hover:bg-gray-50 transition-colors">
+                                    <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div>
+                                            <div className="flex items-baseline gap-4">
+                                                <span className="font-bold text-gray-800">{item.fecha}</span>
+                                                <span className="text-red-600 font-bold">-{formatCurrency(monto)}</span>
+                                            </div>
+                                            <div className="text-sm text-gray-600 mt-1">
+                                                {item.detalles || item.actividad} ({item.formaPago})
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => toggleDetails(item.id)}
+                                            className="w-full md:w-auto bg-gray-100 text-indigo-600 px-4 py-1 rounded text-sm font-medium hover:bg-indigo-50"
+                                        >
+                                            {expandedId === item.id ? 'Ocultar Detalle' : 'Ver Detalle'}
+                                        </button>
+                                    </div>
+                                    {expandedId === item.id && <RenderDetails item={item} />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            {reporte && (
-                <div className="space-y-8">
-                    <h2 className="text-2xl font-semibold border-b pb-2 text-gray-800">Resumen Financiero ({fechas.fechaInicio} a {fechas.fechaFin})</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                        <Card title="Ingresos Brutos" value={ingresosBrutos} color="bg-indigo-600" />
-                        <Card title="Gastos Asoc. a Ingreso" value={gastosAsociados} color="bg-orange-500" />
-                        <Card title="Total Egresos Operacionales" value={egresosOperacionales} color="bg-red-500" />
-                        <Card title="SALDO NETO" value={ingresosNetos} color="bg-green-700" />
+            {/* --- SECCIÓN 3: INGRESOS ASIGNADOS --- */}
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-green-500 overflow-hidden">
+                <div className="bg-green-50 px-6 py-3 border-b border-green-100">
+                    <h2 className="text-xl font-bold text-green-800">✅ Ingresos Asignados</h2>
+                </div>
+                {asignados.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">No hay ingresos asignados aún.</div>
+                ) : (
+                    <div className="divide-y divide-gray-100">
+                        {asignados.map(item => (
+                            <div key={item.id} className="hover:bg-gray-50 transition-colors">
+                                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between md:justify-start md:gap-4 items-baseline">
+                                            <span className="font-bold text-gray-800">{item.fecha}</span>
+                                            <span className="text-green-600 font-bold">{formatCurrency(item.total)}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${item.asignadoA === 'IGNA' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                                {item.asignadoA}
+                                            </span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                            {item.actividad} ({item.moneda})
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 justify-end w-full md:w-auto">
+                                        <button onClick={() => toggleDetails(item.id)} className="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 p-2 rounded text-xs font-bold">
+                                            DETALLE
+                                        </button>
+                                        <button onClick={() => handleEdit(item.id)} className="text-yellow-600 bg-yellow-50 hover:bg-yellow-100 p-2 rounded text-xs font-bold">
+                                            EDITAR
+                                        </button>
+                                        <button onClick={() => handleDelete(item.id)} className="text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded text-xs font-bold">
+                                            ELIMINAR
+                                        </button>
+                                    </div>
+                                </div>
+                                {expandedId === item.id && <RenderDetails item={item} />}
+                            </div>
+                        ))}
                     </div>
+                )}
+            </div>
 
-                    <h2 className="text-2xl font-semibold border-b pb-2 text-gray-800 pt-4">Asignación de Ingresos (100% de la clase)</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6">
-                        <Card title="Asignado a IGNA" value={reporte.totalAsignadoIgna} color="bg-blue-500" />
-                        <Card title="Asignado a JOSE" value={reporte.totalAsignadoJose} color="bg-green-600" />
+            {/* --- SECCIÓN 4: GRÁFICOS Y ESTADÍSTICAS --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-8">
+                {/* Gráfico 1: Distribución Igna vs Jose */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Distribución de Ingresos</h3>
+                    <div className="h-64 flex justify-center">
+                        <Doughnut data={chartDataDistribution} options={{ maintainAspectRatio: false }} />
                     </div>
-                    
-                    <hr className="my-8" />
-                    
-                    <h2 className="text-2xl font-bold mb-6 text-gray-800">📄 Detalle de Transacciones Filtradas</h2>
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actividad</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto Neto</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Moneda</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asignado A</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {ingresosEgresos.length > 0 ? ingresosEgresos.map(clase => <RenderReporteRow key={clase.id} clase={clase} />) : (
-                                    <tr>
-                                        <td colSpan="7" className="text-center p-4 text-gray-500">No hay transacciones en el rango de fechas seleccionado.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <ul className="md:hidden">
-                         {ingresosEgresos.length > 0 ? ingresosEgresos.map(clase => <RenderReporteRow key={clase.id} clase={clase} />) : (
-                            <li className="text-center p-4 text-gray-500 bg-white shadow rounded-lg">No hay transacciones en el rango de fechas seleccionado.</li>
-                        )}
-                    </ul>
-
-                    <hr className="my-8" />
-                    <h2 className="text-2xl font-bold mb-6 text-gray-800">📈 Gráficos de Estadísticas</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="bg-gray-100 p-8 rounded-lg text-center h-64 flex items-center justify-center">
-                            [Aquí iría el gráfico de barras de Ingresos vs Egresos]
-                        </div>
-                         <div className="bg-gray-100 p-8 rounded-lg text-center h-64 flex items-center justify-center">
-                            [Aquí iría el gráfico de torta de Asignación de Ingresos (Igna vs Jose vs Escuela)]
-                        </div>
+                    <div className="mt-4 text-center text-sm text-gray-600">
+                        <p>Igna: {formatCurrency(financials.igna)} | Jose: {formatCurrency(financials.jose)}</p>
                     </div>
                 </div>
-            )}
+
+                {/* Gráfico 2: Flujo de Caja */}
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Ingresos vs Egresos</h3>
+                    <div className="h-64">
+                         <Bar 
+                            data={chartDataFlow} 
+                            options={{ 
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } }
+                            }} 
+                        />
+                    </div>
+                </div>
+
+                {/* Gráfico 3: Gastos por Actividad (Barra Horizontal o Pie) */}
+                <div className="bg-white p-6 rounded-xl shadow-md lg:col-span-2">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Desglose de Gastos</h3>
+                    <div className="h-64">
+                        <Bar 
+                            data={chartDataExpenses}
+                            options={{
+                                maintainAspectRatio: false,
+                                indexAxis: 'y', // Barra horizontal
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
