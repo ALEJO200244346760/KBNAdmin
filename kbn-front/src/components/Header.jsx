@@ -10,10 +10,10 @@ export default function Header() {
 
   const isLoginPage = location.pathname === "/login";
 
+  const isLogged = !!user?.role; // 👈 nueva validación correcta
+
   const handleLogout = async () => {
-    // Ejecuta la función de logout del contexto
     await logout();
-    // Redirige a login
     navigate("/login", { replace: true });
   };
 
@@ -25,7 +25,8 @@ export default function Header() {
   return (
     <header className="bg-white shadow-md fixed top-0 left-0 w-full z-50">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        {/* Logo + KBN */}
+
+        {/* Logo */}
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => goTo("/")}>
           <img src="/logo.png" alt="KBN Logo" className="h-10 w-10 object-contain" />
           <span className="text-2xl font-bold tracking-wide text-gray-800">KBN</span>
@@ -44,6 +45,7 @@ export default function Header() {
 
         {/* Opciones escritorio */}
         <nav className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
+
           {user?.role === "ADMINISTRADOR" && (
             <>
               <button onClick={() => goTo("/admin")} className="hover:text-blue-600 transition-colors">Panel Admin</button>
@@ -56,16 +58,22 @@ export default function Header() {
             <button onClick={() => goTo("/instructor")} className="hover:text-blue-600 transition-colors">Instructor</button>
           )}
 
-          {/* Botón Iniciar sesión si no hay usuario y no estamos en login */}
-          {!user && !isLoginPage && (
-            <button onClick={() => goTo("/login")} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+          {/* Login si NO hay sesión */}
+          {!isLogged && !isLoginPage && (
+            <button
+              onClick={() => goTo("/login")}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+            >
               Iniciar sesión
             </button>
           )}
 
-          {/* Botón Cerrar sesión si hay usuario */}
-          {user && (
-            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition">
+          {/* Logout si hay sesión */}
+          {isLogged && (
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+            >
               Cerrar sesión
             </button>
           )}
@@ -87,12 +95,22 @@ export default function Header() {
             <button className="block py-1 w-full text-left" onClick={() => goTo("/instructor")}>Instructor</button>
           )}
 
-          {!user && !isLoginPage && (
-            <button className="block bg-blue-600 text-white py-2 px-3 rounded-md w-full text-center" onClick={() => goTo("/login")}>Iniciar sesión</button>
+          {!isLogged && !isLoginPage && (
+            <button
+              className="block bg-blue-600 text-white py-2 px-3 rounded-md w-full text-center"
+              onClick={() => goTo("/login")}
+            >
+              Iniciar sesión
+            </button>
           )}
 
-          {user && (
-            <button onClick={handleLogout} className="w-full bg-red-500 text-white py-2 rounded-md">Cerrar sesión</button>
+          {isLogged && (
+            <button
+              onClick={handleLogout}
+              className="w-full bg-red-500 text-white py-2 rounded-md"
+            >
+              Cerrar sesión
+            </button>
           )}
         </div>
       )}
