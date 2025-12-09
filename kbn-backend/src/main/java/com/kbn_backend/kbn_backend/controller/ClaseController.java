@@ -90,15 +90,12 @@ public class ClaseController {
     // 4. GENERAR REPORTE
     @GetMapping("/reporte")
     public ResponseEntity<ReporteKiteDTO> generarReporte(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
+            @RequestParam String fechaInicio,
+            @RequestParam String fechaFin) {
 
+        // Llamamos al repositorio con Strings, ya que la fecha ahora es String
         Optional<ReporteKiteDTO> reporte = claseRepository.getReporteEntreFechas(fechaInicio, fechaFin);
 
-        if (reporte.isPresent()) {
-            return ResponseEntity.ok(reporte.get());
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        return reporte.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
