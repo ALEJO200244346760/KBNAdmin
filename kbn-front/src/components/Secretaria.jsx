@@ -111,8 +111,14 @@ const Secretaria = () => {
 
   // --- LÓGICA DE AGENDA (Nueva) ---
   const handleAgendaChange = e => {
-    setAgendaData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+    const { name, value } = e.target;
+
+    setAgendaData(prev => ({
+        ...prev,
+        [name]: name === "instructorId" ? Number(value) : value
+    }));
+    };
+
 
   const handleAgendaSubmit = async e => {
     e.preventDefault();
