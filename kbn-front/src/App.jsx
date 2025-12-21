@@ -8,19 +8,21 @@ import AdminDashboard from './components/AdminDashboard';
 import InstructorForm from './components/InstructorForm';
 import ReporteEstadisticas from './components/ReporteEstadisticas';
 import UserManagement from './components/UserManagement';
+import Secretaria from './components/Secretaria'; // 👈 NUEVO
 
-// Componente para rutas privadas según rol
+// Ruta privada por rol
 const PrivateRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) return <div className="p-10 text-center">Cargando...</div>;
-
   if (!user?.role) return <Navigate to="/login" replace />;
 
   if (!allowedRoles.includes(user.role)) {
     switch (user.role) {
       case 'ADMINISTRADOR':
         return <Navigate to="/admin" replace />;
+      case 'SECRETARIA':
+        return <Navigate to="/secretaria" replace />;
       case 'INSTRUCTOR':
       case 'ALUMNO':
         return <Navigate to="/instructor" replace />;
@@ -32,7 +34,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-// Redirección raíz según sesión y rol
+// Redirección raíz según rol
 const HomeRedirect = () => {
   const { user, loading } = useAuth();
 
@@ -41,7 +43,9 @@ const HomeRedirect = () => {
 
   switch (user.role) {
     case 'ADMINISTRADOR':
-      return <Navigate to="/admin" replace />; // PANEL ADMIN como página principal
+      return <Navigate to="/admin" replace />;
+    case 'SECRETARIA':
+      return <Navigate to="/secretaria" replace />;
     case 'INSTRUCTOR':
     case 'ALUMNO':
       return <Navigate to="/instructor" replace />;
@@ -79,17 +83,35 @@ function App() {
               }
             />
 
-            {/* INSTRUCTOR / ALUMNO / ADMIN también puede ver InstructorForm */}
+            {/* SECRETARIA */}
+            <Route
+              path="/secretaria"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR', 'SECRETARIA']}>
+                  <Secretaria />
+                </PrivateRoute>
+              }
+            />
+
+            {/* INSTRUCTOR / ALUMNO / ADMIN */}
             <Route
               path="/instructor"
               element={
-                <PrivateRoute allowedRoles={['ADMINISTRADOR','INSTRUCTOR','ALUMNO']}>
+                <PrivateRoute allowedRoles={['ADMINISTRADOR', 'INSTRUCTOR', 'ALUMNO']}>
                   <InstructorForm />
                 </PrivateRoute>
               }
             />
 
-            <Route path="/usuarios" element={<UserManagement />} />
+            {/* Opcional: proteger también */}
+            <Route
+              path="/usuarios"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
+                  <UserManagement />
+                </PrivateRoute>
+              }
+            />
           </Routes>
         </div>
       </HashRouter>

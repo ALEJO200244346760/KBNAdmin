@@ -9,8 +9,7 @@ export default function Header() {
   const navigate = useNavigate();
 
   const isLoginPage = location.pathname === "/login";
-
-  const isLogged = !!user?.role; // 👈 nueva validación correcta
+  const isLogged = !!user?.role;
 
   const handleLogout = async () => {
     await logout();
@@ -27,14 +26,26 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
 
         {/* Logo */}
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => goTo("/")}>
+        <div
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => goTo("/")}
+        >
           <img src="/logo.png" alt="KBN Logo" className="h-10 w-10 object-contain" />
           <span className="text-2xl font-bold tracking-wide text-gray-800">KBN</span>
         </div>
 
         {/* Botón menú móvil */}
-        <button className="md:hidden p-2 rounded focus:outline-none" onClick={() => setMenuOpen(!menuOpen)}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <button
+          className="md:hidden p-2 rounded focus:outline-none"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-7 w-7 text-gray-700"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             {menuOpen ? (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             ) : (
@@ -43,36 +54,46 @@ export default function Header() {
           </svg>
         </button>
 
-        {/* Opciones escritorio */}
+        {/* Menú escritorio */}
         <nav className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
 
+          {/* ADMINISTRADOR ve todo */}
           {user?.role === "ADMINISTRADOR" && (
             <>
-              <button onClick={() => goTo("/admin")} className="hover:text-blue-600 transition-colors">Panel Admin</button>
-              <button onClick={() => goTo("/instructor")} className="hover:text-blue-600 transition-colors">Instructor</button>
-              <button onClick={() => goTo("/reportes")} className="hover:text-blue-600 transition-colors">Estadísticas</button>
+              <button onClick={() => goTo("/admin")} className="hover:text-blue-600">Panel Admin</button>
+              <button onClick={() => goTo("/instructor")} className="hover:text-blue-600">Instructor</button>
+              <button onClick={() => goTo("/secretaria")} className="hover:text-blue-600">Secretaria</button>
+              <button onClick={() => goTo("/reportes")} className="hover:text-blue-600">Estadísticas</button>
             </>
           )}
 
-          {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <button onClick={() => goTo("/instructor")} className="hover:text-blue-600 transition-colors">Instructor</button>
+          {/* SECRETARIA solo Secretaria */}
+          {user?.role === "SECRETARIA" && (
+            <button onClick={() => goTo("/secretaria")} className="hover:text-blue-600">
+              Secretaria
+            </button>
           )}
 
-          {/* Login si NO hay sesión */}
+          {/* INSTRUCTOR / ALUMNO igual que antes */}
+          {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
+            <button onClick={() => goTo("/instructor")} className="hover:text-blue-600">
+              Instructor
+            </button>
+          )}
+
           {!isLogged && !isLoginPage && (
             <button
               onClick={() => goTo("/login")}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
               Iniciar sesión
             </button>
           )}
 
-          {/* Logout si hay sesión */}
           {isLogged && (
             <button
               onClick={handleLogout}
-              className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+              className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
             >
               Cerrar sesión
             </button>
@@ -83,21 +104,31 @@ export default function Header() {
       {/* Menú móvil */}
       {menuOpen && (
         <div className="md:hidden bg-white shadow-md py-3 px-4 space-y-3 text-gray-700 font-medium">
+
           {user?.role === "ADMINISTRADOR" && (
             <>
-              <button className="block py-1 w-full text-left" onClick={() => goTo("/admin")}>Panel Admin</button>
-              <button className="block py-1 w-full text-left" onClick={() => goTo("/instructor")}>Instructor</button>
-              <button className="block py-1 w-full text-left" onClick={() => goTo("/reportes")}>Estadísticas</button>
+              <button className="block w-full text-left" onClick={() => goTo("/admin")}>Panel Admin</button>
+              <button className="block w-full text-left" onClick={() => goTo("/instructor")}>Instructor</button>
+              <button className="block w-full text-left" onClick={() => goTo("/secretaria")}>Secretaria</button>
+              <button className="block w-full text-left" onClick={() => goTo("/reportes")}>Estadísticas</button>
             </>
           )}
 
+          {user?.role === "SECRETARIA" && (
+            <button className="block w-full text-left" onClick={() => goTo("/secretaria")}>
+              Secretaria
+            </button>
+          )}
+
           {(user?.role === "INSTRUCTOR" || user?.role === "ALUMNO") && (
-            <button className="block py-1 w-full text-left" onClick={() => goTo("/instructor")}>Instructor</button>
+            <button className="block w-full text-left" onClick={() => goTo("/instructor")}>
+              Instructor
+            </button>
           )}
 
           {!isLogged && !isLoginPage && (
             <button
-              className="block bg-blue-600 text-white py-2 px-3 rounded-md w-full text-center"
+              className="w-full bg-blue-600 text-white py-2 rounded-md"
               onClick={() => goTo("/login")}
             >
               Iniciar sesión
