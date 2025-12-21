@@ -25,7 +25,7 @@ public class AdminController {
         this.usuarioService = usuarioService;
         this.rolService = rolService;
     }
-    
+
     @PostMapping("/roles")
     public ResponseEntity<Rol> createRole(@RequestBody Rol rol) {
         Rol createdRole = rolService.createRole(rol);
