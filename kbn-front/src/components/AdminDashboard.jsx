@@ -176,9 +176,9 @@ const AdminDashboard = () => {
                       <button 
                         onClick={() => guardarCambioRol(user)}
                         title="Guardar cambio de rol"
-                        className="text-green-600 hover:text-green-800"
+                        className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-800"
                       >
-                        💾
+                        Guardar rol
                       </button>
                   </div>
                 </td>
