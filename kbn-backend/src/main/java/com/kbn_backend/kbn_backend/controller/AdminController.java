@@ -15,19 +15,17 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/administracion")
-public class CardiologoController {
+public class AdminController {
 
     private final UsuarioService usuarioService;
     private final RolService rolService;
 
     @Autowired
-    public CardiologoController(UsuarioService usuarioService, RolService rolService) {
+    public AdminController(UsuarioService usuarioService, RolService rolService) {
         this.usuarioService = usuarioService;
         this.rolService = rolService;
     }
-
-    // CRUD for Roles
-
+    
     @PostMapping("/roles")
     public ResponseEntity<Rol> createRole(@RequestBody Rol rol) {
         Rol createdRole = rolService.createRole(rol);
@@ -36,42 +34,45 @@ public class CardiologoController {
 
     @GetMapping("/roles")
     public ResponseEntity<List<Rol>> getAllRoles() {
-        List<Rol> roles = rolService.getAllRoles();
-        return ResponseEntity.ok(roles);
+        return ResponseEntity.ok(rolService.getAllRoles());
     }
 
-    @GetMapping("/roles/{id}")
-    public ResponseEntity<Rol> getRoleById(@PathVariable Long id) {
-        Optional<Rol> role = rolService.getRoleById(id);
-        return role.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
-    }
+    // --- GESTIÓN DE USUARIOS ---
 
-    @PutMapping("/roles/{id}")
-    public ResponseEntity<Rol> updateRole(@PathVariable Long id, @RequestBody Rol rol) {
-        Optional<Rol> updatedRole = rolService.updateRole(id, rol);
-        return updatedRole.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
-    @DeleteMapping("/roles/{id}")
-    public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
-        boolean deleted = rolService.deleteRole(id);
-        return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
-    }
-
-    // User Role Management
+    // 1. Asignar ROL
     @PutMapping("/users/{userId}/roles")
-    public ResponseEntity<Map<String, String>> addRoleToUser(@PathVariable Long userId, @RequestBody Map<String, String> body) {
-        String roleName = body.get("rol"); // o roleName, dependiendo de tu elección anterior
+    public ResponseEntity<?> addRoleToUser(@PathVariable Long userId, @RequestBody Map<String, String> body) {
+        String roleName = body.get("rol");
         try {
             usuarioService.addRoleToUser(userId, roleName);
             return ResponseEntity.ok(Map.of("message", "Rol asignado exitosamente"));
         } catch (Exception e) {
-            System.err.println("Error al asignar rol: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error al asignar rol: " + e.getMessage()));
         }
     }
 
+    // 2. Editar Datos del Usuario (NUEVO)
+    @PutMapping("/users/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Usuario usuarioDetails) {
+        Optional<Usuario> userOptional = usuarioService.findById(id);
+
+        if (userOptional.isPresent()) {
+            Usuario user = userOptional.get();
+            // Actualizamos solo campos permitidos
+            user.setNombre(usuarioDetails.getNombre());
+            user.setApellido(usuarioDetails.getApellido());
+            user.setEmail(usuarioDetails.getEmail());
+            // Nota: No actualizamos contraseña aquí por seguridad
+
+            usuarioService.save(user); // Asumiendo que tu servicio tiene un método save
+            return ResponseEntity.ok(Map.of("message", "Usuario actualizado correctamente"));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    // 3. Eliminar Usuario
     @DeleteMapping("/users/{id}")
     public ResponseEntity<Void> deleteUsuario(@PathVariable Long id) {
         return usuarioService.findById(id)
