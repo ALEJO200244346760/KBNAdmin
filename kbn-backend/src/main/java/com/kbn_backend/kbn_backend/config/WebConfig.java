@@ -16,4 +16,3 @@ public class WebConfig implements WebMvcConfigurer {
     }
 }
 
-//https://ercv-oms.vercel.app
