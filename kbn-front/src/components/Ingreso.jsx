@@ -35,19 +35,26 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               onChange={handleChange}
               className="mt-1 block w-full rounded-md border p-2 border-gray-300"
             >
-              <option value="Clases">Clases</option>
-              <option value="Aula Kite">Aula Kite</option>
+              <option value="">Seleccionar actividad</option>
+              <option value="Clase de Kite">Clase de Kite</option>
+              <option value="Clase de Wing">Clase de Wing</option>
+              <option value="Clase de Windsurf">Clase de Windsurf</option>
               <option value="Rental">Rental</option>
               <option value="Otro">Otro...</option>
             </select>
           </div>
+
           {formData.actividad === 'Otro' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700">Especifique Actividad</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Especificar actividad
+              </label>
               <input
                 type="text"
                 name="actividadOtro"
+                value={formData.actividadOtro || ''}
                 onChange={handleChange}
+                placeholder="Ej: Aula teórica, asistencia, etc."
                 className="mt-1 block w-full rounded-md border p-2 border-gray-300"
               />
             </div>
