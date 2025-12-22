@@ -30,6 +30,7 @@ const Secretaria = () => {
   };
   const [financeData, setFinanceData] = useState(initialFinanceData);
 
+  // Mantenemos tu lógica de carga que funciona perfecto
   useEffect(() => {
     fetchInstructors();
     if (view === 'MONITOR') fetchAgenda();
@@ -84,7 +85,7 @@ const Secretaria = () => {
     return (
       <div className="max-w-5xl mx-auto p-4 md:p-10 mt-5">
         <h1 className="text-2xl md:text-3xl font-black text-gray-800 mb-8 text-center uppercase italic tracking-tighter">Estación Secretaria KBN</h1>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <MenuCard icon="🖥️" title="Monitor" sub="Estados" color="bg-gray-900" onClick={() => setView('MONITOR')} />
           <MenuCard icon="📅" title="Agendar" sub="Nueva" color="bg-indigo-600" onClick={() => setView('CALENDARIO')} />
           <MenuCard icon="💰" title="Ingreso" sub="Caja" color="bg-emerald-600" onClick={() => setView('INGRESO')} />
@@ -94,7 +95,7 @@ const Secretaria = () => {
     );
   }
 
-  // --- VISTA MONITOR (RESPONSIVE) ---
+  // --- VISTA MONITOR ---
   if (view === 'MONITOR') {
     return (
       <div className="max-w-6xl mx-auto p-4">
@@ -106,34 +107,37 @@ const Secretaria = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {loadingAgenda ? <p className="col-span-full text-center py-10">Cargando agenda...</p> : 
             agendaList.map(item => (
-            <div key={item.id} className={`bg-white rounded-2xl p-5 shadow-sm border-t-4 transition-all ${
-              item.estado === 'RECHAZADA' ? 'border-rose-500 bg-rose-50' : 
-              item.estado === 'PENDIENTE' ? 'border-amber-400' : 'border-emerald-500'
+            <div key={item.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-t-8 transition-all ${
+              item.estado === 'RECHAZADA' ? 'border-rose-500 shadow-rose-50' : 
+              item.estado === 'PENDIENTE' ? 'border-amber-400 shadow-amber-50' : 'border-emerald-500 shadow-emerald-50'
             }`}>
               <div className="flex justify-between items-start mb-3">
-                <span className={`text-[10px] font-black px-2 py-1 rounded uppercase tracking-tighter ${
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${
                   item.estado === 'RECHAZADA' ? 'bg-rose-100 text-rose-700' : 
                   item.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                 }`}>
                   {item.estado === 'PENDIENTE' ? '⏳ Pendiente Confirmar' : item.estado}
                 </span>
-                <p className="text-[10px] font-bold text-gray-400">{item.fecha}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase">{item.fecha}</p>
               </div>
 
-              <h3 className="font-black text-gray-800 uppercase truncate">{item.alumno}</h3>
-              <p className="text-xs font-bold text-indigo-600 mb-2">🏄‍♂️ {item.nombreInstructor}</p>
+              <h3 className="font-black text-gray-800 uppercase text-lg leading-tight mb-1 truncate">{item.alumno}</h3>
+              <p className="text-xs font-bold text-indigo-600 mb-4 tracking-wide italic">🏄‍♂️ {item.nombreInstructor}</p>
               
-              <div className="grid grid-cols-2 gap-2 text-[11px] bg-white/50 p-2 rounded-lg border border-gray-100 font-bold text-gray-500 mb-3">
-                <p>📍 {item.lugar}</p>
-                <p>🏨 {item.hotelDerivacion || 'Sin Hotel'}</p>
-                <p>⏱️ {item.horas} hs</p>
-                <p className="text-emerald-600">💵 ${item.tarifa}</p>
+              <div className="grid grid-cols-2 gap-3 text-[11px] bg-gray-50 p-4 rounded-2xl font-bold text-gray-500 mb-4">
+                <p className="truncate">📍 {item.lugar || 'No especif.'}</p>
+                <p className="truncate">🏨 {item.hotelDerivacion || 'Sin Hotel'}</p>
+                <p>⏱️ {item.horas} hs / {item.hora?.substring(0,5)} hs</p>
+                <p className="text-emerald-600 font-black">💵 TARIFA: ${item.tarifa}</p>
               </div>
 
-              <div className="flex justify-between items-center border-t pt-3 mt-auto">
-                <p className="text-[10px] font-black text-gray-400 uppercase">Pagado: ${item.horasPagadas || 0}</p>
+              <div className="flex justify-between items-center border-t border-gray-100 pt-4 mt-auto">
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">Pagado</span>
+                  <span className="text-sm font-black text-gray-700">${item.horasPagadas || 0}</span>
+                </div>
                 {item.estado === 'RECHAZADA' && (
-                  <button onClick={() => prepararReasignacion(item)} className="bg-rose-600 text-white text-[10px] px-3 py-1.5 rounded-lg font-black uppercase hover:bg-rose-700">Reasignar Instructor</button>
+                  <button onClick={() => prepararReasignacion(item)} className="bg-rose-600 text-white text-[10px] px-4 py-2 rounded-xl font-black uppercase hover:scale-105 transition-all shadow-lg shadow-rose-200">Reasignar</button>
                 )}
               </div>
             </div>
@@ -143,16 +147,16 @@ const Secretaria = () => {
     );
   }
 
-  // --- VISTA AGENDAR (FORMULARIO PROLIJO) ---
+  // --- VISTA CALENDARIO (AGENDAR) ---
   if (view === 'CALENDARIO') {
     return (
-      <div className="max-w-2xl mx-auto p-4 md:p-8 bg-white shadow-2xl rounded-[2rem] mt-5 md:mt-10 border border-gray-100">
-        <h2 className="text-xl font-black text-center mb-8 uppercase italic">{agendaData.id ? '🔄 Reasignar Clase' : '📅 Nueva Asignación'}</h2>
-        <form onSubmit={handleAgendaSubmit} className="space-y-5">
+      <div className="max-w-2xl mx-auto p-6 md:p-10 bg-white shadow-2xl rounded-[2.5rem] mt-5 md:mt-10 border border-gray-100">
+        <h2 className="text-2xl font-black text-center mb-8 uppercase italic tracking-tighter">{agendaData.id ? '🔄 Reasignar Instructor' : '📅 Nueva Asignación'}</h2>
+        <form onSubmit={handleAgendaSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Alumno</label>
-              <input type="text" placeholder="Nombre completo" value={agendaData.alumno} onChange={e => setAgendaData({...agendaData, alumno: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required />
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nombre Alumno</label>
+              <input type="text" placeholder="Juan Perez" value={agendaData.alumno} onChange={e => setAgendaData({...agendaData, alumno: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor</label>
@@ -175,44 +179,34 @@ const Secretaria = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="text" placeholder="Spot / Lugar de clase" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
-            <input type="text" placeholder="Descripción u Hotel" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Lugar / Spot</label>
+              <input type="text" placeholder="Ej: Escuela" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Hotel / Derivación</label>
+              <input type="text" placeholder="Ej: Hotel KBN" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-400 shadow-inner">
-  <div>
-    <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa Pactada</label>
-    <input
-      type="number"
-      value={agendaData.tarifa}
-      onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })}
-      placeholder="0"
-      className="w-full bg-transparent border border-indigo-300 text-xl font-black text-indigo-700 placeholder-indigo-300 p-1 rounded"
-    />
-  </div>
-  <div>
-    <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Solicitadas</label>
-    <input
-      type="number"
-      value={agendaData.horas}
-      onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })}
-      className="w-full bg-transparent border border-indigo-300 text-xl font-black text-indigo-700 p-1 rounded"
-    />
-  </div>
-  <div>
-    <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Pagadas</label>
-    <input
-      type="number"
-      value={agendaData.horasPagadas}
-      onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })}
-      className="w-full bg-transparent border border-indigo-300 text-xl font-black text-indigo-700 p-1 rounded"
-    />
-  </div>
+          <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-100 shadow-inner">
+            <div>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa $</label>
+              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} placeholder="0" className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
+            <div>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas</label>
+              <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Seña $</label>
+              <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
+            </div>
+          </div>
 
           <div className="flex flex-col md:flex-row gap-3 pt-4">
-            <button type="submit" className="flex-1 bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase shadow-lg shadow-indigo-100 hover:scale-[1.02] transition-all">Confirmar Asignación</button>
-            <button type="button" onClick={() => setView('INICIO')} className="bg-gray-100 text-gray-500 p-5 rounded-2xl font-black uppercase hover:bg-gray-200 transition-all">Cancelar</button>
+            <button type="submit" className="flex-[2] bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">Confirmar Asignación</button>
+            <button type="button" onClick={() => setView('INICIO')} className="flex-1 bg-gray-100 text-gray-400 p-5 rounded-2xl font-black uppercase hover:bg-gray-200 transition-all">Cancelar</button>
           </div>
         </form>
       </div>
@@ -244,10 +238,10 @@ const Secretaria = () => {
 };
 
 const MenuCard = ({ icon, title, sub, color, onClick }) => (
-  <button onClick={onClick} className={`${color} p-5 md:p-8 rounded-[2rem] text-white text-center transition-all active:scale-95 shadow-xl hover:shadow-2xl`}>
-    <div className="text-3xl md:text-5xl mb-2">{icon}</div>
-    <div className="font-black uppercase text-sm md:text-xl tracking-tighter leading-none">{title}</div>
-    <div className="text-[9px] md:text-[10px] opacity-60 uppercase font-black tracking-widest mt-1">{sub}</div>
+  <button onClick={onClick} className={`${color} p-6 md:p-8 rounded-[2rem] text-white text-center transition-all active:scale-90 shadow-xl hover:shadow-2xl`}>
+    <div className="text-4xl md:text-5xl mb-3">{icon}</div>
+    <div className="font-black uppercase text-sm md:text-xl tracking-tighter">{title}</div>
+    <div className="text-[10px] opacity-60 uppercase font-black tracking-widest mt-1">{sub}</div>
   </button>
 );
 
