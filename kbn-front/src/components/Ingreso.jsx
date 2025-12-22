@@ -3,11 +3,22 @@ import React from 'react';
 const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setView }) => {
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
+      {/* Botón Volver Simple */}
+      <button 
+        onClick={() => setView('AGENDA')}
+        className="mb-4 text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+      >
+        ← Volver a Agenda
+      </button>
+
       <h2 className="text-2xl font-bold mb-6 text-green-600">💰 Nueva Planilla de Ingreso</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Lógica Dinámica: Admin elige, Instructor solo ve su nombre */}
-        <InstructorField />
+        
+        {/* Campo Instructor: Renderizado con estilo estándar de formulario */}
+        <div className="space-y-1">
+          <InstructorField />
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Fecha</label>
@@ -16,7 +27,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
             name="fecha"
             value={formData.fecha}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2 text-sm"
             required
           />
         </div>
@@ -29,7 +40,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               name="actividad"
               value={formData.actividad}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
               required
             >
               <option value="">Seleccionar actividad</option>
@@ -51,8 +62,8 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
                 name="actividadOtro"
                 value={formData.actividadOtro || ''}
                 onChange={handleChange}
-                placeholder="Ej: Aula teórica, asistencia, etc."
-                className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+                placeholder="Ej: Aula teórica"
+                className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm"
               />
             </div>
           )}
@@ -66,7 +77,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
             name="vendedor"
             value={formData.vendedor || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+            className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
           />
         </div>
 
@@ -78,7 +89,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
             rows="2"
             value={formData.detalles || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+            className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
             placeholder="Ej: Clase a José"
           />
         </div>
@@ -94,7 +105,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               inputMode="decimal"
               value={formData.horas}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
             />
           </div>
           <div>
@@ -105,7 +116,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               inputMode="decimal"
               value={formData.tarifa}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
             />
           </div>
           <div>
@@ -114,7 +125,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               type="number"
               value={formData.total}
               readOnly
-              className="mt-1 block w-full rounded-md border p-2 bg-white font-bold text-green-600"
+              className="mt-1 block w-full rounded-md border p-2 bg-white font-bold text-green-600 text-sm"
             />
           </div>
         </div>
@@ -127,7 +138,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               name="moneda"
               value={formData.moneda}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
             >
               <option value="BRL">Reales (BRL)</option>
               <option value="USD">Dólares (USD)</option>
@@ -143,7 +154,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               inputMode="decimal"
               value={formData.gastos}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm"
             />
           </div>
           <div>
@@ -154,7 +165,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               inputMode="decimal"
               value={formData.comision}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm"
             />
           </div>
         </div>
@@ -166,7 +177,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
             name="formaPago"
             value={formData.formaPago}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border p-2 border-gray-300"
+            className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
           >
             <option value="Efectivo">Efectivo</option>
             <option value="MercadoPago">MercadoPago</option>
@@ -181,14 +192,14 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
               name="formaPagoOtro"
               value={formData.formaPagoOtro || ''}
               onChange={handleChange}
-              className="mt-2 block w-full rounded-md border p-2 border-gray-300"
+              className="mt-2 block w-full rounded-md border p-2 border-gray-300 text-sm"
             />
           )}
         </div>
 
         <button
           type="submit"
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
+          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-green-600 hover:bg-green-700 transition-all uppercase tracking-widest"
         >
           Guardar Ingreso
         </button>
