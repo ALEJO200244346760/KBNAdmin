@@ -1,104 +1,93 @@
-// context/AuthContext.js
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
-/* ---------------------------------------------------
-   Decodificar JWT sin librerías
---------------------------------------------------- */
 const decodeToken = (token) => {
   try {
     const payload = token.split('.')[1];
-    const decoded = JSON.parse(atob(payload));
-    return decoded;
+    return JSON.parse(atob(payload));
   } catch (e) {
     console.error('Error decoding token:', e);
     return null;
   }
 };
 
-/* ---------------------------------------------------
-   Normalizar roles del backend → roles del frontend
---------------------------------------------------- */
 const normalizeRole = (backendRole) => {
   if (!backendRole) return null;
-
   const clean = backendRole.replace("ROLE_", "");
-
-  switch (clean) {
-    case "ADMINISTRADOR":
-      return "ADMINISTRADOR";
-    case "INSTRUCTOR":
-      return "INSTRUCTOR";
-    case "SECRETARIA":
-      return "SECRETARIA";
-    case "ALUMNO":
-      return "ALUMNO";
-    default:
-      return clean;
-  }
+  const roles = {
+    "ADMINISTRADOR": "ADMINISTRADOR",
+    "INSTRUCTOR": "INSTRUCTOR",
+    "SECRETARIA": "SECRETARIA",
+    "ALUMNO": "ALUMNO"
+  };
+  return roles[clean] || clean;
 };
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
-  const [roles, setRoles] = useState([]);
-  const [user, setUser] = useState({ id: null, nombre: '', apellido: '', role: '' });
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /* ---------------------------------------------------
-     Cada vez que token cambie, actualizamos usuario
-  --------------------------------------------------- */
   useEffect(() => {
-    if (token) {
-      const decoded = decodeToken(token);
+    const initializeAuth = async () => {
+      if (token) {
+        const decoded = decodeToken(token);
+        const email = decoded?.sub;
 
-      const backendRole = decoded?.roles?.[0] || null;
-      const normalizedRole = normalizeRole(backendRole);
+        try {
+          // Buscamos los datos completos del usuario (incluyendo el ID) por email
+          // Usamos la ruta /usuario (ajusta si es /api/usuarios)
+          const res = await axios.get(`https://kbnadmin-production.up.railway.app/usuario`);
+          const listaUsuarios = res.data;
+          const usuarioEncontrado = listaUsuarios.find(u => u.email === email);
 
-      setRoles(decoded?.roles || []);
-      setUser({
-        id: decoded?.id || decoded?.sub || null,
-        nombre: decoded?.nombre || '',
-        apellido: decoded?.apellido || '',
-        role: normalizedRole || '',
-      });
+          if (usuarioEncontrado) {
+            setUser({
+              id: usuarioEncontrado.id,
+              nombre: usuarioEncontrado.nombre,
+              apellido: usuarioEncontrado.apellido,
+              email: usuarioEncontrado.email,
+              role: normalizeRole(decoded?.roles?.[0])
+            });
+          } else {
+            // Fallback si no lo encuentra en la lista
+            setUser({
+              id: decoded?.id || null,
+              nombre: decoded?.nombre || '',
+              apellido: decoded?.apellido || '',
+              role: normalizeRole(decoded?.roles?.[0])
+            });
+          }
+        } catch (error) {
+          console.error("Error recuperando info de usuario:", error);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    };
 
-      console.log("🔐 JWT completo decodificado:", decoded);
-      console.log("🔐 JWT ROLE:", backendRole);
-      console.log("🎭 FRONT ROLE:", normalizedRole);
-
-    } else {
-      setRoles([]);
-      setUser({ id: null, nombre: '', apellido: '', role: '' });
-    }
-
-    setLoading(false);
+    initializeAuth();
   }, [token]);
 
-  /* ---------------------------------------------------
-     Login: guardar y activar token
-  --------------------------------------------------- */
-  const login = (token) => {
-    localStorage.setItem('token', token);
-    setToken(token);
+  const login = (newToken) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
   };
 
-  /* ---------------------------------------------------
-     Logout
-  --------------------------------------------------- */
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
-    setRoles([]);
-    setUser({ id: null, nombre: '', apellido: '', role: '' });
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ token, roles, user, login, logout, loading }}>
+    <AuthContext.Provider value={{ token, user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => useContext(AuthContext);
-export { AuthContext };

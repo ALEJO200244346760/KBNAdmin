@@ -1,28 +1,25 @@
-// components/InstructorForm.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-// Formularios existentes
 import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 
 const InstructorForm = () => {
-  const { user, loading } = useAuth();
-
+  const { user, loading: authLoading } = useAuth();
   const [view, setView] = useState('AGENDA'); 
   const [agendaItems, setAgendaItems] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
-  const [instructorId, setInstructorId] = useState(null); // <-- ID numérico real
 
   const today = new Date().toISOString().split('T')[0];
-  const initialFormData = {
+  
+  const [formData, setFormData] = useState({
     tipoTransaccion: 'INGRESO',
     fecha: today,
     actividad: 'Clases',
     actividadOtro: '',
     vendedor: '',
-    instructor: user ? `${user.nombre} ${user.apellido}` : '',
+    instructor: '',
     detalles: '',
     horas: 0,
     tarifa: 0,
@@ -32,44 +29,29 @@ const InstructorForm = () => {
     formaPago: 'Efectivo',
     formaPagoOtro: '',
     moneda: 'USD'
-  };
+  });
 
-  const [formData, setFormData] = useState(initialFormData);
-
-  /* ------------------ Obtener ID numérico si es email ------------------ */
+  // Sincronizar nombre del instructor cuando el usuario carga
   useEffect(() => {
-    if (!loading && user?.id) {
-      // Si user.id parece un email, pedir ID numérico
-      if (user.id.includes('@')) {
-        const fetchId = async () => {
-          try {
-            const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/usuarios/email/${user.id}`);
-            setInstructorId(res.data.id); // <-- asumimos que la API responde {id: 123, ...}
-          } catch (error) {
-            console.error("Error obteniendo ID del instructor:", error);
-          }
-        };
-        fetchId();
-      } else {
-        setInstructorId(user.id);
-      }
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        instructor: `${user.nombre} ${user.apellido}`
+      }));
     }
-  }, [user, loading]);
+  }, [user]);
 
-  /* ------------------ Cargar Agenda ------------------ */
-  useEffect(() => {
-    if (view === 'AGENDA' && instructorId) {
-      fetchAgenda();
-    }
-  }, [view, instructorId]);
-
-  const fetchAgenda = async () => {
+  const fetchAgenda = useCallback(async () => {
+    if (!user?.id) return;
+    
     setLoadingAgenda(true);
     try {
-      const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${instructorId}`);
+      const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`);
       const sorted = res.data.sort((a, b) => {
+        // Pendientes arriba
         if (a.estado === 'PENDIENTE' && b.estado !== 'PENDIENTE') return -1;
         if (a.estado !== 'PENDIENTE' && b.estado === 'PENDIENTE') return 1;
+        // Luego por fecha descendente
         return new Date(b.fecha) - new Date(a.fecha);
       });
       setAgendaItems(sorted);
@@ -78,9 +60,14 @@ const InstructorForm = () => {
     } finally {
       setLoadingAgenda(false);
     }
-  };
+  }, [user?.id]);
 
-  /* ------------------ Cambiar estado de clase ------------------ */
+  useEffect(() => {
+    if (view === 'AGENDA' && !authLoading) {
+      fetchAgenda();
+    }
+  }, [view, authLoading, fetchAgenda]);
+
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
       await axios.put(
@@ -92,16 +79,13 @@ const InstructorForm = () => {
       setAgendaItems(prev => prev.map(item => 
         item.id === id ? { ...item, estado: nuevoEstado } : item
       ));
-
-      alert(`Clase ${nuevoEstado.toLowerCase()} correctamente.`);
+      alert(`Clase ${nuevoEstado.toLowerCase()} con éxito.`);
     } catch (error) {
-      console.error(error);
       alert("Error al actualizar estado.");
       fetchAgenda();
     }
   };
 
-  /* ------------------ Calcular total en Ingreso ------------------ */
   useEffect(() => {
     if (view === 'INGRESO') {
       const totalCalc = (parseFloat(formData.horas) || 0) * (parseFloat(formData.tarifa) || 0) - (parseFloat(formData.gastos) || 0);
@@ -115,156 +99,114 @@ const InstructorForm = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!formData.instructor) return alert('Error: Instructor no identificado.');
-
     const payload = {
-      tipoTransaccion: String(view),
-      fecha: String(formData.fecha),
-      actividad: String(formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad),
-      instructor: String(formData.instructor),
-      moneda: String(formData.moneda),
-      detalles: String(formData.detalles),
-      cantidadHoras: String(view === 'EGRESO' ? '0' : formData.horas),
-      tarifaPorHora: String(view === 'EGRESO' ? '0' : formData.tarifa),
-      total: String(view === 'EGRESO' ? '0' : formData.total),
+      ...formData,
+      tipoTransaccion: view,
+      actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
+      formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
+      cantidadHoras: view === 'EGRESO' ? '0' : String(formData.horas),
+      tarifaPorHora: view === 'EGRESO' ? '0' : String(formData.tarifa),
+      total: view === 'EGRESO' ? '0' : String(formData.total),
       gastosAsociados: String(formData.gastos || '0'),
-      comision: String(formData.comision || '0'),
-      formaPago: String(formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago),
-      vendedor: String(formData.vendedor || ''),
       asignadoA: 'NINGUNO'
     };
 
     try {
       await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
-      alert(`${view} registrado exitosamente!`);
+      alert(`${view} guardado correctamente.`);
       setView('AGENDA');
-      setFormData(initialFormData);
     } catch (error) {
-      alert('Error al guardar. Revisa la conexión.');
+      alert('Error al guardar registro.');
     }
   };
 
   const InstructorField = () => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700">Instructor</label>
+    <div className="mb-4">
+      <label className="block text-sm font-bold text-gray-700 uppercase mb-1">Instructor</label>
       <input
         type="text"
-        name="instructor"
         value={formData.instructor}
         readOnly
-        className="mt-1 block w-full rounded-md border p-2 bg-gray-100 text-gray-500 cursor-not-allowed"
+        className="w-full p-2 bg-gray-100 border rounded text-gray-600 font-semibold"
       />
     </div>
   );
 
+  if (authLoading) return <div className="text-center mt-20">Cargando perfil...</div>;
+
   return (
-    <div className="max-w-4xl mx-auto p-4 pb-20">
-      {/* Encabezado y botones de vista */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Hola, {user?.nombre || 'Instructor'} 👋
-        </h1>
+    <div className="max-w-4xl mx-auto p-4">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-xl shadow-sm">
+        <div>
+          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
+            Panel Instructor
+          </h1>
+          <p className="text-indigo-600 font-medium">{user?.nombre} {user?.apellido}</p>
+        </div>
         
-        <div className="flex bg-gray-100 p-1 rounded-lg">
+        <div className="flex bg-gray-100 p-1 rounded-xl">
           {['AGENDA','INGRESO','EGRESO'].map(v => (
             <button 
               key={v}
               onClick={() => setView(v)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                view === v ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'
+              className={`px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
+                view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-200'
               }`}
             >
-              {v === 'AGENDA' ? '📅 Mi Agenda' : v === 'INGRESO' ? '💰 Ingreso' : '💸 Egreso'}
+              {v}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Vistas */}
       {view === 'AGENDA' && (
-        <div className="space-y-4">
+        <div className="grid gap-4">
           {loadingAgenda ? (
-            <div className="text-center p-10 text-gray-500">Cargando tus clases...</div>
+            <p className="text-center py-10">Actualizando agenda...</p>
           ) : agendaItems.length === 0 ? (
-            <div className="text-center p-10 bg-white rounded-lg shadow border border-gray-100">
-              <p className="text-gray-500 text-lg">📭 No tienes clases asignadas próximamente.</p>
+            <div className="bg-white p-10 rounded-2xl text-center border-2 border-dashed">
+              <span className="text-4xl">🏝️</span>
+              <p className="mt-2 text-gray-500 font-medium">No tienes clases asignadas por ahora.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {agendaItems.map(item => (
-                <div key={item.id} className={`relative p-5 rounded-xl border-l-4 shadow-sm bg-white transition-all hover:shadow-md
-                  ${item.estado === 'PENDIENTE' ? 'border-yellow-400 ring-1 ring-yellow-100' : 
-                  item.estado === 'CONFIRMADA' ? 'border-green-500' : 'border-red-400 opacity-75'}`}>
-                  
-                  <div className="absolute top-4 right-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider
-                      ${item.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' : 
-                        item.estado === 'CONFIRMADA' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {item.estado}
-                    </span>
+            agendaItems.map(item => (
+              <div key={item.id} className={`bg-white p-5 rounded-2xl shadow-sm border-l-8 ${
+                item.estado === 'PENDIENTE' ? 'border-amber-400' : 
+                item.estado === 'CONFIRMADA' ? 'border-emerald-500' : 'border-gray-300'
+              }`}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{item.fecha} - {item.hora?.substring(0,5)} HS</span>
+                    <h3 className="text-xl font-bold text-gray-800">{item.alumno}</h3>
                   </div>
-
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-shrink-0 flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg min-w-[80px]">
-                      <span className="text-xs font-bold text-gray-400 uppercase">{new Date(item.fecha).toLocaleString('es-ES', { weekday: 'short' })}</span>
-                      <span className="text-xl font-bold text-gray-800">{new Date(item.fecha).getDate()}</span>
-                      <span className="text-xs text-gray-500">{item.hora?.substring(0,5)} hs</span>
-                    </div>
-
-                    <div className="flex-grow">
-                      <h3 className="text-lg font-bold text-gray-800">{item.alumno}</h3>
-                      <p className="text-sm text-gray-600 mb-2">📍 {item.lugar} {item.hotelDerivacion && `(Desde: ${item.hotelDerivacion})`}</p>
-                      
-                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-500 mt-2 bg-gray-50 p-2 rounded">
-                        <div>⏳ {item.horas} Horas</div>
-                        <div>💵 Tarifa: ${item.tarifa}</div>
-                        <div>💳 Pagado: ${item.horasPagadas || 0}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {item.estado === 'PENDIENTE' && (
-                    <div className="mt-4 flex gap-3 border-t pt-3">
-                      <button 
-                        onClick={() => handleStatusChange(item.id, 'CONFIRMADA')}
-                        className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 transition"
-                      >
-                        ✅ Confirmar
-                      </button>
-                      <button 
-                        onClick={() => handleStatusChange(item.id, 'RECHAZADA')}
-                        className="flex-1 bg-red-100 text-red-600 py-2 rounded-lg font-bold hover:bg-red-200 transition"
-                      >
-                        ❌ Rechazar
-                      </button>
-                    </div>
-                  )}
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${
+                    item.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {item.estado}
+                  </span>
                 </div>
-              ))}
-            </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4 bg-gray-50 p-3 rounded-xl">
+                  <div><p className="text-gray-400 text-[10px] uppercase font-bold">Lugar</p><p className="font-semibold">{item.lugar}</p></div>
+                  <div><p className="text-gray-400 text-[10px] uppercase font-bold">Horas</p><p className="font-semibold">{item.horas}h</p></div>
+                  <div><p className="text-gray-400 text-[10px] uppercase font-bold">Tarifa</p><p className="font-semibold">${item.tarifa}</p></div>
+                  <div><p className="text-gray-400 text-[10px] uppercase font-bold">Pagado</p><p className="font-semibold text-emerald-600">${item.horasPagadas}</p></div>
+                </div>
+
+                {item.estado === 'PENDIENTE' && (
+                  <div className="flex gap-2">
+                    <button onClick={() => handleStatusChange(item.id, 'CONFIRMADA')} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold text-xs uppercase hover:bg-emerald-600 transition shadow-md shadow-emerald-100">Confirmar</button>
+                    <button onClick={() => handleStatusChange(item.id, 'RECHAZADA')} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold text-xs uppercase hover:bg-gray-200 transition">Rechazar</button>
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </div>
       )}
 
-      {view === 'INGRESO' && (
-        <Ingreso 
-          formData={formData} 
-          handleChange={handleChange} 
-          handleSubmit={handleSubmit} 
-          InstructorField={InstructorField}
-          setView={setView}
-        />
-      )}
-
-      {view === 'EGRESO' && (
-        <Egreso 
-          formData={formData} 
-          handleChange={handleChange} 
-          handleSubmit={handleSubmit} 
-          InstructorField={InstructorField}
-          setView={setView}
-        />
-      )}
+      {view === 'INGRESO' && <Ingreso formData={formData} handleChange={handleChange} handleSubmit={handleSubmit} InstructorField={InstructorField} setView={setView} />}
+      {view === 'EGRESO' && <Egreso formData={formData} handleChange={handleChange} handleSubmit={handleSubmit} InstructorField={InstructorField} setView={setView} />}
     </div>
   );
 };
