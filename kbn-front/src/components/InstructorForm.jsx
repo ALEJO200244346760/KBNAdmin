@@ -182,6 +182,7 @@ const InstructorForm = () => {
         total: 0,
         actividadOtro: '',
         formaPagoOtro: '',
+
         instructor: `${user.nombre} ${user.apellido}`
       }));
       setView('AGENDA');
