@@ -1,20 +1,19 @@
+// components/InstructorForm.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-// Importamos los formularios existentes
+// Formularios existentes
 import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 
 const InstructorForm = () => {
   const { user, loading } = useAuth();
-  
-  // Vistas: 'AGENDA', 'INGRESO', 'EGRESO'
+
   const [view, setView] = useState('AGENDA'); 
   const [agendaItems, setAgendaItems] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
-  
-  // Datos compartidos para formularios de Ingreso/Egreso
+
   const today = new Date().toISOString().split('T')[0];
   const initialFormData = {
     tipoTransaccion: 'INGRESO',
@@ -22,7 +21,7 @@ const InstructorForm = () => {
     actividad: 'Clases',
     actividadOtro: '',
     vendedor: '',
-    instructor: user ? `${user.nombre} ${user.apellido}` : '', // Pre-llenamos con el usuario logueado
+    instructor: user ? `${user.nombre} ${user.apellido}` : '',
     detalles: '',
     horas: 0,
     tarifa: 0,
@@ -36,15 +35,10 @@ const InstructorForm = () => {
 
   const [formData, setFormData] = useState(initialFormData);
 
-  // --- EFECTO: Cargar Agenda al entrar o al volver a la vista AGENDA ---
+  /* ------------------ Cargar Agenda ------------------ */
   useEffect(() => {
-    // Solo disparar fetch si tenemos un ID válido y no estamos cargando el contexto
-    if (view === 'AGENDA') {
-      if (user?.id) {
-        fetchAgenda();
-      } else if (!loading) {
-        console.warn("Esperando a que el usuario se cargue correctamente...");
-      }
+    if (view === 'AGENDA' && user?.id) {
+      fetchAgenda();
     }
   }, [view, user, loading]);
 
@@ -52,7 +46,6 @@ const InstructorForm = () => {
     setLoadingAgenda(true);
     try {
       const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`);
-      // Ordenar: Pendientes primero, luego por fecha
       const sorted = res.data.sort((a, b) => {
         if (a.estado === 'PENDIENTE' && b.estado !== 'PENDIENTE') return -1;
         if (a.estado !== 'PENDIENTE' && b.estado === 'PENDIENTE') return 1;
@@ -66,7 +59,7 @@ const InstructorForm = () => {
     }
   };
 
-  // --- ACCIONES DE AGENDA (Confirmar / Rechazar) ---
+  /* ------------------ Cambiar estado de clase ------------------ */
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
       await axios.put(
@@ -74,20 +67,20 @@ const InstructorForm = () => {
         nuevoEstado,
         { headers: { 'Content-Type': 'text/plain' } }
       );
-      
+
       setAgendaItems(prev => prev.map(item => 
         item.id === id ? { ...item, estado: nuevoEstado } : item
       ));
-      
+
       alert(`Clase ${nuevoEstado.toLowerCase()} correctamente.`);
     } catch (error) {
       console.error(error);
       alert("Error al actualizar estado.");
-      fetchAgenda(); // Revertir si falla
+      fetchAgenda();
     }
   };
 
-  // --- LOGICA DE FORMULARIOS (Ingreso/Egreso) ---
+  /* ------------------ Calcular total en Ingreso ------------------ */
   useEffect(() => {
     if (view === 'INGRESO') {
       const totalCalc = (parseFloat(formData.horas) || 0) * (parseFloat(formData.tarifa) || 0) - (parseFloat(formData.gastos) || 0);
@@ -145,34 +138,28 @@ const InstructorForm = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 pb-20">
-      
+      {/* Encabezado y botones de vista */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-gray-800">
           Hola, {user?.nombre || 'Instructor'} 👋
         </h1>
         
         <div className="flex bg-gray-100 p-1 rounded-lg">
-          <button 
-            onClick={() => setView('AGENDA')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'AGENDA' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            📅 Mi Agenda
-          </button>
-          <button 
-            onClick={() => setView('INGRESO')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'INGRESO' ? 'bg-white shadow text-green-600' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            💰 Ingreso
-          </button>
-          <button 
-            onClick={() => setView('EGRESO')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'EGRESO' ? 'bg-white shadow text-red-600' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            💸 Egreso
-          </button>
+          {['AGENDA','INGRESO','EGRESO'].map(v => (
+            <button 
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                view === v ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {v === 'AGENDA' ? '📅 Mi Agenda' : v === 'INGRESO' ? '💰 Ingreso' : '💸 Egreso'}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* Vistas */}
       {view === 'AGENDA' && (
         <div className="space-y-4">
           {loadingAgenda ? (
@@ -183,18 +170,15 @@ const InstructorForm = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {agendaItems.map((item) => (
-                <div 
-                  key={item.id} 
-                  className={`relative p-5 rounded-xl border-l-4 shadow-sm bg-white transition-all hover:shadow-md 
-                    ${item.estado === 'PENDIENTE' ? 'border-yellow-400 ring-1 ring-yellow-100' : 
-                      item.estado === 'CONFIRMADA' ? 'border-green-500' : 'border-red-400 opacity-75'}`}
-                >
+              {agendaItems.map(item => (
+                <div key={item.id} className={`relative p-5 rounded-xl border-l-4 shadow-sm bg-white transition-all hover:shadow-md
+                  ${item.estado === 'PENDIENTE' ? 'border-yellow-400 ring-1 ring-yellow-100' : 
+                  item.estado === 'CONFIRMADA' ? 'border-green-500' : 'border-red-400 opacity-75'}`}>
+                  
                   <div className="absolute top-4 right-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider 
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider
                       ${item.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' : 
-                        item.estado === 'CONFIRMADA' ? 'bg-green-100 text-green-800' : 
-                        'bg-red-100 text-red-800'}`}>
+                        item.estado === 'CONFIRMADA' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {item.estado}
                     </span>
                   </div>
@@ -260,7 +244,6 @@ const InstructorForm = () => {
           setView={setView}
         />
       )}
-
     </div>
   );
 };

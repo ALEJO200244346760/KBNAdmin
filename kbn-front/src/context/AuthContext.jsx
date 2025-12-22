@@ -1,3 +1,4 @@
+// context/AuthContext.js
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -29,7 +30,7 @@ const normalizeRole = (backendRole) => {
       return "ADMINISTRADOR";
     case "INSTRUCTOR":
       return "INSTRUCTOR";
-    case "SECRETARIA":   // <-- agregado
+    case "SECRETARIA":
       return "SECRETARIA";
     case "ALUMNO":
       return "ALUMNO";
@@ -56,7 +57,7 @@ export const AuthProvider = ({ children }) => {
 
       setRoles(decoded?.roles || []);
       setUser({
-        id: decoded?.id || decoded?.sub || null, // <-- agregamos ID
+        id: decoded?.id || decoded?.sub || null,
         nombre: decoded?.nombre || '',
         apellido: decoded?.apellido || '',
         role: normalizedRole || '',
