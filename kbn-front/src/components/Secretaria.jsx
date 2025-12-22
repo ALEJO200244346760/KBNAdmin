@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,13 +11,13 @@ const Secretaria = () => {
   const [view, setView] = useState('INICIO'); 
   const [instructors, setInstructors] = useState([]);
   const [agendaList, setAgendaList] = useState([]);
-  const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
   
   const initialAgendaData = {
     alumno: '', fecha: today, hora: '10:00', instructorId: '',
-    lugar: '', tarifa: '', horas: 1, horasPagadas: 0,
+    lugar: 'Escuela', tarifa: '', horas: 1, horasPagadas: 0,
     hotelDerivacion: '', estado: 'PENDIENTE'
   };
   const [agendaData, setAgendaData] = useState(initialAgendaData);
@@ -30,54 +30,57 @@ const Secretaria = () => {
   };
   const [financeData, setFinanceData] = useState(initialFinanceData);
 
-  // Mantenemos tu lógica de carga que funciona perfecto
-  useEffect(() => {
-    fetchInstructors();
-    if (view === 'MONITOR') fetchAgenda();
-  }, [view]);
-
-  const fetchInstructors = async () => {
+  // --- CARGA DE DATOS CENTRALIZADA Y SEGURA ---
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get('https://kbnadmin-production.up.railway.app/usuario');
-      setInstructors(res.data);
-    } catch (err) { console.error('Error instructores:', err); }
-  };
-
-  const fetchAgenda = async () => {
-    setLoadingAgenda(true);
-    try {
-      const res = await axios.get('https://kbnadmin-production.up.railway.app/api/agenda/listar');
-      const sorted = res.data.sort((a, b) => {
+      const [resUsers, resAgenda] = await Promise.all([
+        axios.get('https://kbnadmin-production.up.railway.app/usuario'),
+        axios.get('https://kbnadmin-production.up.railway.app/api/agenda/listar')
+      ]);
+      
+      setInstructors(resUsers.data);
+      
+      const sorted = resAgenda.data.sort((a, b) => {
         const order = { 'RECHAZADA': 0, 'PENDIENTE': 1, 'CONFIRMADA': 2 };
         return order[a.estado] - order[b.estado] || new Date(b.fecha) - new Date(a.fecha);
       });
       setAgendaList(sorted);
-    } catch (err) { console.error('Error agenda:', err); }
-    setLoadingAgenda(false);
-  };
+    } catch (err) {
+      console.error('Error cargando datos de Secretaria:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, view]);
+
+  // --- MANEJADORES DE EVENTOS ---
   const handleAgendaSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Creamos una copia de los datos pero convirtiendo a número lo que debe ser número
-  const dataToSubmit = {
-    ...agendaData,
-    instructorId: Number(agendaData.instructorId),
-    tarifa: Number(agendaData.tarifa), // Convertir String "300" a número 300
-    horas: Number(agendaData.horas),
-    horasPagadas: Number(agendaData.horasPagadas)
-  };
+    e.preventDefault();
+    if (!agendaData.instructorId) return alert("Por favor selecciona un instructor");
 
-  try {
-    await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', dataToSubmit);
-    alert("Clase guardada!");
-    setAgendaData(initialAgendaData);
-    setView('MONITOR');
-  } catch (err) {
-    console.error("Detalle del error:", err.response?.data); // Esto te dirá el error real del Java
-    alert("Error 500: El servidor no pudo procesar los datos. Revisa la consola.");
-  }
+    // Lógica de conversión de tipos para evitar el Error 500 en Java
+    const dataToSubmit = {
+      ...agendaData,
+      instructorId: Number(agendaData.instructorId),
+      tarifa: Number(agendaData.tarifa),
+      horas: Number(agendaData.horas),
+      horasPagadas: Number(agendaData.horasPagadas)
     };
+
+    try {
+      await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', dataToSubmit);
+      alert(agendaData.id ? "Clase reasignada con éxito" : "Clase agendada con éxito");
+      setAgendaData(initialAgendaData);
+      setView('MONITOR');
+    } catch (err) { 
+      console.error("Detalle:", err.response?.data);
+      alert("Error al guardar en agenda"); 
+    }
+  };
 
   const prepararReasignacion = (clase) => {
     setAgendaData({ ...clase, estado: 'PENDIENTE' });
@@ -87,13 +90,37 @@ const Secretaria = () => {
   const handleFinanceSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', financeData);
+      // Para finanzas usamos el instructor como String "Nombre Apellido"
+      const payload = { ...financeData, tipoTransaccion: view };
+      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
       alert(`${view} registrado.`);
+      setFinanceData(initialFinanceData);
       setView('INICIO');
     } catch (err) { alert("Error en finanzas"); }
   };
 
-  // --- VISTA INICIO ---
+  // --- SUB-COMPONENTES ---
+  const InstructorSelector = ({ value, onChange, label, name, isFinance = false }) => (
+    <div className="space-y-1">
+      <label className="text-[10px] font-black text-gray-400 uppercase ml-2">{label}</label>
+      <select 
+        name={name}
+        value={value} 
+        onChange={onChange} 
+        className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" 
+        required
+      >
+        <option value="">Seleccionar...</option>
+        {instructors.map(i => (
+          <option key={i.id} value={isFinance ? `${i.nombre} ${i.apellido}` : i.id}>
+            {i.nombre} {i.apellido}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  // --- VISTAS ---
   if (view === 'INICIO') {
     return (
       <div className="max-w-5xl mx-auto p-4 md:p-10 mt-5">
@@ -108,7 +135,6 @@ const Secretaria = () => {
     );
   }
 
-  // --- VISTA MONITOR ---
   if (view === 'MONITOR') {
     return (
       <div className="max-w-6xl mx-auto p-4">
@@ -116,9 +142,8 @@ const Secretaria = () => {
           <h2 className="text-xl font-black uppercase text-gray-800 italic">Monitor de Operaciones</h2>
           <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm">← VOLVER</button>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loadingAgenda ? <p className="col-span-full text-center py-10">Cargando agenda...</p> : 
+          {loading ? <p className="col-span-full text-center py-10">Cargando datos...</p> : 
             agendaList.map(item => (
             <div key={item.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-t-8 transition-all ${
               item.estado === 'RECHAZADA' ? 'border-rose-500 shadow-rose-50' : 
@@ -133,17 +158,14 @@ const Secretaria = () => {
                 </span>
                 <p className="text-[10px] font-bold text-gray-400 uppercase">{item.fecha}</p>
               </div>
-
               <h3 className="font-black text-gray-800 uppercase text-lg leading-tight mb-1 truncate">{item.alumno}</h3>
               <p className="text-xs font-bold text-indigo-600 mb-4 tracking-wide italic">🏄‍♂️ {item.nombreInstructor}</p>
-              
               <div className="grid grid-cols-2 gap-3 text-[11px] bg-gray-50 p-4 rounded-2xl font-bold text-gray-500 mb-4">
-                <p className="truncate">📍 {item.lugar || 'No especif.'}</p>
+                <p className="truncate">📍 {item.lugar}</p>
                 <p className="truncate">🏨 {item.hotelDerivacion || 'Sin Hotel'}</p>
                 <p>⏱️ {item.horas} hs / {item.hora?.substring(0,5)} hs</p>
                 <p className="text-emerald-600 font-black">💵 TARIFA: ${item.tarifa}</p>
               </div>
-
               <div className="flex justify-between items-center border-t border-gray-100 pt-4 mt-auto">
                 <div className="flex flex-col">
                   <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">Pagado</span>
@@ -160,7 +182,6 @@ const Secretaria = () => {
     );
   }
 
-  // --- VISTA CALENDARIO (AGENDAR) ---
   if (view === 'CALENDARIO') {
     return (
       <div className="max-w-2xl mx-auto p-6 md:p-10 bg-white shadow-2xl rounded-[2.5rem] mt-5 md:mt-10 border border-gray-100">
@@ -171,15 +192,13 @@ const Secretaria = () => {
               <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nombre Alumno</label>
               <input type="text" placeholder="Juan Perez" value={agendaData.alumno} onChange={e => setAgendaData({...agendaData, alumno: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor</label>
-              <select value={agendaData.instructorId} onChange={e => setAgendaData({...agendaData, instructorId: Number(e.target.value)})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required>
-                <option value="">Seleccionar...</option>
-                {instructors.map(i => <option key={i.id} value={i.id}>{i.nombre} {i.apellido}</option>)}
-              </select>
-            </div>
+            <InstructorSelector 
+              label="Instructor" 
+              name="instructorId" 
+              value={agendaData.instructorId} 
+              onChange={e => setAgendaData({...agendaData, instructorId: e.target.value})} 
+            />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Fecha</label>
@@ -190,22 +209,14 @@ const Secretaria = () => {
               <input type="time" value={agendaData.hora} onChange={e => setAgendaData({...agendaData, hora: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Lugar / Spot</label>
-              <input type="text" placeholder="Ej: Escuela" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Hotel / Derivación</label>
-              <input type="text" placeholder="Ej: Hotel KBN" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
-            </div>
+            <input type="text" placeholder="Lugar / Spot" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
+            <input type="text" placeholder="Hotel / Derivación" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
           </div>
-
           <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-100 shadow-inner">
             <div>
               <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa $</label>
-              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} placeholder="0" className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
+              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
               <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas</label>
@@ -216,7 +227,6 @@ const Secretaria = () => {
               <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
           </div>
-
           <div className="flex flex-col md:flex-row gap-3 pt-4">
             <button type="submit" className="flex-[2] bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">Confirmar Asignación</button>
             <button type="button" onClick={() => setView('INICIO')} className="flex-1 bg-gray-100 text-gray-400 p-5 rounded-2xl font-black uppercase hover:bg-gray-200 transition-all">Cancelar</button>
@@ -226,7 +236,6 @@ const Secretaria = () => {
     );
   }
 
-  // --- VISTAS FINANZAS ---
   if (view === 'INGRESO' || view === 'EGRESO') {
     const Component = view === 'INGRESO' ? Ingreso : Egreso;
     return (
@@ -235,13 +244,13 @@ const Secretaria = () => {
         handleChange={e => setFinanceData({...financeData, [e.target.name]: e.target.value})} 
         handleSubmit={handleFinanceSubmit} 
         InstructorField={() => (
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Asociar Instructor</label>
-            <select className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" onChange={e => setFinanceData({...financeData, instructor: e.target.value})}>
-              <option value="">Seleccionar...</option>
-              {instructors.map(i => <option key={i.id} value={`${i.nombre} ${i.apellido}`}>{i.nombre} {i.apellido}</option>)}
-            </select>
-          </div>
+          <InstructorSelector 
+            label="Instructor Relacionado" 
+            name="instructor" 
+            isFinance={true}
+            value={financeData.instructor} 
+            onChange={e => setFinanceData({...financeData, instructor: e.target.value})} 
+          />
         )}
         setView={setView} 
       />
