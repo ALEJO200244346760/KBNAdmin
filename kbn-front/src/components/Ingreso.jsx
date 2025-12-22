@@ -12,6 +12,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
       <h2 className="text-2xl font-bold mb-6 text-green-600">💰 Nueva Planilla de Ingreso</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Aquí es donde el Admin podrá elegir a Jose o Igna */}
         <InstructorField />
 
         <div>
@@ -25,7 +26,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
           />
         </div>
 
-        {/* Actividad */}
+        {/* ... Resto de tu formulario (Actividad, Vendedor, Detalles, etc.) queda exactamente IGUAL */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Actividad</label>
@@ -61,7 +62,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
           )}
         </div>
 
-        {/* Vendedor */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Vendedor (Opcional)</label>
           <input
@@ -72,7 +72,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
           />
         </div>
 
-        {/* Detalles */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Detalles</label>
           <textarea
@@ -84,7 +83,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
           />
         </div>
 
-        {/* Horas / Tarifa / Total */}
         <div className="grid grid-cols-3 gap-4 bg-green-50 p-4 rounded-md">
           <div>
             <label className="block text-sm font-medium text-gray-700">Cant. Horas</label>
@@ -120,7 +118,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
           </div>
         </div>
 
-        {/* Moneda / Gastos / Comisión */}
         <div className="grid grid-cols-3 gap-4 mt-2 bg-green-50 p-4 rounded-md">
           <div>
             <label className="block text-sm font-medium text-gray-700">Moneda</label>
@@ -160,7 +157,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
           </div>
         </div>
 
-        {/* Pago */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Forma de Pago</label>
           <select
