@@ -3,10 +3,6 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
-/* =========================
-   Helpers
-========================= */
-
 const decodeToken = (token) => {
   try {
     const payload = token.split('.')[1];
@@ -20,10 +16,6 @@ const normalizeRole = (backendRole) => {
   if (!backendRole) return null;
   return backendRole.replace('ROLE_', '');
 };
-
-/* =========================
-   Provider
-========================= */
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
@@ -48,7 +40,6 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Usuario base desde el JWT
       const initialUser = {
         id: decoded.id || null,
         nombre: decoded.nombre || '',
@@ -60,7 +51,6 @@ export const AuthProvider = ({ children }) => {
       setUser(initialUser);
       setLoading(false);
 
-      // Si el token NO trae ID, lo buscamos en backend (con JWT)
       if (!initialUser.id && initialUser.email) {
         try {
           const res = await axios.get(
@@ -91,10 +81,6 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, [token]);
 
-  /* =========================
-     Auth actions
-  ========================= */
-
   const login = (newToken) => {
     localStorage.setItem('token', newToken);
     setToken(newToken);
@@ -120,9 +106,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-/* =========================
-   Hook
-========================= */
 
 export const useAuth = () => useContext(AuthContext);

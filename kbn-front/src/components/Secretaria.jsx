@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,11 +7,16 @@ import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 
 const Secretaria = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth(); // Extraemos el token para las peticiones
   const [view, setView] = useState('INICIO'); 
   const [instructors, setInstructors] = useState([]);
   const [agendaList, setAgendaList] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Configuramos las cabeceras de autorización de forma centralizada
+  const axiosConfig = useMemo(() => ({
+    headers: { Authorization: `Bearer ${token}` }
+  }), [token]);
 
   const today = new Date().toISOString().split('T')[0];
   
@@ -30,13 +35,14 @@ const Secretaria = () => {
   };
   const [financeData, setFinanceData] = useState(initialFinanceData);
 
-  // --- CARGA DE DATOS CENTRALIZADA Y SEGURA ---
+  // --- CARGA DE DATOS CON SEGURIDAD (TOKEN) ---
   const fetchData = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
       const [resUsers, resAgenda] = await Promise.all([
-        axios.get('https://kbnadmin-production.up.railway.app/usuario'),
-        axios.get('https://kbnadmin-production.up.railway.app/api/agenda/listar')
+        axios.get('https://kbnadmin-production.up.railway.app/usuario', axiosConfig),
+        axios.get('https://kbnadmin-production.up.railway.app/api/agenda/listar', axiosConfig)
       ]);
       
       setInstructors(resUsers.data);
@@ -51,7 +57,7 @@ const Secretaria = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token, axiosConfig]);
 
   useEffect(() => {
     fetchData();
@@ -62,7 +68,7 @@ const Secretaria = () => {
     e.preventDefault();
     if (!agendaData.instructorId) return alert("Por favor selecciona un instructor");
 
-    // Lógica de conversión de tipos para evitar el Error 500 en Java
+    // Conversión de tipos para el Backend Java
     const dataToSubmit = {
       ...agendaData,
       instructorId: Number(agendaData.instructorId),
@@ -72,13 +78,13 @@ const Secretaria = () => {
     };
 
     try {
-      await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', dataToSubmit);
+      await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', dataToSubmit, axiosConfig);
       alert(agendaData.id ? "Clase reasignada con éxito" : "Clase agendada con éxito");
       setAgendaData(initialAgendaData);
       setView('MONITOR');
     } catch (err) { 
-      console.error("Detalle:", err.response?.data);
-      alert("Error al guardar en agenda"); 
+      console.error("Detalle del error:", err.response?.data);
+      alert("Error al guardar en agenda. Verifica los permisos."); 
     }
   };
 
@@ -90,13 +96,15 @@ const Secretaria = () => {
   const handleFinanceSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Para finanzas usamos el instructor como String "Nombre Apellido"
       const payload = { ...financeData, tipoTransaccion: view };
-      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
-      alert(`${view} registrado.`);
+      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload, axiosConfig);
+      alert(`${view} registrado correctamente.`);
       setFinanceData(initialFinanceData);
       setView('INICIO');
-    } catch (err) { alert("Error en finanzas"); }
+    } catch (err) { 
+      console.error("Error finanzas:", err);
+      alert("Error al registrar movimiento financiero"); 
+    }
   };
 
   // --- SUB-COMPONENTES ---
@@ -120,14 +128,15 @@ const Secretaria = () => {
     </div>
   );
 
-  // --- VISTAS ---
+  // --- RENDERIZADO DE VISTAS ---
+
   if (view === 'INICIO') {
     return (
       <div className="max-w-5xl mx-auto p-4 md:p-10 mt-5">
-        <h1 className="text-2xl md:text-3xl font-black text-gray-800 mb-8 text-center uppercase italic tracking-tighter">Estación Secretaria KBN</h1>
+        <h1 className="text-2xl md:text-3xl font-black text-gray-800 mb-8 text-center uppercase italic tracking-tighter">Panel de Secretaria KBN</h1>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <MenuCard icon="🖥️" title="Monitor" sub="Estados" color="bg-gray-900" onClick={() => setView('MONITOR')} />
-          <MenuCard icon="📅" title="Agendar" sub="Nueva" color="bg-indigo-600" onClick={() => setView('CALENDARIO')} />
+          <MenuCard icon="📅" title="Agendar" sub="Nueva Clase" color="bg-indigo-600" onClick={() => setView('CALENDARIO')} />
           <MenuCard icon="💰" title="Ingreso" sub="Caja" color="bg-emerald-600" onClick={() => setView('INGRESO')} />
           <MenuCard icon="💸" title="Egreso" sub="Gastos" color="bg-rose-600" onClick={() => setView('EGRESO')} />
         </div>
@@ -143,7 +152,7 @@ const Secretaria = () => {
           <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm">← VOLVER</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading ? <p className="col-span-full text-center py-10">Cargando datos...</p> : 
+          {loading ? <p className="col-span-full text-center py-10 font-bold text-gray-400">Actualizando datos...</p> : 
             agendaList.map(item => (
             <div key={item.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-t-8 transition-all ${
               item.estado === 'RECHAZADA' ? 'border-rose-500 shadow-rose-50' : 
@@ -154,21 +163,21 @@ const Secretaria = () => {
                   item.estado === 'RECHAZADA' ? 'bg-rose-100 text-rose-700' : 
                   item.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                 }`}>
-                  {item.estado === 'PENDIENTE' ? '⏳ Pendiente Confirmar' : item.estado}
+                  {item.estado === 'PENDIENTE' ? '⏳ Pendiente' : item.estado}
                 </span>
                 <p className="text-[10px] font-bold text-gray-400 uppercase">{item.fecha}</p>
               </div>
               <h3 className="font-black text-gray-800 uppercase text-lg leading-tight mb-1 truncate">{item.alumno}</h3>
               <p className="text-xs font-bold text-indigo-600 mb-4 tracking-wide italic">🏄‍♂️ {item.nombreInstructor}</p>
               <div className="grid grid-cols-2 gap-3 text-[11px] bg-gray-50 p-4 rounded-2xl font-bold text-gray-500 mb-4">
-                <p className="truncate">📍 {item.lugar}</p>
+                <p className="truncate">📍 {item.lugar || 'No especif.'}</p>
                 <p className="truncate">🏨 {item.hotelDerivacion || 'Sin Hotel'}</p>
                 <p>⏱️ {item.horas} hs / {item.hora?.substring(0,5)} hs</p>
                 <p className="text-emerald-600 font-black">💵 TARIFA: ${item.tarifa}</p>
               </div>
               <div className="flex justify-between items-center border-t border-gray-100 pt-4 mt-auto">
                 <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">Pagado</span>
+                  <span className="text-[9px] text-gray-400 uppercase font-black">Seña/Pagado</span>
                   <span className="text-sm font-black text-gray-700">${item.horasPagadas || 0}</span>
                 </div>
                 {item.estado === 'RECHAZADA' && (
@@ -190,10 +199,10 @@ const Secretaria = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nombre Alumno</label>
-              <input type="text" placeholder="Juan" value={agendaData.alumno} onChange={e => setAgendaData({...agendaData, alumno: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required />
+              <input type="text" placeholder="Ej: Juan Perez" value={agendaData.alumno} onChange={e => setAgendaData({...agendaData, alumno: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required />
             </div>
             <InstructorSelector 
-              label="Instructor" 
+              label="Asignar Instructor" 
               name="instructorId" 
               value={agendaData.instructorId} 
               onChange={e => setAgendaData({...agendaData, instructorId: e.target.value})} 
@@ -201,30 +210,30 @@ const Secretaria = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Fecha</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Fecha Clase</label>
               <input type="date" value={agendaData.fecha} onChange={e => setAgendaData({...agendaData, fecha: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Hora</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Horario</label>
               <input type="time" value={agendaData.hora} onChange={e => setAgendaData({...agendaData, hora: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="text" placeholder="Lugar / Spot" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
-            <input type="text" placeholder="Descricpión / Hotel" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
+            <input type="text" placeholder="Lugar / Spot (Ej: Escuela)" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
+            <input type="text" placeholder="Hotel / Origen" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
           </div>
           <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-100 shadow-inner">
             <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa Pactada</label>
-              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} className="w-full bg-transparent border p-2 rounded text-xl font-black text-indigo-700 p-0" />
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa $</label>
+              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Solicitadas</label>
-              <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} className="w-full bg-transparent border p-2 rounded text-xl font-black text-indigo-700 p-0" />
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas</label>
+              <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Pagadas</label>
-              <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} className="w-full bg-transparent border p-2 rounded text-xl font-black text-indigo-700 p-0" />
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Seña $</label>
+              <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
           </div>
           <div className="flex flex-col md:flex-row gap-3 pt-4">
