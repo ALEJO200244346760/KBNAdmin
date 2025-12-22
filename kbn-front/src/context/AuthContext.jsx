@@ -3,6 +3,9 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+/* =========================
+   Helpers
+========================= */
 const decodeToken = (token) => {
   try {
     const payload = token.split('.')[1];
@@ -16,56 +19,78 @@ const normalizeRole = (backendRole) => {
   if (!backendRole) return null;
   const clean = backendRole.replace("ROLE_", "");
   const roles = {
-    "ADMINISTRADOR": "ADMINISTRADOR",
-    "INSTRUCTOR": "INSTRUCTOR",
-    "SECRETARIA": "SECRETARIA",
-    "ALUMNO": "ALUMNO"
+    ADMINISTRADOR: "ADMINISTRADOR",
+    INSTRUCTOR: "INSTRUCTOR",
+    SECRETARIA: "SECRETARIA",
+    ALUMNO: "ALUMNO",
   };
   return roles[clean] || clean;
 };
 
+/* =========================
+   Provider
+========================= */
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initializeAuth = async () => {
-      if (token) {
-        const decoded = decodeToken(token);
-        
-        // 1. SETEO INMEDIATO: Cargamos lo que hay en el token para que el Login funcione YA.
-        const initialUser = {
-          id: decoded?.id || null, // Si el backend no lo manda, será null por ahora
-          nombre: decoded?.nombre || '',
-          apellido: decoded?.apellido || '',
-          role: normalizeRole(decoded?.roles?.[0]),
-          email: decoded?.sub
-        };
-        setUser(initialUser);
-        setLoading(false); // Liberamos las rutas aquí mismo
-
-        // 2. ACTUALIZACIÓN EN SEGUNDO PLANO: Buscamos el ID si no lo tenemos
-        if (!initialUser.id && initialUser.email) {
-          try {
-            const res = await axios.get(`https://kbnadmin-production.up.railway.app/usuario`);
-            const usuarioEncontrado = res.data.find(u => u.email === initialUser.email);
-            if (usuarioEncontrado) {
-              setUser(prev => ({ ...prev, id: usuarioEncontrado.id }));
-            }
-          } catch (error) {
-            console.error("No se pudo obtener el ID extra del servidor");
-          }
-        }
-      } else {
+      if (!token) {
         setUser(null);
         setLoading(false);
+        return;
+      }
+
+      const decoded = decodeToken(token);
+
+      // 1️⃣ Cargar usuario inmediato desde el JWT
+      const initialUser = {
+        id: decoded?.id || null,
+        nombre: decoded?.nombre || '',
+        apellido: decoded?.apellido || '',
+        role: normalizeRole(decoded?.roles?.[0]),
+        email: decoded?.sub,
+      };
+
+      setUser(initialUser);
+      setLoading(false);
+
+      // 2️⃣ Buscar ID real en backend (SIEMPRE con JWT)
+      if (!initialUser.id && initialUser.email) {
+        try {
+          const res = await axios.get(
+            'https://kbnadmin-production.up.railway.app/usuario',
+            {
+              headers: {
+                Authorization: `Bearer ${token}`, // ✅ CLAVE
+              },
+            }
+          );
+
+          const usuarioEncontrado = res.data.find(
+            (u) => u.email === initialUser.email
+          );
+
+          if (usuarioEncontrado) {
+            setUser((prev) => ({
+              ...prev,
+              id: usuarioEncontrado.id,
+            }));
+          }
+        } catch (error) {
+          console.error("No se pudo obtener el ID extra del servidor");
+        }
       }
     };
 
     initializeAuth();
   }, [token]);
 
+  /* =========================
+     Auth actions
+  ========================= */
   const login = (newToken) => {
     localStorage.setItem('token', newToken);
     setToken(newToken);
