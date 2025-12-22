@@ -232,6 +232,7 @@ const InstructorForm = () => {
                   <div><p className="text-gray-400 uppercase text-[9px]">⏱️ Tiempo</p><p className="text-gray-700">{item.horas}hs</p></div>
                   <div><p className="text-gray-400 uppercase text-[9px]">💵 Tarifa</p><p className="text-gray-700">${item.tarifa}</p></div>
                   <div><p className="text-gray-400 uppercase text-[9px]">💳 Pagado</p><p className="text-emerald-600">${item.horasPagadas || 0}</p></div>
+                  <div><p className="text-gray-400 uppercase text-[9px]">🏨 Descripción</p><p className="truncate text-gray-700">{item.hotelDerivacion}</p></div>
                 </div>
 
                 {item.estado === 'PENDIENTE' && (
