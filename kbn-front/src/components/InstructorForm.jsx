@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,11 +9,16 @@ import Agenda from './Agenda';
 import Estadisticas from './Estadisticas';
 
 const InstructorForm = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth(); // Extraemos token del context
   const [view, setView] = useState('AGENDA'); 
   const [agendaItems, setAgendaItems] = useState([]);
   const [clasesFinalizadas, setClasesFinalizadas] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+
+  // Configuración de cabeceras para Axios con el token
+  const axiosConfig = useMemo(() => ({
+    headers: { Authorization: `Bearer ${token}` }
+  }), [token]);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -35,7 +40,7 @@ const InstructorForm = () => {
     moneda: 'USD'
   });
 
-  // Sincronizar nombre del instructor desde el AuthContext
+  // Sincronizar nombre del instructor
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -45,7 +50,7 @@ const InstructorForm = () => {
     }
   }, [user]);
 
-  // Cálculos automáticos de totales
+  // Cálculos automáticos
   useEffect(() => {
     const h = parseFloat(formData.horas) || 0;
     const t = parseFloat(formData.tarifa) || 0;
@@ -54,12 +59,15 @@ const InstructorForm = () => {
     setFormData(prev => ({ ...prev, total: calculado > 0 ? calculado : 0 }));
   }, [formData.horas, formData.tarifa, formData.gastos]);
 
-  // --- FETCH AGENDA (Monitor de clases asignadas) ---
+  // --- FETCH AGENDA (CON TOKEN) ---
   const fetchAgenda = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || !token) return;
     setLoadingAgenda(true);
     try {
-      const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`);
+      const res = await axios.get(
+        `https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`, 
+        axiosConfig
+      );
       const sorted = res.data.sort((a, b) => {
         const order = { 'PENDIENTE': 0, 'CONFIRMADA': 1, 'RECHAZADA': 2 };
         if (order[a.estado] !== order[b.estado]) return order[a.estado] - order[b.estado];
@@ -71,14 +79,16 @@ const InstructorForm = () => {
     } finally {
       setLoadingAgenda(false);
     }
-  }, [user?.id]);
+  }, [user?.id, token, axiosConfig]);
 
-  // --- FETCH ESTADISTICAS (Historial de cobros para el 30%) ---
+  // --- FETCH ESTADISTICAS (CON TOKEN) ---
   const fetchEstadisticas = useCallback(async () => {
-    if (!user?.nombre) return;
+    if (!user?.nombre || !token) return;
     try {
-      const res = await axios.get('https://kbnadmin-production.up.railway.app/api/clases/listar');
-      // Filtramos solo ingresos de este instructor
+      const res = await axios.get(
+        'https://kbnadmin-production.up.railway.app/api/clases/listar', 
+        axiosConfig
+      );
       const filtradas = res.data.filter(c => 
         c.instructor === `${user.nombre} ${user.apellido}` && 
         c.tipoTransaccion === 'INGRESO'
@@ -87,23 +97,27 @@ const InstructorForm = () => {
     } catch (error) {
       console.error("Error cargando estadísticas:", error);
     }
-  }, [user]);
+  }, [user, token, axiosConfig]);
 
-  // Efecto para cargar datos según la vista
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && token) {
       if (view === 'AGENDA') fetchAgenda();
       if (view === 'ESTADISTICAS') fetchEstadisticas();
     }
-  }, [view, authLoading, fetchAgenda, fetchEstadisticas]);
+  }, [view, authLoading, token, fetchAgenda, fetchEstadisticas]);
 
-  // --- HANDLERS ---
+  // --- HANDLERS (CON TOKEN) ---
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
       await axios.put(
         `https://kbnadmin-production.up.railway.app/api/agenda/${id}/estado`,
         nuevoEstado,
-        { headers: { 'Content-Type': 'text/plain' } }
+        { 
+            headers: { 
+                ...axiosConfig.headers, 
+                'Content-Type': 'text/plain' 
+            } 
+        }
       );
       setAgendaItems(prev => prev.map(item => 
         item.id === id ? { ...item, estado: nuevoEstado } : item
@@ -134,9 +148,12 @@ const InstructorForm = () => {
       asignadoA: 'NINGUNO'
     };
     try {
-      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
+      await axios.post(
+        'https://kbnadmin-production.up.railway.app/api/clases/guardar', 
+        payload, 
+        axiosConfig
+      );
       alert(`${view} registrado correctamente.`);
-      // Reset campos variables
       setFormData(prev => ({
         ...prev,
         detalles: '',
@@ -173,19 +190,15 @@ const InstructorForm = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:mt-6">
-      {/* Header Panel */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-50">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">
-            Panel Instructor
-          </h1>
+          <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">Panel Instructor</h1>
           <div className="flex items-center gap-2 mt-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
             <p className="text-indigo-600 font-black text-xs uppercase tracking-widest">{user?.nombre} {user?.apellido}</p>
           </div>
         </div>
         
-        {/* Navegación */}
         <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
           {['AGENDA', 'INGRESO', 'EGRESO', 'ESTADISTICAS'].map(v => (
             <button 
@@ -201,7 +214,6 @@ const InstructorForm = () => {
         </div>
       </div>
 
-      {/* Vistas Dinámicas */}
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {view === 'AGENDA' && (
           <Agenda 
