@@ -6,6 +6,7 @@ const AuthContext = createContext();
 /* =========================
    Helpers
 ========================= */
+
 const decodeToken = (token) => {
   try {
     const payload = token.split('.')[1];
@@ -17,21 +18,15 @@ const decodeToken = (token) => {
 
 const normalizeRole = (backendRole) => {
   if (!backendRole) return null;
-  const clean = backendRole.replace("ROLE_", "");
-  const roles = {
-    ADMINISTRADOR: "ADMINISTRADOR",
-    INSTRUCTOR: "INSTRUCTOR",
-    SECRETARIA: "SECRETARIA",
-    ALUMNO: "ALUMNO",
-  };
-  return roles[clean] || clean;
+  return backendRole.replace('ROLE_', '');
 };
 
 /* =========================
    Provider
 ========================= */
+
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,26 +40,34 @@ export const AuthProvider = ({ children }) => {
 
       const decoded = decodeToken(token);
 
-      // 1️⃣ Cargar usuario inmediato desde el JWT
+      if (!decoded) {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Usuario base desde el JWT
       const initialUser = {
-        id: decoded?.id || null,
-        nombre: decoded?.nombre || '',
-        apellido: decoded?.apellido || '',
-        role: normalizeRole(decoded?.roles?.[0]),
-        email: decoded?.sub,
+        id: decoded.id || null,
+        nombre: decoded.nombre || '',
+        apellido: decoded.apellido || '',
+        email: decoded.sub,
+        role: normalizeRole(decoded.roles?.[0]),
       };
 
       setUser(initialUser);
       setLoading(false);
 
-      // 2️⃣ Buscar ID real en backend (SIEMPRE con JWT)
+      // Si el token NO trae ID, lo buscamos en backend (con JWT)
       if (!initialUser.id && initialUser.email) {
         try {
           const res = await axios.get(
             'https://kbnadmin-production.up.railway.app/usuario',
             {
               headers: {
-                Authorization: `Bearer ${token}`, // ✅ CLAVE
+                Authorization: `Bearer ${token}`,
               },
             }
           );
@@ -80,7 +83,7 @@ export const AuthProvider = ({ children }) => {
             }));
           }
         } catch (error) {
-          console.error("No se pudo obtener el ID extra del servidor");
+          console.error('No se pudo obtener el ID extra del servidor');
         }
       }
     };
@@ -91,6 +94,7 @@ export const AuthProvider = ({ children }) => {
   /* =========================
      Auth actions
   ========================= */
+
   const login = (newToken) => {
     localStorage.setItem('token', newToken);
     setToken(newToken);
@@ -103,10 +107,22 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        login,
+        logout,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
+
+/* =========================
+   Hook
+========================= */
 
 export const useAuth = () => useContext(AuthContext);
