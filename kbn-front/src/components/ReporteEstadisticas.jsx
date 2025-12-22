@@ -9,12 +9,15 @@ import {
   BarElement,
   Title
 } from 'chart.js';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import { Doughnut, Bar } from 'react-chartjs-2';
 
 // Registro de componentes de gráficos
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
 const ReporteEstadisticas = () => {
+    const { token } = useAuth();
     // --- ESTADOS ---
     const [allData, setAllData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -30,16 +33,20 @@ const ReporteEstadisticas = () => {
 
     // --- EFECTOS ---
     useEffect(() => {
-        fetchData();
-    }, []);
+        if (token) { // Solo dispara si el token ya existe
+            fetchData();
+        }
+    }, [token]);
 
     // --- LOGICA DE DATOS ---
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await fetch('https://kbnadmin-production.up.railway.app/api/clases/listar');
-            const data = await response.json();
+            const response = await axios.get('https://kbnadmin-production.up.railway.app/api/clases/listar', {
+            headers: { Authorization: `Bearer ${token}` } // CLAVE: El token
+            });
             
+            const data = response.data;
             const listPendientes = [];
             const listEgresos = [];
             const listAsignados = [];
@@ -117,17 +124,15 @@ const ReporteEstadisticas = () => {
     const saveAssignment = async (id, asignadoA) => {
         if (!asignadoA || asignadoA === 'NINGUNO') return alert("Selecciona un instructor válido.");
         try {
-            const res = await fetch(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ asignadoA }) // Usando el DTO correcto
-            });
-            if (res.ok) {
-                alert("Asignado correctamente.");
-                fetchData();
-            }
+            // Axios.put(URL, BODY, CONFIG)
+            await axios.put(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, 
+                { asignadoA }, 
+                { headers: { Authorization: `Bearer ${token}` } } // CLAVE: El token
+            );
+            alert("Asignado correctamente.");
+            fetchData();
         } catch (e) {
-            alert("Error de conexión");
+            alert("Error de red o no autorizado");
         }
     };
 
