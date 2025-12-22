@@ -10,7 +10,7 @@ function Register() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post('/login/register', {
+      const response = await axios.post('/register', {
         nombre,
         apellido,
         email,
