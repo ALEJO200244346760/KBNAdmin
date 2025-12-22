@@ -35,8 +35,7 @@ public class AuthController {
     @Autowired
     private UsuarioService usuarioService;
 
-    // ✅ Ahora POST a /login funciona
-    @PostMapping
+    @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody JwtRequest authenticationRequest) throws Exception {
         authenticate(authenticationRequest.getEmail(), authenticationRequest.getPassword());
 
