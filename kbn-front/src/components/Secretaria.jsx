@@ -17,7 +17,7 @@ const Secretaria = () => {
   
   const initialAgendaData = {
     alumno: '', fecha: today, hora: '10:00', instructorId: '',
-    lugar: 'Escuela', tarifa: '', horas: 1, horasPagadas: 0,
+    lugar: '', tarifa: '', horas: 1, horasPagadas: 0,
     hotelDerivacion: '', estado: 'PENDIENTE'
   };
   const [agendaData, setAgendaData] = useState(initialAgendaData);
