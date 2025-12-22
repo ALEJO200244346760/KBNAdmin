@@ -220,7 +220,6 @@ const InstructorForm = () => {
                 </option>
               ))
             }
-            <option value="ADMIN">ADMIN / GASTO GENERAL</option>
           </select>
         ) : (
           <input
