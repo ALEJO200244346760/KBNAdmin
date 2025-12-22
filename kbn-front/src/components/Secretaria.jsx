@@ -57,14 +57,27 @@ const Secretaria = () => {
   };
 
   const handleAgendaSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', agendaData);
-      alert(agendaData.id ? "Clase reasignada con éxito" : "Clase agendada con éxito");
-      setAgendaData(initialAgendaData);
-      setView('MONITOR');
-    } catch (err) { alert("Error al guardar en agenda"); }
+  e.preventDefault();
+  
+  // Creamos una copia de los datos pero convirtiendo a número lo que debe ser número
+  const dataToSubmit = {
+    ...agendaData,
+    instructorId: Number(agendaData.instructorId),
+    tarifa: Number(agendaData.tarifa), // Convertir String "300" a número 300
+    horas: Number(agendaData.horas),
+    horasPagadas: Number(agendaData.horasPagadas)
   };
+
+  try {
+    await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', dataToSubmit);
+    alert("Clase guardada!");
+    setAgendaData(initialAgendaData);
+    setView('MONITOR');
+  } catch (err) {
+    console.error("Detalle del error:", err.response?.data); // Esto te dirá el error real del Java
+    alert("Error 500: El servidor no pudo procesar los datos. Revisa la consola.");
+  }
+    };
 
   const prepararReasignacion = (clase) => {
     setAgendaData({ ...clase, estado: 'PENDIENTE' });
