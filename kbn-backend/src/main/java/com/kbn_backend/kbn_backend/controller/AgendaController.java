@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@CrossOrigin(origins = "https://kbn-admin.vercel.app", allowCredentials = "true")
 @RequestMapping("/api/agenda")
 public class AgendaController {
 
