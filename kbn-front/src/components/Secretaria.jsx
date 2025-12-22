@@ -212,7 +212,7 @@ const Secretaria = () => {
               <input type="text" placeholder="Ej: Playa Mansa" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Hotel / Origen</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Descripción/Hotel</label>
               <input type="text" placeholder="Hotel o Derivación" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
             </div>
           </div>
