@@ -3,12 +3,6 @@ import React from 'react';
 const Egreso = ({ formData, handleChange, handleSubmit, InstructorField, setView }) => {
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mt-10">
-      <button
-        onClick={() => setView('AGENDA')}
-        className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center"
-      >
-        ← Volver a la Agenda
-      </button>
       <h2 className="text-2xl font-bold mb-6 text-red-600">💸 Registro de Egreso</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">

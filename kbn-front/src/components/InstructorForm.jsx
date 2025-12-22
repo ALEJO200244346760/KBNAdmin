@@ -27,7 +27,7 @@ const InstructorForm = () => {
     actividad: 'Clase de Kite',
     actividadOtro: '',
     vendedor: '',
-    instructor: '', // Nombre visual
+    instructor: '', 
     detalles: '',
     horas: 0,
     tarifa: 0,
@@ -44,7 +44,9 @@ const InstructorForm = () => {
     if (user) {
       setFormData(prev => ({
         ...prev,
-        instructor: `${user.nombre} ${user.apellido}`
+        // Si es Admin, dejamos el campo instructor vacío para obligar a elegir
+        // Si es Instructor, asignamos su nombre automáticamente
+        instructor: user.role === 'ADMINISTRADOR' ? '' : `${user.nombre} ${user.apellido}`
       }));
     }
   }, [user]);
@@ -54,7 +56,6 @@ const InstructorForm = () => {
     const h = parseFloat(formData.horas) || 0;
     const t = parseFloat(formData.tarifa) || 0;
     const g = parseFloat(formData.gastos) || 0;
-    // El total es lo que realmente ingresa
     const calculado = (h * t) - g;
     setFormData(prev => ({ ...prev, total: calculado > 0 ? calculado : 0 }));
   }, [formData.horas, formData.tarifa, formData.gastos]);
@@ -81,14 +82,14 @@ const InstructorForm = () => {
   }, [user?.id, token, axiosConfig]);
 
   const fetchEstadisticas = useCallback(async () => {
-    if (!user?.nombre || !token) return;
+    if (!user || !token) return;
     try {
       const res = await axios.get(
         'https://kbnadmin-production.up.railway.app/api/clases/listar', 
         axiosConfig
       );
-      // Filtro para Estadísticas: Solo lo que pertenece a este instructor (o todo si es Admin)
-      const isAdmin = user?.rol === 'ADMINISTRADOR';
+      // CORRECCIÓN: Usar user.role
+      const isAdmin = user?.role === 'ADMINISTRADOR';
       const filtradas = res.data.filter(c => 
         (isAdmin || c.instructor === `${user.nombre} ${user.apellido}`) && 
         c.tipoTransaccion === 'INGRESO'
@@ -136,14 +137,13 @@ const InstructorForm = () => {
     e.preventDefault();
     const payload = {
       ...formData,
-      tipoTransaccion: view, // INGRESO o EGRESO
+      tipoTransaccion: view, 
       actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
       formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
       cantidadHoras: String(formData.horas),
       tarifaPorHora: String(formData.tarifa),
       total: String(formData.total),
       gastosAsociados: String(formData.gastos || '0'),
-      // Importante: Si el admin elige a alguien, ese nombre va al campo instructor del backend
       instructor: formData.instructor 
     };
 
@@ -170,21 +170,22 @@ const InstructorForm = () => {
     }
   };
 
-  // COMPONENTE DINÁMICO: Permite al Admin elegir instructor
+  // COMPONENTE DINÁMICO CORREGIDO
   const InstructorField = () => {
-    const isAdmin = user?.rol === 'ADMINISTRADOR';
+    // IMPORTANTE: Tu AuthContext usa 'role', no 'rol'
+    const isAdmin = user?.role === 'ADMINISTRADOR';
 
     if (isAdmin) {
       return (
-        <div className="space-y-1 bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+        <div className="space-y-1 bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-4">
           <label className="text-[10px] font-black text-indigo-600 uppercase ml-2 italic">
-            Modo Administrador: Asignar Ingreso a...
+            Modo Administrador: Asignar a...
           </label>
           <select
             name="instructor"
             value={formData.instructor}
             onChange={handleChange}
-            className="p-4 bg-white rounded-2xl w-full border-indigo-200 font-bold text-indigo-900 focus:ring-indigo-500"
+            className="p-4 bg-white rounded-2xl w-full border border-indigo-200 font-bold text-indigo-900 focus:ring-indigo-500 outline-none"
             required
           >
             <option value="">-- Seleccionar Instructor --</option>
@@ -197,8 +198,8 @@ const InstructorForm = () => {
     }
 
     return (
-      <div className="space-y-1">
-        <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor</label>
+      <div className="space-y-1 mb-4">
+        <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor (Solo Lectura)</label>
         <input
           type="text"
           value={formData.instructor}
@@ -223,7 +224,7 @@ const InstructorForm = () => {
           <div className="flex items-center gap-2 mt-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
             <p className="text-indigo-600 font-black text-xs uppercase tracking-widest">
-              {user?.nombre} {user?.apellido} ({user?.rol})
+              {user?.nombre} {user?.apellido} ({user?.role})
             </p>
           </div>
         </div>
