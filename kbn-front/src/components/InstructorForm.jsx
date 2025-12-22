@@ -14,6 +14,9 @@ const InstructorForm = () => {
   const [agendaItems, setAgendaItems] = useState([]);
   const [clasesFinalizadas, setClasesFinalizadas] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+  
+  // Lista dinámica de instructores
+  const [listaInstructores, setListaInstructores] = useState([]);
 
   const axiosConfig = useMemo(() => ({
     headers: { Authorization: `Bearer ${token}` }
@@ -39,19 +42,32 @@ const InstructorForm = () => {
     moneda: 'USD'
   });
 
-  // Sincronizar nombre del instructor y manejo de roles
+  // 1. CARGA DINÁMICA DE INSTRUCTORES (Para el select del Admin)
   useEffect(() => {
-    if (user) {
+    const fetchUsuarios = async () => {
+      if (user?.role === 'ADMINISTRADOR' && token) {
+        try {
+          const res = await axios.get('https://kbnadmin-production.up.railway.app/usuario', axiosConfig);
+          setListaInstructores(res.data);
+        } catch (error) {
+          console.error("Error cargando instructores:", error);
+        }
+      }
+    };
+    fetchUsuarios();
+  }, [user?.role, token, axiosConfig]);
+
+  // 2. SINCRONIZAR NOMBRE INICIAL
+  useEffect(() => {
+    if (user && !formData.instructor) {
       setFormData(prev => ({
         ...prev,
-        // Si es Admin, dejamos el campo instructor vacío para obligar a elegir
-        // Si es Instructor, asignamos su nombre automáticamente
-        instructor: user.role === 'ADMINISTRADOR' ? '' : `${user.nombre} ${user.apellido}`
+        instructor: `${user.nombre} ${user.apellido}`
       }));
     }
-  }, [user]);
+  }, [user, formData.instructor]);
 
-  // Cálculos automáticos de Total
+  // 3. CÁLCULOS AUTOMÁTICOS
   useEffect(() => {
     const h = parseFloat(formData.horas) || 0;
     const t = parseFloat(formData.tarifa) || 0;
@@ -60,6 +76,7 @@ const InstructorForm = () => {
     setFormData(prev => ({ ...prev, total: calculado > 0 ? calculado : 0 }));
   }, [formData.horas, formData.tarifa, formData.gastos]);
 
+  // 4. FETCH AGENDA (Con tu lógica de ordenamiento original)
   const fetchAgenda = useCallback(async () => {
     if (!user?.id || !token) return;
     setLoadingAgenda(true);
@@ -81,6 +98,7 @@ const InstructorForm = () => {
     }
   }, [user?.id, token, axiosConfig]);
 
+  // 5. FETCH ESTADISTICAS
   const fetchEstadisticas = useCallback(async () => {
     if (!user || !token) return;
     try {
@@ -88,7 +106,6 @@ const InstructorForm = () => {
         'https://kbnadmin-production.up.railway.app/api/clases/listar', 
         axiosConfig
       );
-      // CORRECCIÓN: Usar user.role
       const isAdmin = user?.role === 'ADMINISTRADOR';
       const filtradas = res.data.filter(c => 
         (isAdmin || c.instructor === `${user.nombre} ${user.apellido}`) && 
@@ -107,6 +124,7 @@ const InstructorForm = () => {
     }
   }, [view, authLoading, token, fetchAgenda, fetchEstadisticas]);
 
+  // 6. MANEJO DE ESTADO DE AGENDA (Recuperado)
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
       await axios.put(
@@ -133,6 +151,7 @@ const InstructorForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // 7. SUBMIT (Con toda tu lógica de mapeo de campos)
   const handleSubmit = async e => {
     e.preventDefault();
     const payload = {
@@ -162,7 +181,8 @@ const InstructorForm = () => {
         gastos: 0,
         total: 0,
         actividadOtro: '',
-        formaPagoOtro: ''
+        formaPagoOtro: '',
+        instructor: `${user.nombre} ${user.apellido}`
       }));
       setView('AGENDA');
     } catch (error) {
@@ -170,42 +190,45 @@ const InstructorForm = () => {
     }
   };
 
-  // COMPONENTE DINÁMICO CORREGIDO
+  // 8. INSTRUCTOR FIELD (Dinámico y con estilo simple)
   const InstructorField = () => {
-    // IMPORTANTE: Tu AuthContext usa 'role', no 'rol'
     const isAdmin = user?.role === 'ADMINISTRADOR';
 
-    if (isAdmin) {
-      return (
-        <div className="space-y-1 bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-4">
-          <label className="text-[10px] font-black text-indigo-600 uppercase ml-2 italic">
-            Modo Administrador: Asignar a...
-          </label>
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700">Instructor Responsable</label>
+        {isAdmin ? (
           <select
             name="instructor"
             value={formData.instructor}
             onChange={handleChange}
-            className="p-4 bg-white rounded-2xl w-full border border-indigo-200 font-bold text-indigo-900 focus:ring-indigo-500 outline-none"
+            className="mt-1 block w-full rounded-md border p-2 border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white"
             required
           >
-            <option value="">-- Seleccionar Instructor --</option>
-            <option value="JOSE">JOSE</option>
-            <option value="IGNA">IGNA</option>
-            <option value="ADMIN">ADMIN (Gasto General)</option>
+            {/* Primero el admin logueado */}
+            <option value={`${user.nombre} ${user.apellido}`}>
+              {user.nombre} {user.apellido} (Tú)
+            </option>
+            
+            {/* Mapeo dinámico de instructores de la DB */}
+            {listaInstructores
+              .filter(ins => `${ins.nombre} ${ins.apellido}` !== `${user.nombre} ${user.apellido}`)
+              .map(ins => (
+                <option key={ins.id} value={`${ins.nombre} ${ins.apellido}`}>
+                  {ins.nombre} {ins.apellido}
+                </option>
+              ))
+            }
+            <option value="ADMIN">ADMIN / GASTO GENERAL</option>
           </select>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-1 mb-4">
-        <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor (Solo Lectura)</label>
-        <input
-          type="text"
-          value={formData.instructor}
-          readOnly
-          className="p-4 bg-gray-100 rounded-2xl w-full border-none font-bold text-gray-500 cursor-not-allowed"
-        />
+        ) : (
+          <input
+            type="text"
+            value={formData.instructor}
+            readOnly
+            className="mt-1 block w-full rounded-md border p-2 border-gray-300 bg-gray-50 text-gray-500 cursor-not-allowed"
+          />
+        )}
       </div>
     );
   };
