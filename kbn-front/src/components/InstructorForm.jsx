@@ -13,6 +13,7 @@ const InstructorForm = () => {
   const [view, setView] = useState('AGENDA'); 
   const [agendaItems, setAgendaItems] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [instructorId, setInstructorId] = useState(null); // <-- ID numérico real
 
   const today = new Date().toISOString().split('T')[0];
   const initialFormData = {
@@ -35,17 +36,37 @@ const InstructorForm = () => {
 
   const [formData, setFormData] = useState(initialFormData);
 
+  /* ------------------ Obtener ID numérico si es email ------------------ */
+  useEffect(() => {
+    if (!loading && user?.id) {
+      // Si user.id parece un email, pedir ID numérico
+      if (user.id.includes('@')) {
+        const fetchId = async () => {
+          try {
+            const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/usuarios/email/${user.id}`);
+            setInstructorId(res.data.id); // <-- asumimos que la API responde {id: 123, ...}
+          } catch (error) {
+            console.error("Error obteniendo ID del instructor:", error);
+          }
+        };
+        fetchId();
+      } else {
+        setInstructorId(user.id);
+      }
+    }
+  }, [user, loading]);
+
   /* ------------------ Cargar Agenda ------------------ */
   useEffect(() => {
-    if (view === 'AGENDA' && user?.id) {
+    if (view === 'AGENDA' && instructorId) {
       fetchAgenda();
     }
-  }, [view, user, loading]);
+  }, [view, instructorId]);
 
   const fetchAgenda = async () => {
     setLoadingAgenda(true);
     try {
-      const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`);
+      const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${instructorId}`);
       const sorted = res.data.sort((a, b) => {
         if (a.estado === 'PENDIENTE' && b.estado !== 'PENDIENTE') return -1;
         if (a.estado !== 'PENDIENTE' && b.estado === 'PENDIENTE') return 1;
