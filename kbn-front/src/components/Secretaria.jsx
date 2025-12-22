@@ -179,20 +179,36 @@ const Secretaria = () => {
             <input type="text" placeholder="Hotel o Derivación" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
           </div>
 
-          <div className="grid grid-cols-3 gap-2 bg-indigo-50/50 p-4 rounded-[1.5rem] border border-indigo-100">
-            <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa $</label>
-              <input type="number" placeholder="0" value={agendaData.tarifa} onChange={e => setAgendaData({...agendaData, tarifa: e.target.value})} className="w-full bg-transparent border-none text-lg font-black text-indigo-700 p-1" />
+          <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-400 shadow-inner">
+  <div>
+    <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa Pactada</label>
+    <input
+      type="number"
+      value={agendaData.tarifa}
+      onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })}
+      placeholder="0"
+      className="w-full bg-transparent border border-indigo-300 text-xl font-black text-indigo-700 placeholder-indigo-300 p-1 rounded"
+    />
+  </div>
+  <div>
+    <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Solicitadas</label>
+    <input
+      type="number"
+      value={agendaData.horas}
+      onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })}
+      className="w-full bg-transparent border border-indigo-300 text-xl font-black text-indigo-700 p-1 rounded"
+    />
+  </div>
+  <div>
+    <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Pagadas</label>
+    <input
+      type="number"
+      value={agendaData.horasPagadas}
+      onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })}
+      className="w-full bg-transparent border border-indigo-300 text-xl font-black text-indigo-700 p-1 rounded"
+    />
+  </div>
             </div>
-            <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas</label>
-              <input type="number" value={agendaData.horas} onChange={e => setAgendaData({...agendaData, horas: e.target.value})} className="w-full bg-transparent border-none text-lg font-black text-indigo-700 p-1" />
-            </div>
-            <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Seña $</label>
-              <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({...agendaData, horasPagadas: e.target.value})} className="w-full bg-transparent border-none text-lg font-black text-indigo-700 p-1" />
-            </div>
-          </div>
 
           <div className="flex flex-col md:flex-row gap-3 pt-4">
             <button type="submit" className="flex-1 bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase shadow-lg shadow-indigo-100 hover:scale-[1.02] transition-all">Confirmar Asignación</button>
