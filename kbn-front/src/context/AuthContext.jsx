@@ -8,7 +8,6 @@ const decodeToken = (token) => {
     const payload = token.split('.')[1];
     return JSON.parse(atob(payload));
   } catch (e) {
-    console.error('Error decoding token:', e);
     return null;
   }
 };
@@ -34,39 +33,34 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       if (token) {
         const decoded = decodeToken(token);
-        const email = decoded?.sub;
+        
+        // 1. SETEO INMEDIATO: Cargamos lo que hay en el token para que el Login funcione YA.
+        const initialUser = {
+          id: decoded?.id || null, // Si el backend no lo manda, será null por ahora
+          nombre: decoded?.nombre || '',
+          apellido: decoded?.apellido || '',
+          role: normalizeRole(decoded?.roles?.[0]),
+          email: decoded?.sub
+        };
+        setUser(initialUser);
+        setLoading(false); // Liberamos las rutas aquí mismo
 
-        try {
-          // Buscamos los datos completos del usuario (incluyendo el ID) por email
-          // Usamos la ruta /usuario (ajusta si es /api/usuarios)
-          const res = await axios.get(`https://kbnadmin-production.up.railway.app/usuario`);
-          const listaUsuarios = res.data;
-          const usuarioEncontrado = listaUsuarios.find(u => u.email === email);
-
-          if (usuarioEncontrado) {
-            setUser({
-              id: usuarioEncontrado.id,
-              nombre: usuarioEncontrado.nombre,
-              apellido: usuarioEncontrado.apellido,
-              email: usuarioEncontrado.email,
-              role: normalizeRole(decoded?.roles?.[0])
-            });
-          } else {
-            // Fallback si no lo encuentra en la lista
-            setUser({
-              id: decoded?.id || null,
-              nombre: decoded?.nombre || '',
-              apellido: decoded?.apellido || '',
-              role: normalizeRole(decoded?.roles?.[0])
-            });
+        // 2. ACTUALIZACIÓN EN SEGUNDO PLANO: Buscamos el ID si no lo tenemos
+        if (!initialUser.id && initialUser.email) {
+          try {
+            const res = await axios.get(`https://kbnadmin-production.up.railway.app/usuario`);
+            const usuarioEncontrado = res.data.find(u => u.email === initialUser.email);
+            if (usuarioEncontrado) {
+              setUser(prev => ({ ...prev, id: usuarioEncontrado.id }));
+            }
+          } catch (error) {
+            console.error("No se pudo obtener el ID extra del servidor");
           }
-        } catch (error) {
-          console.error("Error recuperando info de usuario:", error);
         }
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initializeAuth();
