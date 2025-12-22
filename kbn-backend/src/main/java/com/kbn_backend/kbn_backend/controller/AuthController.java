@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/login")
+@RequestMapping("/login") // Base path
 @CrossOrigin(origins = "https://kbn-admin.vercel.app", allowCredentials = "true")
 public class AuthController {
 
@@ -36,7 +36,8 @@ public class AuthController {
     @Autowired
     private UsuarioService usuarioService;
 
-    @PostMapping("/login")
+    // ✅ Ahora POST a /login funciona
+    @PostMapping
     public ResponseEntity<?> createAuthenticationToken(@RequestBody JwtRequest authenticationRequest) throws Exception {
         authenticate(authenticationRequest.getEmail(), authenticationRequest.getPassword());
 
@@ -54,6 +55,7 @@ public class AuthController {
         return ResponseEntity.ok(new JwtResponse(token));
     }
 
+    // Register puede quedarse igual
     @PostMapping("/register")
     public ResponseEntity<?> saveUser(@RequestBody UsuarioDto usuario) throws Exception {
         usuario.setRol("ENFERMERO");
@@ -69,7 +71,4 @@ public class AuthController {
             throw new Exception("INVALID_CREDENTIALS", e);
         }
     }
-
-
 }
-
