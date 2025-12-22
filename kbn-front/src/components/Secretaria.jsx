@@ -213,18 +213,20 @@ const Secretaria = () => {
             <input type="text" placeholder="Lugar / Spot" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
             <input type="text" placeholder="Descricpión / Hotel" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
           </div>
-          <div>
-              <label className="block text-sm font-medium text-gray-700">Tarifa Pactada</label>
-              <input type="number" name="tarifa" value={agendaData.tarifa} onChange={handleAgendaChange} className="w-full border p-2 rounded" placeholder="$" />
+          <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-100 shadow-inner">
+            <div>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa Pactada</label>
+              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} className="w-full bg-transparent border rounded text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Horas Solicitadas</label>
-              <input type="number" name="horas" value={agendaData.horas} onChange={handleAgendaChange} className="w-full border p-2 rounded" />
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Solicitadas</label>
+              <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} className="w-full bg-transparent border rounded text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Horas Pagadas</label>
-              <input type="number" name="horasPagadas" value={agendaData.horasPagadas} onChange={handleAgendaChange} className="w-full border p-2 rounded" placeholder="Seña o total" />
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Pagadas</label>
+              <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} className="w-full bg-transparent border rounded text-xl font-black text-indigo-700 p-0" />
             </div>
+          </div>
           <div className="flex flex-col md:flex-row gap-3 pt-4">
             <button type="submit" className="flex-[2] bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">Confirmar Asignación</button>
             <button type="button" onClick={() => setView('INICIO')} className="flex-1 bg-gray-100 text-gray-400 p-5 rounded-2xl font-black uppercase hover:bg-gray-200 transition-all">Cancelar</button>
