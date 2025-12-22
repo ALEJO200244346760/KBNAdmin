@@ -117,7 +117,8 @@ const Secretaria = () => {
         ...prev,
         [name]: name === "instructorId" ? Number(value) : value
     }));
-    };
+  };
+
 
 
   const handleAgendaSubmit = async e => {
