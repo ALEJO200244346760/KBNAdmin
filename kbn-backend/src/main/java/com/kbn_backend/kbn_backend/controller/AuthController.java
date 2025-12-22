@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/login") // Base path
 @CrossOrigin(origins = "https://kbn-admin.vercel.app", allowCredentials = "true")
 public class AuthController {
 
