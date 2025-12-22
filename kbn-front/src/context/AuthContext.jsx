@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext();
 
 /* ---------------------------------------------------
-   Decodificar JWT sin librerías (como ya tenías)
+   Decodificar JWT sin librerías
 --------------------------------------------------- */
 const decodeToken = (token) => {
   try {
@@ -18,9 +18,6 @@ const decodeToken = (token) => {
 
 /* ---------------------------------------------------
    Normalizar roles del backend → roles del frontend
-   ROLE_ADMINISTRADOR → ADMINISTRADOR
-   ROLE_INSTRUCTOR → INSTRUCTOR
-   ROLE_ALUMNO → ALUMNO
 --------------------------------------------------- */
 const normalizeRole = (backendRole) => {
   if (!backendRole) return null;
@@ -32,6 +29,8 @@ const normalizeRole = (backendRole) => {
       return "ADMINISTRADOR";
     case "INSTRUCTOR":
       return "INSTRUCTOR";
+    case "SECRETARIA":   // <-- agregado
+      return "SECRETARIA";
     case "ALUMNO":
       return "ALUMNO";
     default:
@@ -42,7 +41,7 @@ const normalizeRole = (backendRole) => {
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [roles, setRoles] = useState([]);
-  const [user, setUser] = useState({ nombre: '', apellido: '', role: '' });
+  const [user, setUser] = useState({ id: null, nombre: '', apellido: '', role: '' });
   const [loading, setLoading] = useState(true);
 
   /* ---------------------------------------------------
@@ -57,17 +56,19 @@ export const AuthProvider = ({ children }) => {
 
       setRoles(decoded?.roles || []);
       setUser({
+        id: decoded?.id || decoded?.sub || null, // <-- agregamos ID
         nombre: decoded?.nombre || '',
         apellido: decoded?.apellido || '',
         role: normalizedRole || '',
       });
 
+      console.log("🔐 JWT completo decodificado:", decoded);
       console.log("🔐 JWT ROLE:", backendRole);
       console.log("🎭 FRONT ROLE:", normalizedRole);
 
     } else {
       setRoles([]);
-      setUser({ nombre: '', apellido: '', role: '' });
+      setUser({ id: null, nombre: '', apellido: '', role: '' });
     }
 
     setLoading(false);
@@ -88,7 +89,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     setToken(null);
     setRoles([]);
-    setUser({ nombre: '', apellido: '', role: '' });
+    setUser({ id: null, nombre: '', apellido: '', role: '' });
   };
 
   return (

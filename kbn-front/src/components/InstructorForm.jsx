@@ -7,7 +7,7 @@ import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 
 const InstructorForm = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   
   // Vistas: 'AGENDA', 'INGRESO', 'EGRESO'
   const [view, setView] = useState('AGENDA'); 
@@ -38,15 +38,19 @@ const InstructorForm = () => {
 
   // --- EFECTO: Cargar Agenda al entrar o al volver a la vista AGENDA ---
   useEffect(() => {
-    if (view === 'AGENDA' && user && user.id) {
-      fetchAgenda();
+    // Solo disparar fetch si tenemos un ID válido y no estamos cargando el contexto
+    if (view === 'AGENDA') {
+      if (user?.id) {
+        fetchAgenda();
+      } else if (!loading) {
+        console.warn("Esperando a que el usuario se cargue correctamente...");
+      }
     }
-  }, [view, user]);
+  }, [view, user, loading]);
 
   const fetchAgenda = async () => {
     setLoadingAgenda(true);
     try {
-      // Endpoint que creamos en el paso anterior
       const res = await axios.get(`https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`);
       // Ordenar: Pendientes primero, luego por fecha
       const sorted = res.data.sort((a, b) => {
@@ -65,12 +69,12 @@ const InstructorForm = () => {
   // --- ACCIONES DE AGENDA (Confirmar / Rechazar) ---
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
-      // Enviamos el string directo (el backend lo limpia)
-      await axios.put(`https://kbnadmin-production.up.railway.app/api/agenda/${id}/estado`, nuevoEstado, {
-        headers: { 'Content-Type': 'text/plain' }
-      });
+      await axios.put(
+        `https://kbnadmin-production.up.railway.app/api/agenda/${id}/estado`,
+        nuevoEstado,
+        { headers: { 'Content-Type': 'text/plain' } }
+      );
       
-      // Actualización optimista (Visual inmediata)
       setAgendaItems(prev => prev.map(item => 
         item.id === id ? { ...item, estado: nuevoEstado } : item
       ));
@@ -84,7 +88,6 @@ const InstructorForm = () => {
   };
 
   // --- LOGICA DE FORMULARIOS (Ingreso/Egreso) ---
-  // (Mantuvimos la lógica que ya tenías funcionando)
   useEffect(() => {
     if (view === 'INGRESO') {
       const totalCalc = (parseFloat(formData.horas) || 0) * (parseFloat(formData.tarifa) || 0) - (parseFloat(formData.gastos) || 0);
@@ -98,7 +101,6 @@ const InstructorForm = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    // Validación básica
     if (!formData.instructor) return alert('Error: Instructor no identificado.');
 
     const payload = {
@@ -121,7 +123,6 @@ const InstructorForm = () => {
     try {
       await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload);
       alert(`${view} registrado exitosamente!`);
-      // Volver a la agenda después de guardar (opcional)
       setView('AGENDA');
       setFormData(initialFormData);
     } catch (error) {
@@ -129,7 +130,6 @@ const InstructorForm = () => {
     }
   };
 
-  // Helper para mostrar input de instructor (Solo lectura para instructor)
   const InstructorField = () => (
     <div>
       <label className="block text-sm font-medium text-gray-700">Instructor</label>
@@ -143,15 +143,12 @@ const InstructorForm = () => {
     </div>
   );
 
-  // --- RENDERIZADO PRINCIPAL ---
-
   return (
     <div className="max-w-4xl mx-auto p-4 pb-20">
       
-      {/* HEADER Y NAVEGACIÓN */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-gray-800">
-          Hola, {user.nombre} 👋
+          Hola, {user?.nombre || 'Instructor'} 👋
         </h1>
         
         <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -176,7 +173,6 @@ const InstructorForm = () => {
         </div>
       </div>
 
-      {/* --- VISTA: AGENDA --- */}
       {view === 'AGENDA' && (
         <div className="space-y-4">
           {loadingAgenda ? (
@@ -194,7 +190,6 @@ const InstructorForm = () => {
                     ${item.estado === 'PENDIENTE' ? 'border-yellow-400 ring-1 ring-yellow-100' : 
                       item.estado === 'CONFIRMADA' ? 'border-green-500' : 'border-red-400 opacity-75'}`}
                 >
-                  {/* Badge de Estado */}
                   <div className="absolute top-4 right-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider 
                       ${item.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' : 
@@ -204,16 +199,13 @@ const InstructorForm = () => {
                     </span>
                   </div>
 
-                  {/* Contenido Card */}
                   <div className="flex flex-col md:flex-row gap-4">
-                    {/* Fecha y Hora */}
                     <div className="flex-shrink-0 flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg min-w-[80px]">
                       <span className="text-xs font-bold text-gray-400 uppercase">{new Date(item.fecha).toLocaleString('es-ES', { weekday: 'short' })}</span>
                       <span className="text-xl font-bold text-gray-800">{new Date(item.fecha).getDate()}</span>
                       <span className="text-xs text-gray-500">{item.hora?.substring(0,5)} hs</span>
                     </div>
 
-                    {/* Detalles */}
                     <div className="flex-grow">
                       <h3 className="text-lg font-bold text-gray-800">{item.alumno}</h3>
                       <p className="text-sm text-gray-600 mb-2">📍 {item.lugar} {item.hotelDerivacion && `(Desde: ${item.hotelDerivacion})`}</p>
@@ -226,7 +218,6 @@ const InstructorForm = () => {
                     </div>
                   </div>
 
-                  {/* Botones de Acción (Solo si está PENDIENTE) */}
                   {item.estado === 'PENDIENTE' && (
                     <div className="mt-4 flex gap-3 border-t pt-3">
                       <button 
@@ -250,7 +241,6 @@ const InstructorForm = () => {
         </div>
       )}
 
-      {/* --- VISTA: FORMULARIOS --- */}
       {view === 'INGRESO' && (
         <Ingreso 
           formData={formData} 
