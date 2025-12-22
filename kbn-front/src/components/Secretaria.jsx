@@ -219,15 +219,15 @@ const Secretaria = () => {
 
           <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 shadow-inner">
             <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa $</label>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa Pactada</label>
               <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({...agendaData, tarifa: e.target.value})} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Cant. Horas</label>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Solicitadas</label>
               <input type="number" value={agendaData.horas} onChange={e => setAgendaData({...agendaData, horas: e.target.value})} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
             <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Pago Adelanto</label>
+              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Pagadas</label>
               <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({...agendaData, horasPagadas: e.target.value})} className="w-full bg-transparent border-none text-xl font-black text-indigo-700 p-0" />
             </div>
           </div>
