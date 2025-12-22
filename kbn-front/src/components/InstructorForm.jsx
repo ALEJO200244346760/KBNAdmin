@@ -9,13 +9,12 @@ import Agenda from './Agenda';
 import Estadisticas from './Estadisticas';
 
 const InstructorForm = () => {
-  const { user, token, loading: authLoading } = useAuth(); // Extraemos token del context
+  const { user, token, loading: authLoading } = useAuth();
   const [view, setView] = useState('AGENDA'); 
   const [agendaItems, setAgendaItems] = useState([]);
   const [clasesFinalizadas, setClasesFinalizadas] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
 
-  // Configuración de cabeceras para Axios con el token
   const axiosConfig = useMemo(() => ({
     headers: { Authorization: `Bearer ${token}` }
   }), [token]);
@@ -25,10 +24,10 @@ const InstructorForm = () => {
   const [formData, setFormData] = useState({
     tipoTransaccion: 'INGRESO',
     fecha: today,
-    actividad: 'Clases',
+    actividad: 'Clase de Kite',
     actividadOtro: '',
     vendedor: '',
-    instructor: '',
+    instructor: '', // Nombre visual
     detalles: '',
     horas: 0,
     tarifa: 0,
@@ -40,7 +39,7 @@ const InstructorForm = () => {
     moneda: 'USD'
   });
 
-  // Sincronizar nombre del instructor
+  // Sincronizar nombre del instructor y manejo de roles
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -50,16 +49,16 @@ const InstructorForm = () => {
     }
   }, [user]);
 
-  // Cálculos automáticos
+  // Cálculos automáticos de Total
   useEffect(() => {
     const h = parseFloat(formData.horas) || 0;
     const t = parseFloat(formData.tarifa) || 0;
     const g = parseFloat(formData.gastos) || 0;
+    // El total es lo que realmente ingresa
     const calculado = (h * t) - g;
     setFormData(prev => ({ ...prev, total: calculado > 0 ? calculado : 0 }));
   }, [formData.horas, formData.tarifa, formData.gastos]);
 
-  // --- FETCH AGENDA (CON TOKEN) ---
   const fetchAgenda = useCallback(async () => {
     if (!user?.id || !token) return;
     setLoadingAgenda(true);
@@ -81,7 +80,6 @@ const InstructorForm = () => {
     }
   }, [user?.id, token, axiosConfig]);
 
-  // --- FETCH ESTADISTICAS (CON TOKEN) ---
   const fetchEstadisticas = useCallback(async () => {
     if (!user?.nombre || !token) return;
     try {
@@ -89,8 +87,10 @@ const InstructorForm = () => {
         'https://kbnadmin-production.up.railway.app/api/clases/listar', 
         axiosConfig
       );
+      // Filtro para Estadísticas: Solo lo que pertenece a este instructor (o todo si es Admin)
+      const isAdmin = user?.rol === 'ADMINISTRADOR';
       const filtradas = res.data.filter(c => 
-        c.instructor === `${user.nombre} ${user.apellido}` && 
+        (isAdmin || c.instructor === `${user.nombre} ${user.apellido}`) && 
         c.tipoTransaccion === 'INGRESO'
       );
       setClasesFinalizadas(filtradas);
@@ -106,7 +106,6 @@ const InstructorForm = () => {
     }
   }, [view, authLoading, token, fetchAgenda, fetchEstadisticas]);
 
-  // --- HANDLERS (CON TOKEN) ---
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
       await axios.put(
@@ -122,7 +121,6 @@ const InstructorForm = () => {
       setAgendaItems(prev => prev.map(item => 
         item.id === id ? { ...item, estado: nuevoEstado } : item
       ));
-      alert(`Clase ${nuevoEstado.toLowerCase()} con éxito.`);
       if (nuevoEstado === 'RECHAZADA') fetchAgenda();
     } catch (error) {
       alert("Error al actualizar estado.");
@@ -138,15 +136,17 @@ const InstructorForm = () => {
     e.preventDefault();
     const payload = {
       ...formData,
-      tipoTransaccion: view,
+      tipoTransaccion: view, // INGRESO o EGRESO
       actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
       formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
       cantidadHoras: String(formData.horas),
       tarifaPorHora: String(formData.tarifa),
       total: String(formData.total),
       gastosAsociados: String(formData.gastos || '0'),
-      asignadoA: 'NINGUNO'
+      // Importante: Si el admin elige a alguien, ese nombre va al campo instructor del backend
+      instructor: formData.instructor 
     };
+
     try {
       await axios.post(
         'https://kbnadmin-production.up.railway.app/api/clases/guardar', 
@@ -166,25 +166,52 @@ const InstructorForm = () => {
       }));
       setView('AGENDA');
     } catch (error) {
-      alert('Error al guardar registro financiero.');
+      alert('Error al guardar registro.');
     }
   };
 
-  const InstructorField = () => (
-    <div className="space-y-1">
-      <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor (Solo Lectura)</label>
-      <input
-        type="text"
-        value={formData.instructor}
-        readOnly
-        className="p-4 bg-gray-100 rounded-2xl w-full border-none font-bold text-gray-500 cursor-not-allowed"
-      />
-    </div>
-  );
+  // COMPONENTE DINÁMICO: Permite al Admin elegir instructor
+  const InstructorField = () => {
+    const isAdmin = user?.rol === 'ADMINISTRADOR';
+
+    if (isAdmin) {
+      return (
+        <div className="space-y-1 bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+          <label className="text-[10px] font-black text-indigo-600 uppercase ml-2 italic">
+            Modo Administrador: Asignar Ingreso a...
+          </label>
+          <select
+            name="instructor"
+            value={formData.instructor}
+            onChange={handleChange}
+            className="p-4 bg-white rounded-2xl w-full border-indigo-200 font-bold text-indigo-900 focus:ring-indigo-500"
+            required
+          >
+            <option value="">-- Seleccionar Instructor --</option>
+            <option value="JOSE">JOSE</option>
+            <option value="IGNA">IGNA</option>
+            <option value="ADMIN">ADMIN (Gasto General)</option>
+          </select>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Instructor</label>
+        <input
+          type="text"
+          value={formData.instructor}
+          readOnly
+          className="p-4 bg-gray-100 rounded-2xl w-full border-none font-bold text-gray-500 cursor-not-allowed"
+        />
+      </div>
+    );
+  };
 
   if (authLoading) return (
     <div className="flex justify-center items-center min-h-screen">
-      <p className="font-black text-gray-300 animate-pulse italic uppercase tracking-tighter">Cargando Perfil...</p>
+      <p className="font-black text-gray-300 animate-pulse italic uppercase tracking-tighter">Cargando...</p>
     </div>
   );
 
@@ -192,10 +219,12 @@ const InstructorForm = () => {
     <div className="max-w-4xl mx-auto p-4 md:mt-6">
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-50">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">Panel Instructor</h1>
+          <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">KBN Panel</h1>
           <div className="flex items-center gap-2 mt-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-            <p className="text-indigo-600 font-black text-xs uppercase tracking-widest">{user?.nombre} {user?.apellido}</p>
+            <p className="text-indigo-600 font-black text-xs uppercase tracking-widest">
+              {user?.nombre} {user?.apellido} ({user?.rol})
+            </p>
           </div>
         </div>
         
