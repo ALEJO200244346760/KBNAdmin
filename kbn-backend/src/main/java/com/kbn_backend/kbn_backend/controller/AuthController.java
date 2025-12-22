@@ -58,7 +58,7 @@ public class AuthController {
     // Register puede quedarse igual
     @PostMapping("/register")
     public ResponseEntity<?> saveUser(@RequestBody UsuarioDto usuario) throws Exception {
-        usuario.setRol("ENFERMERO");
+        usuario.setRol("INSTRUCTOR");
         return ResponseEntity.ok(userDetailsService.save(usuario));
     }
 
