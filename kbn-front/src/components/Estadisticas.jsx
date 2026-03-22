@@ -73,7 +73,7 @@ const Estadisticas = ({ clases }) => {
               <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
                 <th className="p-5">Fecha</th>
                 <th className="p-5">Alumno / Detalles</th>
-                <th className="p-5 text-center">Horas</th>
+                <th className="p-5 text-right">Horas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
