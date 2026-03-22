@@ -13,23 +13,24 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import ReportesEstadisticasGraficos from './ReportesEstadisticasGraficos';
 
+// Registro de componentes de gráficos
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
 const ReporteEstadisticas = () => {
     const { token } = useAuth();
     
-    // --- ESTADOS DE DATOS ---
+    // --- ESTADOS ---
     const [allData, setAllData] = useState([]);
-    const [instructoresDB, setInstructoresDB] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // UI Helpers
-    const [expandedId, setExpandedId] = useState(null);
-    const [showOtherCurrencies, setShowOtherCurrencies] = useState(false);
-    const [showFilters, setShowFilters] = useState(false);
-
-    // --- ESTADO DE FILTROS ---
-    const [filters, setFilters] = useState({
+    // Listas Originales
+    const [pendientes, setPendientes] = useState([]);
+    const [egresos, setEgresos] = useState([]);
+    const [asignados, setAsignados] = useState([]);
+    
+    // Filtros
+    const [mostrarFiltros, setMostrarFiltros] = useState(false);
+    const [filtros, setFiltros] = useState({
         moneda: '',
         formaPago: '',
         instructor: '',
@@ -37,22 +38,49 @@ const ReporteEstadisticas = () => {
         fechaInicio: '',
         fechaFin: ''
     });
+    
+    // UI Helpers
+    const [expandedId, setExpandedId] = useState(null);
+    const [showOtherCurrencies, setShowOtherCurrencies] = useState(false);
 
     // --- EFECTOS ---
     useEffect(() => {
         if (token) {
             fetchData();
-            fetchInstructores();
         }
     }, [token]);
 
+    // --- LOGICA DE DATOS ---
     const fetchData = async () => {
         setLoading(true);
         try {
             const response = await axios.get('https://kbnadmin-production.up.railway.app/api/clases/listar', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setAllData(response.data);
+            
+            const data = response.data;
+            const listPendientes = [];
+            const listEgresos = [];
+            const listAsignados = [];
+
+            data.forEach(item => {
+                if (item.tipoTransaccion === 'EGRESO') {
+                    listEgresos.push(item);
+                } else if (item.tipoTransaccion === 'INGRESO') {
+                    if (!item.asignadoA || item.asignadoA.trim() === '' || item.asignadoA.toUpperCase() === 'NINGUNO') {
+                        item.asignadoA = "NINGUNO"; 
+                        listPendientes.push(item);
+                    } else {
+                        listAsignados.push(item);
+                    }
+                }
+            });
+
+            setAllData(data);
+            setPendientes(listPendientes);
+            setEgresos(listEgresos);
+            setAsignados(listAsignados);
+
         } catch (error) {
             console.error("Error al cargar datos:", error);
         } finally {
@@ -60,230 +88,311 @@ const ReporteEstadisticas = () => {
         }
     };
 
-    const fetchInstructores = async () => {
-        try {
-            const res = await axios.get('https://kbnadmin-production.up.railway.app/usuario', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setInstructoresDB(res.data);
-        } catch (e) {
-            console.error("Error cargando instructores:", e);
-        }
+    // --- EXTRAER INSTRUCTORES ÚNICOS PARA EL FILTRO ---
+    const instructoresDisponibles = useMemo(() => {
+        const instructoresSet = new Set(allData.map(item => item.instructor).filter(Boolean));
+        return Array.from(instructoresSet);
+    }, [allData]);
+
+    // --- LOGICA DE FILTRADO ---
+    const handleFiltroChange = (e) => {
+        const { name, value } = e.target;
+        setFiltros(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- LÓGICA DE FILTRADO MAESTRO (INSTRUCTOR + ASIGNADO) ---
-    const filteredData = useMemo(() => {
-        return allData.filter(item => {
-            const matchMoneda = !filters.moneda || item.moneda === filters.moneda;
-            const matchPago = !filters.formaPago || item.formaPago === filters.formaPago;
-            const matchActividad = !filters.actividad || item.actividad === filters.actividad;
-            
-            // Busca si el instructor dio la clase O si el socio la tiene asignada
-            const matchInstructor = !filters.instructor || 
-                                    item.instructor === filters.instructor || 
-                                    item.asignadoA === filters.instructor;
-            
-            const matchInicio = !filters.fechaInicio || item.fecha >= filters.fechaInicio;
-            const matchFin = !filters.fechaFin || item.fecha <= filters.fechaFin;
-
-            return matchMoneda && matchPago && matchActividad && matchInstructor && matchInicio && matchFin;
+    const limpiarFiltros = () => {
+        setFiltros({
+            moneda: '',
+            formaPago: '',
+            instructor: '',
+            actividad: '',
+            fechaInicio: '',
+            fechaFin: ''
         });
-    }, [allData, filters]);
+    };
 
-    // --- CLASIFICACIÓN DE LISTAS ---
-    const { pendientes, egresos, asignados } = useMemo(() => {
-        const p = []; const e = []; const a = [];
-        filteredData.forEach(item => {
-            if (item.tipoTransaccion === 'EGRESO') {
-                e.push(item);
-            } else if (item.tipoTransaccion === 'INGRESO') {
-                if (!item.asignadoA || item.asignadoA.trim() === '' || item.asignadoA.toUpperCase() === 'NINGUNO') {
-                    p.push({ ...item, asignadoA: "NINGUNO" });
-                } else {
-                    a.push(item);
-                }
-            }
+    const aplicarFiltros = (lista) => {
+        return lista.filter(item => {
+            let match = true;
+            if (filtros.moneda && item.moneda !== filtros.moneda) match = false;
+            if (filtros.formaPago && item.formaPago !== filtros.formaPago) match = false;
+            if (filtros.instructor && item.instructor !== filtros.instructor) match = false;
+            if (filtros.actividad && item.actividad !== filtros.actividad) match = false;
+            if (filtros.fechaInicio && item.fecha < filtros.fechaInicio) match = false;
+            if (filtros.fechaFin && item.fecha > filtros.fechaFin) match = false;
+            return match;
         });
-        return { pendientes: p, egresos: e, asignados: a };
-    }, [filteredData]);
+    };
 
-    // --- TOTALES ---
+    // Listas filtradas reactivas
+    const pendientesFiltrados = useMemo(() => aplicarFiltros(pendientes), [pendientes, filtros]);
+    const egresosFiltrados = useMemo(() => aplicarFiltros(egresos), [egresos, filtros]);
+    const asignadosFiltrados = useMemo(() => aplicarFiltros(asignados), [asignados, filtros]);
+
+    // --- CÁLCULO DE TOTALES POR MONEDA (SOBRE DATOS FILTRADOS) ---
     const totalesPorMoneda = useMemo(() => {
         const totales = {};
-        const sumarMonto = (moneda, monto) => {
+
+        const procesarMonto = (moneda, monto) => {
             const mon = moneda || 'USD';
-            totales[mon] = (totales[mon] || 0) + monto;
+            if (!totales[mon]) totales[mon] = 0;
+            totales[mon] += monto;
         };
 
-        [...pendientes, ...asignados].forEach(i => sumarMonto(i.moneda, parseFloat(i.total) || 0));
-        egresos.forEach(i => sumarMonto(i.moneda, -(parseFloat(i.gastosAsociados) || parseFloat(i.total) || 0)));
+        [...pendientesFiltrados, ...asignadosFiltrados].forEach(item => {
+            const total = parseFloat(item.total) || 0;
+            procesarMonto(item.moneda, total);
+        });
+
+        egresosFiltrados.forEach(item => {
+            const monto = parseFloat(item.gastosAsociados) || parseFloat(item.total) || 0;
+            procesarMonto(item.moneda, -monto);
+        });
 
         return totales;
-    }, [pendientes, egresos, asignados]);
+    }, [pendientesFiltrados, egresosFiltrados, asignadosFiltrados]);
 
     // --- ACCIONES ---
-    const handleFilterChange = (e) => setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const resetFilters = () => setFilters({ moneda: '', formaPago: '', instructor: '', actividad: '', fechaInicio: '', fechaFin: '' });
-    const toggleDetails = (id) => setExpandedId(prev => prev === id ? null : id);
-    const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(val) || 0).replace('US', '');
+    const toggleDetails = (id) => {
+        setExpandedId(prev => prev === id ? null : id);
+    };
+
+    const formatCurrency = (val) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(val) || 0).replace('US', '');
+    };
 
     const handlePendienteChange = (id, val) => {
-        setAllData(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
+        // Actualizamos la lista original para mantener el estado sincronizado
+        setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
     };
 
     const saveAssignment = async (id, asignadoA) => {
         if (!asignadoA || asignadoA === 'NINGUNO') return alert("Selecciona un instructor válido.");
         try {
             await axios.put(`https://kbnadmin-production.up.railway.app/api/clases/asignar/${id}`, 
-                { asignadoA }, { headers: { Authorization: `Bearer ${token}` } }
+                { asignadoA }, 
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             alert("Asignado correctamente.");
             fetchData();
-        } catch (e) { alert("Error al asignar."); }
+        } catch (e) {
+            alert("Error de red o no autorizado");
+        }
     };
 
-    const handleDelete = (id) => { if(window.confirm("¿Eliminar registro?")) alert("Endpoint DELETE pendiente."); };
-    const handleEdit = (id) => alert(`Editar ID: ${id}`);
+    const handleDelete = async (id) => {
+        if(!window.confirm("¿Eliminar registro?")) return;
+        alert("Funcionalidad pendiente de Endpoint DELETE");
+    };
 
+    const handleEdit = (id) => {
+        alert(`Editar ID: ${id}`);
+    };
+
+    // --- RENDERIZADO DE DETALLES ---
     const RenderDetails = ({ item }) => (
-        <div className="bg-gray-50 p-6 rounded-b-2xl border-t border-gray-200 text-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
-            <div><span className="font-bold text-gray-500 uppercase text-[10px]">Detalle:</span> <p className="font-bold text-gray-800">{item.detalles || '-'}</p></div>
-            <div><span className="font-bold text-gray-500 uppercase text-[10px]">Vendedor:</span> <p className="font-bold text-gray-800">{item.vendedor || '-'}</p></div>
-            <div><span className="font-bold text-gray-500 uppercase text-[10px]">Forma Pago:</span> <p className="font-bold text-gray-800">{item.formaPago || '-'}</p></div>
+        <div className="bg-gray-50 p-4 rounded-b-lg border-t border-gray-200 text-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
+            <div><span className="font-bold text-gray-700">Detalle:</span> {item.detalles || '-'}</div>
+            <div><span className="font-bold text-gray-700">Vendedor:</span> {item.vendedor || '-'}</div>
+            <div><span className="font-bold text-gray-700">Forma Pago:</span> {item.formaPago || '-'}</div>
+            
             {item.tipoTransaccion === 'INGRESO' && (
                 <>
-                    <div><span className="font-bold text-gray-500 uppercase text-[10px]">Tarifa/H:</span> <p className="font-bold text-gray-800">{formatCurrency(item.tarifaPorHora)}</p></div>
-                    <div><span className="font-bold text-gray-500 uppercase text-[10px]">Comisión:</span> <p className="font-bold text-gray-800">{formatCurrency(item.comision)}</p></div>
-                    <div><span className="font-bold text-red-500 uppercase text-[10px]">Gastos:</span> <p className="font-bold text-red-600">{formatCurrency(item.gastosAsociados)}</p></div>
+                    <div><span className="font-bold text-gray-700">Horas:</span> {item.cantidadHoras}</div>
+                    <div><span className="font-bold text-gray-700">Tarifa:</span> {formatCurrency(item.tarifaPorHora)}</div>
+                    <div><span className="font-bold text-gray-700">Comisión:</span> {formatCurrency(item.comision)}</div>
+                    <div><span className="font-bold text-red-600">Gastos:</span> {formatCurrency(item.gastosAsociados)}</div>
                 </>
             )}
-            <div className="col-span-full"><span className="font-bold text-gray-500 uppercase text-[10px]">Registro creado por:</span> <p className="font-bold text-gray-800">{item.instructor}</p></div>
+             {item.tipoTransaccion === 'EGRESO' && (
+                <div><span className="font-bold text-gray-700">Pago a:</span> {item.detalleFormaPago || '-'}</div>
+            )}
+             <div className="col-span-1 md:col-span-2"><span className="font-bold text-gray-700">Creado por:</span> {item.instructor}</div>
         </div>
     );
 
-    if (loading) return <div className="p-20 text-center text-2xl text-indigo-600 font-black uppercase italic animate-pulse">Cargando Sistema KBN...</div>;
+    if (loading) return <div className="p-10 text-center text-xl text-indigo-600 font-bold">Cargando datos...</div>;
 
     return (
         <div className="max-w-7xl mx-auto p-4 space-y-8 pb-20">
             
-            {/* --- CABECERA Y TOTALES (USD, BRL, EUR) --- */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 gap-6">
-                <div className="flex items-center gap-4">
+            {/* --- HEADER CON TOTALES POR MONEDA Y FILTROS --- */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b pb-6 gap-4">
+                <div className="flex items-center gap-3">
                     <button 
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`p-4 rounded-2xl transition-all border-2 ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 border-gray-100 text-gray-400 hover:text-indigo-600'}`}
+                        onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                        className={`p-2 rounded-lg transition-colors flex items-center justify-center shadow-sm border ${mostrarFiltros ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                        title="Filtros"
                     >
-                        {showFilters ? '✕' : '⚙️'}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
                     </button>
-                    <h1 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">Panel Financiero</h1>
+                    <h1 className="text-3xl font-bold text-gray-800">Panel Financiero</h1>
                 </div>
                 
-                <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-                    <div className="bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-lg flex-1 lg:flex-none text-center">
-                        <p className="text-[10px] uppercase font-black opacity-80 italic">Total USD</p>
-                        <p className="text-2xl font-black italic">{formatCurrency(totalesPorMoneda['USD'] || 0)}</p>
-                    </div>
-                    <div className="bg-yellow-400 text-white px-6 py-4 rounded-2xl shadow-lg flex-1 lg:flex-none text-center">
-                        <p className="text-[10px] uppercase font-black opacity-80 italic">Total BRL</p>
-                        <p className="text-2xl font-black italic">R$ {formatCurrency(totalesPorMoneda['BRL'] || 0).replace('$','')}</p>
-                    </div>
-                    <div className="bg-blue-600 text-white px-6 py-4 rounded-2xl shadow-lg flex-1 lg:flex-none text-center">
-                        <p className="text-[10px] uppercase font-black opacity-80 italic">Total EUR</p>
-                        <p className="text-2xl font-black italic">€ {formatCurrency(totalesPorMoneda['EUR'] || 0).replace('$','')}</p>
+                <div className="flex flex-wrap gap-3 items-center w-full lg:w-auto">
+                    {/* Total USD */}
+                    <div className="bg-green-600 text-white px-5 py-3 rounded-lg shadow-md flex-1 lg:flex-none text-center min-w-[140px]">
+                        <p className="text-xs uppercase opacity-80 font-semibold">Total USD</p>
+                        <p className="text-2xl font-bold">{formatCurrency(totalesPorMoneda['USD'] || 0)}</p>
                     </div>
 
+                    {/* Total Reales */}
+                    <div className="bg-yellow-500 text-white px-5 py-3 rounded-lg shadow-md flex-1 lg:flex-none text-center min-w-[140px]">
+                        <p className="text-xs uppercase opacity-80 font-semibold">Total BRL</p>
+                        <p className="text-2xl font-bold">R$ {formatCurrency(totalesPorMoneda['BRL'] || 0).replace('$','')}</p>
+                    </div>
+
+                    {/* Botón Otras Monedas */}
                     <div className="relative">
-                        <button onClick={() => setShowOtherCurrencies(!showOtherCurrencies)} className="bg-gray-800 text-white p-4 rounded-2xl shadow-lg font-black text-[10px] h-full uppercase">🌐 Otras</button>
+                        <button 
+                            onClick={() => setShowOtherCurrencies(!showOtherCurrencies)}
+                            className="bg-indigo-600 text-white p-3 rounded-lg shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-2 h-full"
+                            title="Ver otras monedas"
+                        >
+                            <span>🌐</span> Otras
+                        </button>
+                        
+                        {/* Dropdown de Otras Monedas */}
                         {showOtherCurrencies && (
-                            <div className="absolute right-0 mt-3 w-48 bg-white rounded-2xl shadow-2xl z-50 border p-4 animate-in zoom-in-95">
-                                <h4 className="text-[10px] font-black text-gray-400 uppercase mb-2 border-b pb-1 italic">Otras Divisas</h4>
-                                {Object.entries(totalesPorMoneda).map(([mon, val]) => {
-                                    if (['USD', 'BRL', 'EUR'].includes(mon)) return null;
-                                    return <div key={mon} className="flex justify-between py-1 border-b border-gray-50 last:border-none">
-                                        <span className="font-black text-xs text-gray-600">{mon}</span>
-                                        <span className="font-black text-xs text-emerald-600">{formatCurrency(val)}</span>
-                                    </div>;
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200 p-2">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 border-b pb-1">Otras Monedas</h4>
+                                {Object.entries(totalesPorMoneda).map(([moneda, valor]) => {
+                                    if (moneda === 'USD' || moneda === 'BRL') return null;
+                                    return (
+                                        <div key={moneda} className="flex justify-between text-sm py-1">
+                                            <span className="font-semibold">{moneda}:</span>
+                                            <span>{formatCurrency(valor)}</span>
+                                        </div>
+                                    );
                                 })}
+                                {Object.keys(totalesPorMoneda).every(m => m === 'USD' || m === 'BRL') && (
+                                    <p className="text-xs text-gray-400 italic">No hay otras monedas.</p>
+                                )}
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* --- PANEL DE FILTROS --- */}
-            {showFilters && (
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 animate-in slide-in-from-top-5">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase italic ml-2">Moneda</label>
-                        <select name="moneda" value={filters.moneda} onChange={handleFilterChange} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="">TODAS</option>
-                            <option value="USD">DÓLARES (USD)</option>
-                            <option value="BRL">REALES (BRL)</option>
-                            <option value="EUR">EUROS (EUR)</option>
-                            <option value="ARS">PESOS (ARS)</option>
-                        </select>
+            {/* --- PANEL DE FILTROS DESPLEGABLE --- */}
+            {mostrarFiltros && (
+                <div className="bg-white p-5 rounded-xl shadow-md border border-indigo-100 animate-fadeIn relative">
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 className="text-sm font-black text-gray-500 uppercase tracking-wider">Filtros de Búsqueda</h3>
+                        <button onClick={limpiarFiltros} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            <span>✕</span> Limpiar Todo
+                        </button>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase italic ml-2">Instructor / Socio</label>
-                        <select name="instructor" value={filters.instructor} onChange={handleFilterChange} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="">TODOS</option>
-                            <option value="JOSE">JOSE</option>
-                            <option value="IGNA">IGNA</option>
-                            {instructoresDB.map(i => <option key={i.id} value={`${i.nombre} ${i.apellido}`}>{i.nombre} {i.apellido}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase italic ml-2">Actividad</label>
-                        <select name="actividad" value={filters.actividad} onChange={handleFilterChange} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="">TODAS</option>
-                            <option value="Clase de Kite">KITE</option>
-                            <option value="Clase de Wing">WING</option>
-                            <option value="Rental">RENTAL</option>
-                        </select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase italic ml-2">Desde</label>
-                        <input type="date" name="fechaInicio" value={filters.fechaInicio} onChange={handleFilterChange} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase italic ml-2">Hasta</label>
-                        <input type="date" name="fechaFin" value={filters.fechaFin} onChange={handleFilterChange} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
-                    <div className="flex items-end">
-                        <button onClick={resetFilters} className="w-full p-4 bg-red-50 text-red-500 rounded-2xl font-black text-[10px] uppercase hover:bg-red-500 hover:text-white transition-all">Limpiar</button>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                        {/* Fecha Inicio */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Desde Fecha</label>
+                            <input type="date" name="fechaInicio" value={filtros.fechaInicio} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold" />
+                        </div>
+
+                        {/* Fecha Fin */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Hasta Fecha</label>
+                            <input type="date" name="fechaFin" value={filtros.fechaFin} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold" />
+                        </div>
+
+                        {/* Moneda */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Moneda</label>
+                            <select name="moneda" value={filtros.moneda} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                                <option value="">Todas</option>
+                                <option value="BRL">Reales (BRL)</option>
+                                <option value="USD">Dólares (USD)</option>
+                                <option value="EUR">Euros (EUR)</option>
+                                <option value="ARS">Pesos (ARS)</option>
+                                <option value="CLP">Pesos Chilenos (CLP)</option>
+                            </select>
+                        </div>
+
+                        {/* Forma de Pago */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Forma de Pago</label>
+                            <select name="formaPago" value={filtros.formaPago} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                                <option value="">Todas</option>
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="MercadoPago">MercadoPago</option>
+                                <option value="Transferencia">Transferencia</option>
+                                <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                                <option value="USD">USD</option>
+                                <option value="Otro">Otro...</option>
+                            </select>
+                        </div>
+
+                        {/* Instructor */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Instructor</label>
+                            <select name="instructor" value={filtros.instructor} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                                <option value="">Todos</option>
+                                {instructoresDisponibles.map(inst => (
+                                    <option key={inst} value={inst}>{inst}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Actividad */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Actividad</label>
+                            <select name="actividad" value={filtros.actividad} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                                <option value="">Todas</option>
+                                <option value="Clase de Kite">Clase de Kite</option>
+                                <option value="Clase de Wing">Clase de Wing</option>
+                                <option value="Clase de Windsurf">Clase de Windsurf</option>
+                                <option value="Rental">Rental</option>
+                                <option value="Otro">Otro...</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* --- SECCIÓN 1: PENDIENTES --- */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                <div className="bg-yellow-50 px-8 py-5 border-b border-yellow-100">
-                    <h2 className="text-xs font-black text-yellow-700 uppercase italic flex items-center gap-2">🔔 Pendientes de Asignación ({pendientes.length})</h2>
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-yellow-500 overflow-hidden">
+                <div className="bg-yellow-50 px-6 py-3 border-b border-yellow-100">
+                    <h2 className="text-xl font-bold text-yellow-800 flex items-center gap-2">
+                        🔔 Pendientes de Asignación <span className="bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded-full">{pendientesFiltrados.length}</span>
+                    </h2>
                 </div>
-                {pendientes.length === 0 ? <p className="p-10 text-center text-gray-400 font-bold italic">No hay ingresos pendientes.</p> : (
-                    <div className="divide-y divide-gray-50">
-                        {pendientes.map(item => (
-                            <div key={item.id} className="hover:bg-gray-50 transition-colors p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-4">
-                                        <span className="font-black text-gray-900 italic uppercase">{item.fecha}</span>
-                                        <span className="text-emerald-600 font-black text-lg">{formatCurrency(item.total)} <span className="text-[10px] text-gray-400">{item.moneda}</span></span>
+                
+                {pendientesFiltrados.length === 0 ? (
+                     <div className="p-6 text-center text-gray-500">✅ No hay registros que coincidan con los filtros.</div>
+                ) : (
+                    <div className="divide-y divide-gray-100">
+                        {pendientesFiltrados.map(item => (
+                            <div key={item.id} className="hover:bg-gray-50 transition-colors">
+                                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between md:justify-start md:gap-4 items-baseline">
+                                            <span className="font-bold text-gray-800">{item.fecha}</span>
+                                            <span className="text-green-600 font-bold">{formatCurrency(item.total)} <span className="text-xs text-gray-500">{item.moneda}</span></span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                            {item.actividad} - {item.instructor}
+                                        </div>
                                     </div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{item.actividad} • {item.instructor}</p>
+                                    
+                                    <div className="flex items-center gap-2 w-full md:w-auto">
+                                        <select 
+                                            value={item.asignadoA}
+                                            onChange={(e) => handlePendienteChange(item.id, e.target.value)}
+                                            className="border rounded px-2 py-1 text-sm w-full md:w-32 bg-white"
+                                        >
+                                            <option value="NINGUNO">Elegir...</option>
+                                            <option value="IGNA">IGNA</option>
+                                            <option value="JOSE">JOSE</option>
+                                        </select>
+                                        <button onClick={() => saveAssignment(item.id, item.asignadoA)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Guardar</button>
+                                        <button onClick={() => toggleDetails(item.id)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">▼</button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                    <select 
-                                        value={item.asignadoA} 
-                                        onChange={(e) => handlePendienteChange(item.id, e.target.value)}
-                                        className="p-3 bg-gray-100 rounded-xl border-none font-black text-[10px] w-full md:w-40 outline-none focus:ring-2 focus:ring-indigo-500"
-                                    >
-                                        <option value="NINGUNO">ASIGNAR A...</option>
-                                        <option value="JOSE">JOSE</option>
-                                        <option value="IGNA">IGNA</option>
-                                    </select>
-                                    <button onClick={() => saveAssignment(item.id, item.asignadoA)} className="bg-emerald-500 text-white p-3 rounded-xl font-black text-[10px] hover:bg-emerald-600">GUARDAR</button>
-                                    <button onClick={() => toggleDetails(item.id)} className="bg-gray-200 text-gray-700 p-3 rounded-xl text-xs">{expandedId === item.id ? '▲' : '▼'}</button>
-                                </div>
+                                {expandedId === item.id && <RenderDetails item={item} />}
                             </div>
                         ))}
                     </div>
@@ -291,54 +400,102 @@ const ReporteEstadisticas = () => {
             </div>
 
             {/* --- SECCIÓN 2: EGRESOS --- */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                <div className="bg-red-50 px-8 py-5 border-b border-red-100 font-black text-red-700 uppercase italic text-xs">💸 Registro de Egresos</div>
-                {egresos.map(item => (
-                    <div key={item.id} className="p-6 border-b last:border-none flex justify-between items-center hover:bg-gray-50">
-                        <div>
-                            <span className="font-black text-gray-900 italic uppercase">{item.fecha}</span>
-                            <span className="ml-4 text-red-500 font-black text-lg">-{formatCurrency(item.total)} <span className="text-[10px] text-gray-400">{item.moneda}</span></span>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{item.detalles || item.actividad}</p>
-                        </div>
-                        <button onClick={() => toggleDetails(item.id)} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-all uppercase">Detalle</button>
-                    </div>
-                ))}
-            </div>
-
-            {/* --- SECCIÓN 3: ASIGNADOS (CON BOTONES) --- */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                <div className="bg-emerald-50 px-8 py-5 border-b border-emerald-100 font-black text-emerald-700 uppercase italic text-xs">✅ Ingresos Confirmados</div>
-                <div className="divide-y divide-gray-50">
-                    {asignados.map(item => (
-                        <div key={item.id} className="hover:bg-gray-50 transition-colors">
-                            <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-6">
-                                        <span className="font-black text-gray-900 italic uppercase w-20">{item.fecha}</span>
-                                        <div className="flex flex-col">
-                                            <span className="text-emerald-600 font-black text-xl">{formatCurrency(item.total)} <span className="text-[10px] text-gray-400">{item.moneda}</span></span>
-                                            {parseFloat(item.gastosAsociados) > 0 && <span className="text-red-400 text-[10px] font-black uppercase italic">📉 Gastos: -{formatCurrency(item.gastosAsociados)}</span>}
-                                        </div>
-                                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic ${item.asignadoA === 'IGNA' ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                            {item.asignadoA}
-                                        </span>
-                                    </div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 md:pl-28 tracking-widest">{item.actividad}</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => toggleDetails(item.id)} className="bg-indigo-50 text-indigo-600 p-3 rounded-xl font-black text-[10px] uppercase">Detalle</button>
-                                    <button onClick={() => handleEdit(item.id)} className="bg-yellow-50 text-yellow-600 p-3 rounded-xl font-black text-[10px] uppercase">Editar</button>
-                                    <button onClick={() => handleDelete(item.id)} className="bg-red-50 text-red-600 p-3 rounded-xl font-black text-[10px] uppercase">Borrar</button>
-                                </div>
-                            </div>
-                            {expandedId === item.id && <RenderDetails item={item} />}
-                        </div>
-                    ))}
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-red-500 overflow-hidden">
+                <div className="bg-red-50 px-6 py-3 border-b border-red-100">
+                    <h2 className="text-xl font-bold text-red-800">💸 Egresos</h2>
                 </div>
+                {egresosFiltrados.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">No hay egresos que coincidan con los filtros.</div>
+                ) : (
+                     <div className="divide-y divide-gray-100">
+                        {egresosFiltrados.map(item => {
+                            const monto = parseFloat(item.gastosAsociados) || parseFloat(item.total) || 0;
+                            return (
+                                <div key={item.id} className="hover:bg-gray-50 transition-colors">
+                                    <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex-1">
+                                            <div className="flex items-baseline gap-4">
+                                                <span className="font-bold text-gray-800">{item.fecha}</span>
+                                                <span className="text-red-600 font-bold">-{formatCurrency(monto)} <span className="text-xs text-gray-500">{item.moneda}</span></span>
+                                            </div>
+                                            <div className="text-sm text-gray-600 mt-1">
+                                                {item.detalles || item.actividad}
+                                            </div>
+                                        </div>
+                                        <button onClick={() => toggleDetails(item.id)} className="w-full md:w-auto bg-gray-100 text-indigo-600 px-4 py-1 rounded text-sm font-medium hover:bg-indigo-50">
+                                            {expandedId === item.id ? 'Ocultar' : 'Ver Detalle'}
+                                        </button>
+                                    </div>
+                                    {expandedId === item.id && <RenderDetails item={item} />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            {/* --- GRÁFICOS --- */}
-            <ReportesEstadisticasGraficos asignados={asignados} egresos={egresos} />
+            {/* --- SECCIÓN 3: INGRESOS ASIGNADOS --- */}
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-green-500 overflow-hidden">
+                <div className="bg-green-50 px-6 py-3 border-b border-green-100">
+                    <h2 className="text-xl font-bold text-green-800">✅ Ingresos Asignados</h2>
+                </div>
+                {asignadosFiltrados.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">No hay ingresos asignados que coincidan.</div>
+                ) : (
+                    <div className="divide-y divide-gray-100">
+                        {asignadosFiltrados.map(item => (
+                            <div key={item.id} className="hover:bg-gray-50 transition-colors">
+                                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between md:justify-start md:gap-4 items-center">
+                                            <span className="font-bold text-gray-800 w-24">{item.fecha}</span>
+                                            
+                                            <div className="flex flex-col">
+                                                <span className="text-green-600 font-bold text-lg">
+                                                    {formatCurrency(item.total)} <span className="text-xs text-gray-500">{item.moneda}</span>
+                                                </span>
+                                                {parseFloat(item.gastosAsociados) > 0 && (
+                                                    <span className="text-red-500 text-xs font-semibold flex items-center">
+                                                        📉 Gastos: -{formatCurrency(item.gastosAsociados)}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${item.asignadoA === 'IGNA' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                                {item.asignadoA}
+                                            </span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1 pl-0 md:pl-28">
+                                            {item.actividad}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 justify-end w-full md:w-auto mt-2 md:mt-0">
+                                        <button onClick={() => toggleDetails(item.id)} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">
+                                            DETALLE
+                                        </button>
+                                        <button onClick={() => handleEdit(item.id)} className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 px-3 py-1 rounded text-xs font-bold border border-yellow-200">
+                                            EDITAR
+                                        </button>
+                                        <button onClick={() => handleDelete(item.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded text-xs font-bold border border-red-200">
+                                            ELIMINAR
+                                        </button>
+                                    </div>
+                                </div>
+                                {expandedId === item.id && <RenderDetails item={item} />}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* --- SECCIÓN 4: GRÁFICOS Y ESTADÍSTICAS --- */}
+            {/* Los gráficos ahora reciben los datos filtrados en tiempo real */}
+            <ReportesEstadisticasGraficos 
+            asignados={asignadosFiltrados} 
+            egresos={egresosFiltrados} 
+            />
+
         </div>
     );
 };
