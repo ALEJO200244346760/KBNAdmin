@@ -142,6 +142,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
             >
               <option value="BRL">Reales (BRL)</option>
               <option value="USD">Dólares (USD)</option>
+              <option value="EUR">Euros (EUR)</option>
               <option value="ARS">Pesos (ARS)</option>
               <option value="CLP">Pesos Chilenos (CLP)</option>
             </select>
@@ -182,6 +183,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit, InstructorField, setVie
             <option value="Efectivo">Efectivo</option>
             <option value="MercadoPago">MercadoPago</option>
             <option value="Transferencia">Transferencia</option>
+            <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
             <option value="USD">USD</option>
             <option value="Otro">Otro...</option>
           </select>
