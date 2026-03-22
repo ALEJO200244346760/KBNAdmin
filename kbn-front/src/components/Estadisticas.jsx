@@ -74,8 +74,7 @@ const Estadisticas = ({ clases }) => {
                 <th className="p-5 pl-8">Fecha</th>
                 <th className="p-5">Alumno / Detalles</th>
                 <th className="p-5 text-center">Horas</th>
-                <th className="p-5 text-right">Valor Total</th>
-                <th className="p-5 text-right pr-8 text-indigo-600">Mi 30%</th>
+                
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -96,14 +95,7 @@ const Estadisticas = ({ clases }) => {
                     <td className="p-5 text-center text-[11px] font-black text-gray-700">
                       {clase.cantidadHoras}h
                     </td>
-                    <td className="p-5 text-right text-[11px] font-bold text-gray-400">
-                      ${clase.total}
-                    </td>
-                    <td className="p-5 text-right pr-8">
-                      <span className="text-[12px] font-black text-indigo-600">
-                        ${(parseFloat(clase.total) * 0.30).toFixed(2)}
-                      </span>
-                    </td>
+                    
                   </tr>
                 ))
               ) : (
