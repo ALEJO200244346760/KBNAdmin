@@ -51,13 +51,7 @@ const Estadisticas = ({ clases }) => {
 
       {/* Cards de Rendimiento Personal */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100 text-white">
-          <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">Mi Ganancia Acumulada (30%)</p>
-          <h2 className="text-4xl font-black italic tracking-tighter">
-            ${misGananciasTotales.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </h2>
-          <p className="text-[9px] mt-2 font-bold opacity-80 uppercase">Período: {meses[selectedMonth]} {selectedYear}</p>
-        </div>
+        
 
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-50">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Horas en el Agua</p>
