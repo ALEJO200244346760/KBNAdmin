@@ -97,7 +97,7 @@ const Estadisticas = ({ clases }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="p-16 text-center">
+                  <td colSpan="3" className="p-16 text-center">
                     <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No hay ingresos registrados en este mes</p>
                   </td>
                 </tr>
