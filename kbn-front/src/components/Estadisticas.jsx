@@ -71,42 +71,34 @@ const Estadisticas = ({ clases }) => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                <th className="p-5 pl-6">Fecha</th>
-                <th className="p-5 pl-6">Alumno / Detalles</th>
+                <th className="p-5 pl-8">Fecha</th>
+                <th className="p-5">Alumno / Detalles</th>
                 <th className="p-5 text-center">Horas</th>
               </tr>
             </thead>
-
             <tbody className="divide-y divide-gray-50">
               {clasesDelMes.length > 0 ? (
                 clasesDelMes.map((clase) => (
                   <tr key={clase.id} className="hover:bg-gray-50/50 transition-colors">
-                    
-                    <td className="p-5 pl-6 text-[10px] font-bold text-gray-400">
+                    <td className="p-5 pl-8 text-[10px] font-bold text-gray-400">
                       {clase.fecha}
                     </td>
-
-                    <td className="p-5 pl-6">
+                    <td className="p-5">
                       <p className="text-[11px] font-black text-gray-800 uppercase leading-none mb-1">
                         {clase.detalles || 'Clase de Kitesurf'}
                       </p>
-                      <span className="text-[9px] font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-500">
-                        {clase.formaPago}
-                      </span>
+                      
                     </td>
-
                     <td className="p-5 text-center text-[11px] font-black text-gray-700">
                       {clase.cantidadHoras}h
                     </td>
-
+                    
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3" className="p-16 text-center">
-                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                      No hay ingresos registrados en este mes
-                    </p>
+                  <td colSpan="5" className="p-16 text-center">
+                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No hay ingresos registrados en este mes</p>
                   </td>
                 </tr>
               )}
