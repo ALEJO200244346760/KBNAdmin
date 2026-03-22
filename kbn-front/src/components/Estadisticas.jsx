@@ -64,48 +64,57 @@ const Estadisticas = ({ clases }) => {
 
       {/* Tabla de Liquidación Detallada */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-50 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 bg-gray-50/50">
-          <h3 className="font-black text-gray-800 uppercase text-xs italic">Desglose de mis clases</h3>
+  <div className="p-6 border-b border-gray-50 bg-gray-50/50">
+    <h3 className="font-black text-gray-800 uppercase text-xs italic">
+      Desglose de mis clases
+    </h3>
+  </div>
+
+  <div className="overflow-x-auto">
+    <table className="w-full text-left border-collapse table-fixed">
+      <thead>
+        <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
+          <th className="p-5 w-1/4">Fecha</th>
+          <th className="p-5 w-1/2">Alumno / Detalles</th>
+          <th className="p-5 w-1/4 text-center">Horas</th>
+        </tr>
+      </thead>
+
+      <tbody className="divide-y divide-gray-50">
+        {clasesDelMes.length > 0 ? (
+          clasesDelMes.map((clase) => (
+            <tr
+              key={clase.id}
+              className="hover:bg-gray-50/50 transition-colors"
+            >
+              <td className="p-5 pl-8 text-[10px] font-bold text-gray-400 whitespace-nowrap">
+                {clase.fecha}
+              </td>
+
+              <td className="p-5">
+                <p className="text-[11px] font-black text-gray-800 uppercase leading-none mb-1 truncate">
+                  {clase.detalles || "Clase de Kitesurf"}
+                </p>
+              </td>
+
+              <td className="p-5 text-center text-[11px] font-black text-gray-700 whitespace-nowrap">
+                {clase.cantidadHoras}h
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="3" className="p-16 text-center">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                No hay ingresos registrados en este mes
+              </p>
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                <th className="p-5">Fecha</th>
-                <th className="p-5">Alumno / Detalles</th>
-                <th className="p-5 text-right">Horas</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {clasesDelMes.length > 0 ? (
-                clasesDelMes.map((clase) => (
-                  <tr key={clase.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="p-5 pl-8 text-[10px] font-bold text-gray-400">
-                      {clase.fecha}
-                    </td>
-                    <td className="p-5">
-                      <p className="text-[11px] font-black text-gray-800 uppercase leading-none mb-1">
-                        {clase.detalles || 'Clase de Kitesurf'}
-                      </p>
-                      
-                    </td>
-                    <td className="p-5 text-center text-[11px] font-black text-gray-700">
-                      {clase.cantidadHoras}h
-                    </td>
-                    
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="3" className="p-16 text-center">
-                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No hay ingresos registrados en este mes</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 };
