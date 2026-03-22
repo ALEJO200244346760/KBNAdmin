@@ -293,6 +293,7 @@ const ReporteEstadisticas = () => {
                                 <option value="">Todas</option>
                                 <option value="BRL">Reales (BRL)</option>
                                 <option value="USD">Dólares (USD)</option>
+                                <option value="EUR">Euros (EUR)</option>
                                 <option value="ARS">Pesos (ARS)</option>
                                 <option value="CLP">Pesos Chilenos (CLP)</option>
                             </select>
