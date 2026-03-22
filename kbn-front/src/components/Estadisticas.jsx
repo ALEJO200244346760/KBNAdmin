@@ -74,7 +74,7 @@ const Estadisticas = ({ clases }) => {
     <table className="w-full text-left border-collapse table-fixed">
       <thead>
         <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-          <th className="p-5 w-1/4">Fecha</th>
+          <th className="p-5 w-1/2">Fecha</th>
           <th className="p-5 w-1/2">Alumno / Detalles</th>
           <th className="p-5 w-1/4 text-center">Horas</th>
         </tr>
