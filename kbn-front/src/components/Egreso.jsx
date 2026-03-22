@@ -47,15 +47,15 @@ const Egreso = ({ formData, handleChange, handleSubmit, InstructorField, setView
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 uppercase text-[10px]">Monto del Egreso</label>
+            <label className="block text-sm font-bold text-gray-700">Monto del Egreso</label>
             <input
               type="number"
-              name="montoEgreso" // Usamos el nombre de la función intermedia
+              name="total" /* CAMBIO ACÁ: antes decía "gastos" */
               inputMode="decimal"
-              value={formData.total || formData.gastos || ''} 
-              onChange={handleEgresoChange}
-              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-red-600 font-black text-lg focus:ring-red-500 focus:border-red-500 bg-red-50"
-              placeholder="0.00"
+              value={formData.total} /* CAMBIO ACÁ: antes decía formData.gastos */
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border p-2 border-gray-300 text-red-600 font-bold text-sm focus:ring-red-500 focus:border-red-500"
+              placeholder="Monto a descontar"
               required
             />
           </div>

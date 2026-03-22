@@ -129,7 +129,7 @@ const ReporteEstadisticas = () => {
     const egresosFiltrados = useMemo(() => aplicarFiltros(egresos), [egresos, filtros]);
     const asignadosFiltrados = useMemo(() => aplicarFiltros(asignados), [asignados, filtros]);
 
-    // --- CÁLCULO DE TOTALES POR MONEDA (SOBRE DATOS FILTRADOS) ---
+    // --- CÁLCULO DE TOTALES POR MONEDA (LÓGICA CORREGIDA) ---
     const totalesPorMoneda = useMemo(() => {
         const totales = {};
 
@@ -139,13 +139,16 @@ const ReporteEstadisticas = () => {
             totales[mon] += monto;
         };
 
+        // Sumamos Ingresos (Asignados y Pendientes)
         [...pendientesFiltrados, ...asignadosFiltrados].forEach(item => {
             const total = parseFloat(item.total) || 0;
             procesarMonto(item.moneda, total);
         });
 
+        // Restamos Egresos
         egresosFiltrados.forEach(item => {
-            const monto = parseFloat(item.gastosAsociados) || parseFloat(item.total) || 0;
+            // Buscamos el monto en 'total' (nuevo) o 'gastosAsociados' (viejo)
+            const monto = parseFloat(item.total) || parseFloat(item.gastosAsociados) || 0;
             procesarMonto(item.moneda, -monto);
         });
 
@@ -162,7 +165,6 @@ const ReporteEstadisticas = () => {
     };
 
     const handlePendienteChange = (id, val) => {
-        // Actualizamos la lista original para mantener el estado sincronizado
         setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
     };
 
@@ -205,7 +207,7 @@ const ReporteEstadisticas = () => {
                 </>
             )}
              {item.tipoTransaccion === 'EGRESO' && (
-                <div><span className="font-bold text-gray-700">Pago a:</span> {item.detalleFormaPago || '-'}</div>
+                <div><span className="font-bold text-gray-700">Concepto:</span> {item.detalles || '-'}</div>
             )}
              <div className="col-span-1 md:col-span-2"><span className="font-bold text-gray-700">Creado por:</span> {item.instructor}</div>
         </div>
@@ -256,66 +258,59 @@ const ReporteEstadisticas = () => {
                         
                         {/* Dropdown de Otras Monedas */}
                         {showOtherCurrencies && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200 p-2">
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200 p-2 text-gray-800">
                                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 border-b pb-1">Otras Monedas</h4>
                                 {Object.entries(totalesPorMoneda).map(([moneda, valor]) => {
                                     if (moneda === 'USD' || moneda === 'BRL') return null;
                                     return (
                                         <div key={moneda} className="flex justify-between text-sm py-1">
                                             <span className="font-semibold">{moneda}:</span>
-                                            <span>{formatCurrency(valor)}</span>
+                                            <span className={valor < 0 ? 'text-red-600' : 'text-green-600'}>
+                                                {formatCurrency(valor)}
+                                            </span>
                                         </div>
                                     );
                                 })}
-                                {Object.keys(totalesPorMoneda).every(m => m === 'USD' || m === 'BRL') && (
-                                    <p className="text-xs text-gray-400 italic">No hay otras monedas.</p>
-                                )}
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* --- PANEL DE FILTROS DESPLEGABLE --- */}
+            {/* --- PANEL DE FILTROS --- */}
             {mostrarFiltros && (
                 <div className="bg-white p-5 rounded-xl shadow-md border border-indigo-100 animate-fadeIn relative">
                     <div className="flex justify-between items-center mb-4 border-b pb-2">
                         <h3 className="text-sm font-black text-gray-500 uppercase tracking-wider">Filtros de Búsqueda</h3>
-                        <button onClick={limpiarFiltros} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                            <span>✕</span> Limpiar Todo
-                        </button>
+                        <button onClick={limpiarFiltros} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">✕ Limpiar Todo</button>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                        {/* Fecha Inicio */}
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Desde Fecha</label>
-                            <input type="date" name="fechaInicio" value={filtros.fechaInicio} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold" />
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Desde</label>
+                            <input type="date" name="fechaInicio" value={filtros.fechaInicio} onChange={handleFiltroChange} className="w-full p-2 bg-gray-50 rounded border-none text-sm" />
                         </div>
 
                         {/* Fecha Fin */}
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Hasta Fecha</label>
-                            <input type="date" name="fechaFin" value={filtros.fechaFin} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold" />
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Hasta</label>
+                            <input type="date" name="fechaFin" value={filtros.fechaFin} onChange={handleFiltroChange} className="w-full p-2 bg-gray-50 rounded border-none text-sm" />
                         </div>
-
-                        {/* Moneda */}
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Moneda</label>
-                            <select name="moneda" value={filtros.moneda} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Moneda</label>
+                            <select name="moneda" value={filtros.moneda} onChange={handleFiltroChange} className="w-full p-2 bg-gray-50 rounded border-none text-sm">
                                 <option value="">Todas</option>
                                 <option value="BRL">Reales (BRL)</option>
                                 <option value="USD">Dólares (USD)</option>
                                 <option value="EUR">Euros (EUR)</option>
                                 <option value="ARS">Pesos (ARS)</option>
-                                <option value="CLP">Pesos Chilenos (CLP)</option>
                             </select>
                         </div>
 
                         {/* Forma de Pago */}
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Forma de Pago</label>
-                            <select name="formaPago" value={filtros.formaPago} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Forma de Pago</label>
+                            <select name="formaPago" value={filtros.formaPago} onChange={handleFiltroChange} className="w-full p-2 bg-gray-50 rounded border-none text-sm">
                                 <option value="">Todas</option>
                                 <option value="Efectivo">Efectivo</option>
                                 <option value="MercadoPago">MercadoPago</option>
@@ -328,8 +323,8 @@ const ReporteEstadisticas = () => {
 
                         {/* Instructor */}
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Instructor</label>
-                            <select name="instructor" value={filtros.instructor} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Instructor</label>
+                            <select name="instructor" value={filtros.instructor} onChange={handleFiltroChange} className="w-full p-2 bg-gray-50 rounded border-none text-sm">
                                 <option value="">Todos</option>
                                 {instructoresDisponibles.map(inst => (
                                     <option key={inst} value={inst}>{inst}</option>
@@ -339,8 +334,8 @@ const ReporteEstadisticas = () => {
 
                         {/* Actividad */}
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Actividad</label>
-                            <select name="actividad" value={filtros.actividad} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
+                            <label className="text-[10px] font-black text-gray-400 uppercase">Actividad</label>
+                            <select name="actividad" value={filtros.actividad} onChange={handleFiltroChange} className="w-full p-2 bg-gray-50 rounded border-none text-sm">
                                 <option value="">Todas</option>
                                 <option value="Clase de Kite">Clase de Kite</option>
                                 <option value="Clase de Wing">Clase de Wing</option>
@@ -356,82 +351,54 @@ const ReporteEstadisticas = () => {
             {/* --- SECCIÓN 1: PENDIENTES --- */}
             <div className="bg-white rounded-xl shadow-md border-l-4 border-yellow-500 overflow-hidden">
                 <div className="bg-yellow-50 px-6 py-3 border-b border-yellow-100">
-                    <h2 className="text-xl font-bold text-yellow-800 flex items-center gap-2">
-                        🔔 Pendientes de Asignación <span className="bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded-full">{pendientesFiltrados.length}</span>
-                    </h2>
+                    <h2 className="text-xl font-bold text-yellow-800">🔔 Pendientes de Asignación</h2>
                 </div>
-                
-                {pendientesFiltrados.length === 0 ? (
-                     <div className="p-6 text-center text-gray-500">✅ No hay registros que coincidan con los filtros.</div>
-                ) : (
-                    <div className="divide-y divide-gray-100">
-                        {pendientesFiltrados.map(item => (
-                            <div key={item.id} className="hover:bg-gray-50 transition-colors">
-                                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex justify-between md:justify-start md:gap-4 items-baseline">
-                                            <span className="font-bold text-gray-800">{item.fecha}</span>
-                                            <span className="text-green-600 font-bold">{formatCurrency(item.total)} <span className="text-xs text-gray-500">{item.moneda}</span></span>
-                                        </div>
-                                        <div className="text-sm text-gray-600 mt-1">
-                                            {item.actividad} - {item.instructor}
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-2 w-full md:w-auto">
-                                        <select 
-                                            value={item.asignadoA}
-                                            onChange={(e) => handlePendienteChange(item.id, e.target.value)}
-                                            className="border rounded px-2 py-1 text-sm w-full md:w-32 bg-white"
-                                        >
-                                            <option value="NINGUNO">Elegir...</option>
-                                            <option value="IGNA">IGNA</option>
-                                            <option value="JOSE">JOSE</option>
-                                        </select>
-                                        <button onClick={() => saveAssignment(item.id, item.asignadoA)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Guardar</button>
-                                        <button onClick={() => toggleDetails(item.id)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">▼</button>
-                                    </div>
+                <div className="divide-y divide-gray-100">
+                    {pendientesFiltrados.map(item => (
+                        <div key={item.id} className="hover:bg-gray-50">
+                            <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <div className="flex-1">
+                                    <span className="font-bold">{item.fecha}</span> - <span className="text-green-600 font-bold">{formatCurrency(item.total)} {item.moneda}</span>
+                                    <p className="text-xs text-gray-500">{item.actividad} | {item.instructor}</p>
                                 </div>
-                                {expandedId === item.id && <RenderDetails item={item} />}
+                                <div className="flex gap-2">
+                                    <select value={item.asignadoA} onChange={(e) => handlePendienteChange(item.id, e.target.value)} className="text-sm border rounded">
+                                        <option value="NINGUNO">Asignar a...</option>
+                                        <option value="IGNA">IGNA</option>
+                                        <option value="JOSE">JOSE</option>
+                                    </select>
+                                    <button onClick={() => saveAssignment(item.id, item.asignadoA)} className="bg-green-600 text-white px-3 py-1 rounded text-xs">Guardar</button>
+                                    <button onClick={() => toggleDetails(item.id)} className="bg-gray-100 px-3 py-1 rounded text-xs">Detalle</button>
+                                </div>
                             </div>
-                        ))}
-                    </div>
-                )}
+                            {expandedId === item.id && <RenderDetails item={item} />}
+                        </div>
+                    ))}
+                </div>
             </div>
 
-            {/* --- SECCIÓN 2: EGRESOS --- */}
+            {/* --- SECCIÓN 2: EGRESOS (CORREGIDO) --- */}
             <div className="bg-white rounded-xl shadow-md border-l-4 border-red-500 overflow-hidden">
                 <div className="bg-red-50 px-6 py-3 border-b border-red-100">
                     <h2 className="text-xl font-bold text-red-800">💸 Egresos</h2>
                 </div>
-                {egresosFiltrados.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500">No hay egresos que coincidan con los filtros.</div>
-                ) : (
-                     <div className="divide-y divide-gray-100">
-                        {egresosFiltrados.map(item => {
-                            const monto = parseFloat(item.gastosAsociados) || parseFloat(item.total) || 0;
-                            return (
-                                <div key={item.id} className="hover:bg-gray-50 transition-colors">
-                                    <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-baseline gap-4">
-                                                <span className="font-bold text-gray-800">{item.fecha}</span>
-                                                <span className="text-red-600 font-bold">-{formatCurrency(monto)} <span className="text-xs text-gray-500">{item.moneda}</span></span>
-                                            </div>
-                                            <div className="text-sm text-gray-600 mt-1">
-                                                {item.detalles || item.actividad}
-                                            </div>
-                                        </div>
-                                        <button onClick={() => toggleDetails(item.id)} className="w-full md:w-auto bg-gray-100 text-indigo-600 px-4 py-1 rounded text-sm font-medium hover:bg-indigo-50">
-                                            {expandedId === item.id ? 'Ocultar' : 'Ver Detalle'}
-                                        </button>
+                <div className="divide-y divide-gray-100">
+                    {egresosFiltrados.map(item => {
+                        const monto = parseFloat(item.total) || parseFloat(item.gastosAsociados) || 0;
+                        return (
+                            <div key={item.id} className="hover:bg-gray-50">
+                                <div className="p-4 flex justify-between items-center">
+                                    <div>
+                                        <span className="font-bold">{item.fecha}</span> - <span className="text-red-600 font-bold">-{formatCurrency(monto)} {item.moneda}</span>
+                                        <p className="text-xs text-gray-500">{item.detalles || 'Egreso general'}</p>
                                     </div>
-                                    {expandedId === item.id && <RenderDetails item={item} />}
+                                    <button onClick={() => toggleDetails(item.id)} className="text-indigo-600 text-xs font-bold">VER DETALLE</button>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
+                                {expandedId === item.id && <RenderDetails item={item} />}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* --- SECCIÓN 3: INGRESOS ASIGNADOS --- */}
@@ -439,63 +406,31 @@ const ReporteEstadisticas = () => {
                 <div className="bg-green-50 px-6 py-3 border-b border-green-100">
                     <h2 className="text-xl font-bold text-green-800">✅ Ingresos Asignados</h2>
                 </div>
-                {asignadosFiltrados.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500">No hay ingresos asignados que coincidan.</div>
-                ) : (
-                    <div className="divide-y divide-gray-100">
-                        {asignadosFiltrados.map(item => (
-                            <div key={item.id} className="hover:bg-gray-50 transition-colors">
-                                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex justify-between md:justify-start md:gap-4 items-center">
-                                            <span className="font-bold text-gray-800 w-24">{item.fecha}</span>
-                                            
-                                            <div className="flex flex-col">
-                                                <span className="text-green-600 font-bold text-lg">
-                                                    {formatCurrency(item.total)} <span className="text-xs text-gray-500">{item.moneda}</span>
-                                                </span>
-                                                {parseFloat(item.gastosAsociados) > 0 && (
-                                                    <span className="text-red-500 text-xs font-semibold flex items-center">
-                                                        📉 Gastos: -{formatCurrency(item.gastosAsociados)}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${item.asignadoA === 'IGNA' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                                {item.asignadoA}
-                                            </span>
-                                        </div>
-                                        <div className="text-sm text-gray-600 mt-1 pl-0 md:pl-28">
-                                            {item.actividad}
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex gap-2 justify-end w-full md:w-auto mt-2 md:mt-0">
-                                        <button onClick={() => toggleDetails(item.id)} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded text-xs font-bold border border-indigo-200">
-                                            DETALLE
-                                        </button>
-                                        <button onClick={() => handleEdit(item.id)} className="bg-yellow-50 text-yellow-600 hover:bg-yellow-100 px-3 py-1 rounded text-xs font-bold border border-yellow-200">
-                                            EDITAR
-                                        </button>
-                                        <button onClick={() => handleDelete(item.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded text-xs font-bold border border-red-200">
-                                            ELIMINAR
-                                        </button>
-                                    </div>
+                <div className="divide-y divide-gray-100">
+                    {asignadosFiltrados.map(item => (
+                        <div key={item.id} className="hover:bg-gray-50">
+                            <div className="p-4 flex justify-between items-center">
+                                <div>
+                                    <span className="font-bold">{item.fecha}</span> - <span className="text-green-600 font-bold">{formatCurrency(item.total)} {item.moneda}</span>
+                                    <span className="ml-2 text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">{item.asignadoA}</span>
+                                    <p className="text-xs text-gray-500">{item.actividad}</p>
                                 </div>
-                                {expandedId === item.id && <RenderDetails item={item} />}
+                                <div className="flex gap-2">
+                                    <button onClick={() => toggleDetails(item.id)} className="text-gray-400 hover:text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
-                        ))}
-                    </div>
-                )}
+                            {expandedId === item.id && <RenderDetails item={item} />}
+                        </div>
+                    ))}
+                </div>
             </div>
 
-            {/* --- SECCIÓN 4: GRÁFICOS Y ESTADÍSTICAS --- */}
-            {/* Los gráficos ahora reciben los datos filtrados en tiempo real */}
-            <ReportesEstadisticasGraficos 
-            asignados={asignadosFiltrados} 
-            egresos={egresosFiltrados} 
-            />
-
+            <ReportesEstadisticasGraficos asignados={asignadosFiltrados} egresos={egresosFiltrados} />
         </div>
     );
 };
