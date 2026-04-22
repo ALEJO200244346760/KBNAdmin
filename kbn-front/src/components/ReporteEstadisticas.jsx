@@ -320,6 +320,7 @@ const ReporteEstadisticas = () => {
                                 <option value="">Todas</option>
                                 <option value="Clase de Kite">Clase de Kite</option>
                                 <option value="Clase de Wing">Clase de Wing</option>
+                                <option value="Clase de Windsurf">Clase de Windsurf</option>
                                 <option value="Rental">Rental</option>
                                 <option value="Otro">Otro...</option>
                             </select>
