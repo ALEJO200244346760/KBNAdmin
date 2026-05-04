@@ -209,6 +209,7 @@ const Secretaria = () => {
   if (view === 'CALENDARIO') {
     return (
       <div className="max-w-2xl mx-auto p-6 md:p-10 bg-white shadow-2xl rounded-[2.5rem] mt-5 md:mt-10 border border-gray-100">
+        <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm">← VOLVER</button>
         <h2 className="text-2xl font-black text-center mb-8 uppercase italic tracking-tighter">{agendaData.id ? '🔄 Reasignar Instructor' : '📅 Nueva Asignación'}</h2>
         <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm">← VOLVER</button>
         <form onSubmit={handleAgendaSubmit} className="space-y-6">
