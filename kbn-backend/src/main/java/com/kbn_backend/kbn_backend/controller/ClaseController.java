@@ -2,16 +2,19 @@ package com.kbn_backend.kbn_backend.controller;
 
 import com.kbn_backend.kbn_backend.model.ClaseRegistro;
 import com.kbn_backend.kbn_backend.repository.ClaseRepository;
+import com.kbn_backend.kbn_backend.service.FinanzasService;
 import com.kbn_backend.kbn_backend.dto.ReporteKiteDTO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Controlador para la gestión de movimientos financieros (Ingresos/Egresos)
+ * y su impacto en el sistema de Pasivos de la escuela.
+ */
 @RestController
 @RequestMapping("/api/clases")
 public class ClaseController {
@@ -19,83 +22,76 @@ public class ClaseController {
     @Autowired
     private ClaseRepository claseRepository;
 
-    // --- DTO INTERNO PARA ASEGURAR EL MAPEO DEL JSON ---
+    @Autowired
+    private FinanzasService finanzasService;
+
+    // --- DTO INTERNO PARA ASIGNACIONES ---
     public static class AsignacionRequest {
         private String asignadoA;
-
-        // Getters y Setters necesarios
         public String getAsignadoA() { return asignadoA; }
         public void setAsignadoA(String asignadoA) { this.asignadoA = asignadoA; }
     }
-    // --------------------------------------------------
 
-    // 1. GUARDAR REGISTRO
+    /**
+     * 1. GUARDAR REGISTRO
+     * Delega la lógica de negocio al Service para manejar la integridad
+     * transaccional entre el Egreso y el Pasivo.
+     */
     @PostMapping("/guardar")
     public ResponseEntity<ClaseRegistro> guardarClase(@RequestBody ClaseRegistro registro) {
-        if ("INGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
-            registro.setAsignadoA(null);
-            registro.setRevisado(false);
-        }
-        if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
-            registro.setAsignadoA(null);
-            registro.setRevisado(true);
-        }
-
-        // Calculo de seguridad por si viene nulo
-        if (registro.getTotal() == null && registro.getCantidadHoras() != null && registro.getTarifaPorHora() != null) {
-            // Convertir Strings a Double si es necesario, asumiendo que en tu modelo son Strings
-            try {
-                double h = Double.parseDouble(registro.getCantidadHoras());
-                double t = Double.parseDouble(registro.getTarifaPorHora());
-                registro.setTotal(String.valueOf(h * t));
-            } catch (Exception e) {
-                registro.setTotal("0");
-            }
-        }
-
-        ClaseRegistro savedRegistro = claseRepository.save(registro);
+        // El Service se encarga de:
+        // - Validar tipos (Ingreso/Egreso)
+        // - Calcular totales de seguridad
+        // - Descontar del Pasivo si corresponde
+        // - Registrar el historial de pagos
+        ClaseRegistro savedRegistro = finanzasService.guardarTransaccion(registro);
         return ResponseEntity.ok(savedRegistro);
     }
 
-    // 2. LISTAR CLASES
+    /**
+     * 2. LISTAR CLASES
+     * Retorna todos los movimientos ordenados por fecha descendente.
+     */
     @GetMapping("/listar")
     public ResponseEntity<List<ClaseRegistro>> listarClases() {
         return ResponseEntity.ok(claseRepository.findAllByOrderByFechaDesc());
     }
 
-    // 3. ASIGNAR INGRESO (CORREGIDO CON DTO)
+    /**
+     * 3. ASIGNAR INGRESO
+     * Permite marcar a quién pertenece un ingreso pendiente.
+     */
     @PutMapping("/asignar/{id}")
     public ResponseEntity<?> asignarIngreso(@PathVariable Long id, @RequestBody AsignacionRequest request) {
-
-        // Debug en consola para verificar qué llega
-        System.out.println("Solicitud de asignación recibida para ID: " + id + " - Valor: " + request.getAsignadoA());
-
-        String nuevoValor = request.getAsignadoA();
+        System.out.println("Solicitud de asignación para ID: " + id + " -> " + request.getAsignadoA());
 
         return claseRepository.findById(id)
                 .map(registro -> {
                     if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
-                        return ResponseEntity.badRequest().body("No se puede asignar ingreso a una transacción de EGRESO.");
+                        return ResponseEntity.badRequest()
+                                .body("No se puede asignar un responsable a una transacción de tipo EGRESO.");
                     }
 
-                    registro.setAsignadoA(nuevoValor); // Asignamos el valor del DTO
+                    registro.setAsignadoA(request.getAsignadoA());
                     registro.setRevisado(true);
 
                     claseRepository.save(registro);
-                    return ResponseEntity.ok("Asignación actualizada correctamente a: " + nuevoValor);
+                    return ResponseEntity.ok("Asignación actualizada correctamente.");
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 4. GENERAR REPORTE
+    /**
+     * 4. GENERAR REPORTE
+     * Obtiene el resumen financiero entre dos fechas.
+     */
     @GetMapping("/reporte")
     public ResponseEntity<ReporteKiteDTO> generarReporte(
             @RequestParam String fechaInicio,
             @RequestParam String fechaFin) {
 
-        // Llamamos al repositorio con Strings, ya que la fecha ahora es String
         Optional<ReporteKiteDTO> reporte = claseRepository.getReporteEntreFechas(fechaInicio, fechaFin);
-
-        return reporte.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return reporte.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

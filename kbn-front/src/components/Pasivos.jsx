@@ -1,0 +1,89 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const Pasivos = ({ axiosConfig, setView }) => {
+  const [pasivos, setPasivos] = useState([]);
+  const [selectedPasivo, setSelectedPasivo] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    fetchPasivos();
+  }, []);
+
+  const fetchPasivos = async () => {
+    try {
+      const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
+      setPasivos(res.data);
+    } catch (err) {
+      console.error("Error al cargar pasivos", err);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-black uppercase text-gray-800 italic">Deudas y Pasivos Pendientes</h2>
+        <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm">← VOLVER</button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {pasivos.map(p => (
+          <div key={p.id} className="bg-white rounded-[2rem] p-6 shadow-sm border-t-8 border-rose-400">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[10px] font-black text-gray-400 uppercase">{p.fecha}</span>
+              <span className={`text-sm font-black ${p.montoTotal < 0 ? 'text-emerald-500' : 'text-rose-600'}`}>
+                {p.moneda} {p.montoTotal}
+              </span>
+            </div>
+            <h3 className="font-black text-gray-800 uppercase text-lg mb-1">{p.titulo}</h3>
+            <p className="text-xs text-gray-500 mb-4 h-10 overflow-hidden">{p.descripcion}</p>
+            
+            <button 
+              onClick={() => { setSelectedPasivo(p); setShowModal(true); }}
+              className="w-full bg-gray-100 text-gray-800 py-3 rounded-xl font-black text-[10px] uppercase hover:bg-gray-200 transition-all"
+            >
+              Ver Historial de Pagos
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* MODAL DE DETALLES */}
+      {showModal && selectedPasivo && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="font-black uppercase italic text-gray-800">Historial: {selectedPasivo.titulo}</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400">✕</button>
+            </div>
+            
+            <div className="space-y-3 max-h-60 overflow-y-auto mb-6">
+              {selectedPasivo.historialPagos?.length > 0 ? (
+                selectedPasivo.historialPagos.map(pago => (
+                  <div key={pago.id} className="bg-gray-50 p-4 rounded-2xl flex justify-between items-center border-l-4 border-emerald-500">
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">{pago.fecha}</p>
+                      <p className="text-xs font-bold text-gray-700">{pago.nota}</p>
+                    </div>
+                    <span className="font-black text-emerald-600">-${pago.montoPagado}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-gray-400 py-4 font-bold">No hay pagos registrados aún.</p>
+              )}
+            </div>
+
+            <button 
+              onClick={() => setShowModal(false)}
+              className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase shadow-lg shadow-indigo-100"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Pasivos;

@@ -13,6 +13,8 @@ public class ClaseRegistro {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long pasivoId; // Nuevo campo para vincular el Egreso con una deuda
+
     // --- CAMPO NUEVO PARA INGRESOS/EGRESOS ---
     @Column(nullable = false)
     private String tipoTransaccion; // VALORES: "INGRESO" o "EGRESO"

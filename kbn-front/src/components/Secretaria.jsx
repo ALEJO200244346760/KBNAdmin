@@ -6,6 +6,7 @@ import { useLocation } from "react-router-dom";
 // Componentes financieros reutilizados
 import Ingreso from './Ingreso';
 import Egreso from './Egreso';
+import Pasivos from './Pasivos';
 
 const Secretaria = () => {
   const { user, token } = useAuth(); // Extraemos el token para las peticiones
@@ -152,6 +153,7 @@ const Secretaria = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <MenuCard icon="🖥️" title="Monitor" sub="Estados" color="bg-gray-900" onClick={() => setView('MONITOR')} />
           <MenuCard icon="📅" title="Agendar" sub="Nueva Clase" color="bg-indigo-600" onClick={() => setView('CALENDARIO')} />
+          <MenuCard icon="📉" title="Pasivos" sub="Deudas" color="bg-amber-500" onClick={() => setView('PASIVOS')} />
           <MenuCard icon="💰" title="Ingreso" sub="Caja" color="bg-emerald-600" onClick={() => setView('INGRESO')} />
           <MenuCard icon="💸" title="Egreso" sub="Gastos" color="bg-rose-600" onClick={() => setView('EGRESO')} />
         </div>
@@ -284,6 +286,10 @@ const Secretaria = () => {
       />
       </div>
     );
+  }
+
+  if (view === 'PASIVOS') {
+    return <Pasivos axiosConfig={axiosConfig} setView={setView} />;
   }
   return null;
 };
