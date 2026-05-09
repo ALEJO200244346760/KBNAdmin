@@ -1,5 +1,6 @@
 package com.kbn_backend.kbn_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ public class PagoPasivo {
 
     @ManyToOne
     @JoinColumn(name = "pasivo_id")
+    @JsonBackReference // ESTO EVITA EL BUCLE INFINITO
     private Pasivo pasivo;
 
     public Long getId() {

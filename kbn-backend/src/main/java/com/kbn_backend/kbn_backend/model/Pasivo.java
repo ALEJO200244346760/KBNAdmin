@@ -1,5 +1,6 @@
 package com.kbn_backend.kbn_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -14,12 +15,9 @@ public class Pasivo {
     private Long id;
     private String titulo;
     private String descripcion;
-    private Double montoTotal;
+    private Double montoTotal; // Cambia a Double si estaba como String
     private String moneda;
-    private String fecha;
-
-    @OneToMany(mappedBy = "pasivo", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PagoPasivo> historialPagos;
+    private String fecha; // Si usas String en el frontend, mantenlo String aquí o LocalDate
 
     public Long getId() {
         return id;
@@ -67,13 +65,5 @@ public class Pasivo {
 
     public void setFecha(String fecha) {
         this.fecha = fecha;
-    }
-
-    public List<PagoPasivo> getHistorialPagos() {
-        return historialPagos;
-    }
-
-    public void setHistorialPagos(List<PagoPasivo> historialPagos) {
-        this.historialPagos = historialPagos;
     }
 }
