@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/pasivos")
-@CrossOrigin(origins = "*") // Ajusta según tus necesidades de CORS
 public class PasivoController {
 
     @Autowired
