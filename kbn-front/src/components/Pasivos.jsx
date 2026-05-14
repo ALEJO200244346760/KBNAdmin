@@ -14,7 +14,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
 
   const today = new Date().toISOString().split('T')[0];
 
-  const initialPasivoForm = { titulo: '', descripcion: '', montoTotal: '', moneda: 'USD', fecha: today };
+  const initialPasivoForm = { titulo: '', descripcion: '', montoTotal: '', moneda: 'BRL', fecha: today };
   const [newPasivo, setNewPasivo] = useState(initialPasivoForm);
   const [editPasivo, setEditPasivo] = useState(initialPasivoForm);
 
