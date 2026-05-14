@@ -16,6 +16,30 @@ import ReportesEstadisticasGraficos from './ReportesEstadisticasGraficos';
 // Registro de componentes de gráficos
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
+// --- FUNCIÓN CENTRALIZADA DE PORCENTAJES ---
+// Esto asegura que la regla de negocio no falle nunca en ninguna parte del código
+const calcularReparto = (asignadoA, montoBase) => {
+    let pIgna = 10, pJose = 10; // Por defecto: Ausentes = 10% cada uno
+
+    if (asignadoA === 'IGNA') {
+        pIgna = 15;
+        pJose = 10;
+    } else if (asignadoA === 'JOSE') {
+        pIgna = 10;
+        pJose = 15;
+    } else if (asignadoA === 'AMBOS') {
+        pIgna = 12.5;
+        pJose = 12.5;
+    }
+
+    return {
+        pIgna,
+        pJose,
+        mIgna: (montoBase * pIgna) / 100,
+        mJose: (montoBase * pJose) / 100
+    };
+};
+
 const ReporteEstadisticas = () => {
     const { token } = useAuth();
     
@@ -36,7 +60,8 @@ const ReporteEstadisticas = () => {
         instructor: '',
         actividad: '',
         fechaInicio: '',
-        fechaFin: ''
+        fechaFin: '',
+        asignadoA: '' // NUEVO FILTRO
     });
     
     // UI Helpers
@@ -88,13 +113,13 @@ const ReporteEstadisticas = () => {
         }
     };
 
-    // --- EXTRAER INSTRUCTORES ÚNICOS PARA EL FILTRO ---
+    // --- EXTRAER INSTRUCTORES ÚNICOS ---
     const instructoresDisponibles = useMemo(() => {
         const instructoresSet = new Set(allData.map(item => item.instructor).filter(Boolean));
         return Array.from(instructoresSet);
     }, [allData]);
 
-    // --- LOGICA DE FILTRADO ---
+    // --- LÓGICA DE FILTRADO ---
     const handleFiltroChange = (e) => {
         const { name, value } = e.target;
         setFiltros(prev => ({ ...prev, [name]: value }));
@@ -107,7 +132,8 @@ const ReporteEstadisticas = () => {
             instructor: '',
             actividad: '',
             fechaInicio: '',
-            fechaFin: ''
+            fechaFin: '',
+            asignadoA: ''
         });
     };
 
@@ -120,6 +146,7 @@ const ReporteEstadisticas = () => {
             if (filtros.actividad && item.actividad !== filtros.actividad) match = false;
             if (filtros.fechaInicio && item.fecha < filtros.fechaInicio) match = false;
             if (filtros.fechaFin && item.fecha > filtros.fechaFin) match = false;
+            if (filtros.asignadoA && item.asignadoA !== filtros.asignadoA) match = false;
             return match;
         });
     };
@@ -128,7 +155,7 @@ const ReporteEstadisticas = () => {
     const egresosFiltrados = useMemo(() => aplicarFiltros(egresos), [egresos, filtros]);
     const asignadosFiltrados = useMemo(() => aplicarFiltros(asignados), [asignados, filtros]);
 
-    // --- CÁLCULO DE TOTALES POR MONEDA ---
+    // --- CÁLCULO DE TOTALES GENERALES POR MONEDA ---
     const totalesPorMoneda = useMemo(() => {
         const totales = {};
         const procesarMonto = (moneda, monto) => {
@@ -150,6 +177,26 @@ const ReporteEstadisticas = () => {
         return totales;
     }, [pendientesFiltrados, egresosFiltrados, asignadosFiltrados]);
 
+    // --- NUEVO: CÁLCULO DE LIQUIDACIÓN A PAGAR A IGNA Y JOSE (FIN DE MES) ---
+    const liquidacionInstructores = useMemo(() => {
+        const totales = { IGNA: {}, JOSE: {} };
+        
+        asignadosFiltrados.forEach(item => {
+            const montoBase = parseFloat(item.total) || 0;
+            const moneda = item.moneda || 'USD';
+            
+            const { mIgna, mJose } = calcularReparto(item.asignadoA, montoBase);
+
+            if (!totales.IGNA[moneda]) totales.IGNA[moneda] = 0;
+            if (!totales.JOSE[moneda]) totales.JOSE[moneda] = 0;
+
+            totales.IGNA[moneda] += mIgna;
+            totales.JOSE[moneda] += mJose;
+        });
+
+        return totales;
+    }, [asignadosFiltrados]);
+
     // --- ACCIONES ---
     const toggleDetails = (id) => {
         setExpandedId(prev => prev === id ? null : id);
@@ -163,39 +210,19 @@ const ReporteEstadisticas = () => {
         setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
     };
 
-    // NUEVA LÓGICA DE ASIGNACIÓN CON PORCENTAJES PARA IGNA Y JOSE
     const saveAssignment = async (item, asignadoA) => {
         if (!asignadoA || asignadoA === 'NINGUNO') return alert("Selecciona un instructor válido.");
         
         const montoBase = parseFloat(item.total) || 0;
-        let pIgna = 10;
-        let pJose = 10;
-
-        // Reglas de negocio
-        if (asignadoA === 'IGNA') {
-            pIgna = 15;
-            pJose = 10;
-        } else if (asignadoA === 'JOSE') {
-            pIgna = 10;
-            pJose = 15;
-        } else if (asignadoA === 'AMBOS') {
-            pIgna = 12.5;
-            pJose = 12.5;
-        } else {
-            // Si es ALE u otro, ambos ausentes = 10%
-            pIgna = 10;
-            pJose = 10;
-        }
-
-        const montoIgna = (montoBase * pIgna) / 100;
-        const montoJose = (montoBase * pJose) / 100;
+        
+        // Usamos nuestra función centralizada para garantizar exactitud
+        const { pIgna, pJose, mIgna, mJose } = calcularReparto(asignadoA, montoBase);
 
         // Generamos el texto a agregar en los detalles
         const strIgna = pIgna.toString().replace('.', ',');
         const strJose = pJose.toString().replace('.', ',');
-        const notaPorcentajes = ` | Reparto: IGNA ${strIgna}% ($${montoIgna.toFixed(2)}) - JOSE ${strJose}% ($${montoJose.toFixed(2)})`;
+        const notaPorcentajes = ` | Reparto: IGNA ${strIgna}% ($${mIgna.toFixed(2)}) - JOSE ${strJose}% ($${mJose.toFixed(2)})`;
         
-        // Evitamos concatenar repetidamente si re-asignan la misma clase
         let detallesActuales = item.detalles || '';
         if (detallesActuales.includes('| Reparto:')) {
             detallesActuales = detallesActuales.split('| Reparto:')[0].trim();
@@ -225,15 +252,7 @@ const ReporteEstadisticas = () => {
 
     // --- RENDER DE PORCENTAJES EN VIVO PARA ASIGNADOS ---
     const renderRepartoDesglose = (item) => {
-        const montoBase = parseFloat(item.total) || 0;
-        let pIgna = 10, pJose = 10;
-        
-        if (item.asignadoA === 'IGNA') { pIgna = 15; pJose = 10; }
-        else if (item.asignadoA === 'JOSE') { pIgna = 10; pJose = 15; }
-        else if (item.asignadoA === 'AMBOS') { pIgna = 12.5; pJose = 12.5; }
-        
-        const mIgna = (montoBase * pIgna) / 100;
-        const mJose = (montoBase * pJose) / 100;
+        const { pIgna, pJose, mIgna, mJose } = calcularReparto(item.asignadoA, parseFloat(item.total) || 0);
 
         return (
             <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase">
@@ -335,7 +354,7 @@ const ReporteEstadisticas = () => {
                         </button>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Desde Fecha</label>
                             <input type="date" name="fechaInicio" value={filtros.fechaInicio} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold" />
@@ -355,6 +374,19 @@ const ReporteEstadisticas = () => {
                                 <option value="CLP">Pesos Chilenos (CLP)</option>
                             </select>
                         </div>
+                        
+                        {/* --- NUEVO FILTRO DE ASIGNACIÓN A --- */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-indigo-500 uppercase ml-1">Filtro Asignado A</label>
+                            <select name="asignadoA" value={filtros.asignadoA} onChange={handleFiltroChange} className="w-full p-2.5 bg-indigo-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-indigo-900">
+                                <option value="">Todos los registros</option>
+                                <option value="IGNA">Solo Igna (Pres:15% / Aus:10%)</option>
+                                <option value="JOSE">Solo Jose (Pres:15% / Aus:10%)</option>
+                                <option value="AMBOS">Ambos Presentes (12.5% c/u)</option>
+                                <option value="ALE">Ambos Ausentes (10% c/u)</option>
+                            </select>
+                        </div>
+
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Forma de Pago</label>
                             <select name="formaPago" value={filtros.formaPago} onChange={handleFiltroChange} className="w-full p-2.5 bg-gray-50 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold">
@@ -386,6 +418,44 @@ const ReporteEstadisticas = () => {
                 </div>
             )}
 
+            {/* --- PANEL DE LIQUIDACIÓN DE SOCIOS (NUEVO) --- */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden mb-8">
+                <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        💰 Liquidación a Pagar (Fin de Mes)
+                    </h2>
+                    <span className="text-slate-400 text-xs hidden md:block">Calculado sobre ingresos asignados según los filtros activos</span>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Tarjeta IGNA */}
+                    <div className="bg-slate-700/40 rounded-lg p-5 border border-slate-600/50 shadow-inner">
+                        <h3 className="text-lg font-black text-indigo-400 mb-3 border-b border-slate-600 pb-2">TOTAL IGNA</h3>
+                        <div className="space-y-2">
+                            {Object.entries(liquidacionInstructores.IGNA).map(([moneda, monto]) => (
+                                <div key={moneda} className="flex justify-between items-center">
+                                    <span className="text-slate-300 font-semibold">{moneda}:</span>
+                                    <span className="text-xl font-bold text-white">{formatCurrency(monto)}</span>
+                                </div>
+                            ))}
+                            {Object.keys(liquidacionInstructores.IGNA).length === 0 && <span className="text-slate-500 italic text-sm">No hay montos calculados.</span>}
+                        </div>
+                    </div>
+                    {/* Tarjeta JOSE */}
+                    <div className="bg-slate-700/40 rounded-lg p-5 border border-slate-600/50 shadow-inner">
+                        <h3 className="text-lg font-black text-emerald-400 mb-3 border-b border-slate-600 pb-2">TOTAL JOSE</h3>
+                        <div className="space-y-2">
+                            {Object.entries(liquidacionInstructores.JOSE).map(([moneda, monto]) => (
+                                <div key={moneda} className="flex justify-between items-center">
+                                    <span className="text-slate-300 font-semibold">{moneda}:</span>
+                                    <span className="text-xl font-bold text-white">{formatCurrency(monto)}</span>
+                                </div>
+                            ))}
+                            {Object.keys(liquidacionInstructores.JOSE).length === 0 && <span className="text-slate-500 italic text-sm">No hay montos calculados.</span>}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* --- SECCIÓN 1: PENDIENTES --- */}
             <div className="bg-white rounded-xl shadow-md border-l-4 border-yellow-500 overflow-hidden">
                 <div className="bg-yellow-50 px-6 py-3 border-b border-yellow-100 flex justify-between items-center">
@@ -395,7 +465,7 @@ const ReporteEstadisticas = () => {
                     </h2>
                 </div>
                 {pendientesFiltrados.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500 italic">No hay ingresos pendientes de asignar.</div>
+                    <div className="p-6 text-center text-gray-500 italic">No hay ingresos pendientes de asignar para estos filtros.</div>
                 ) : (
                     <div className="divide-y divide-gray-100">
                         {pendientesFiltrados.map(item => (
@@ -440,7 +510,7 @@ const ReporteEstadisticas = () => {
                     </h2>
                 </div>
                 {egresosFiltrados.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500 italic">No se registraron egresos.</div>
+                    <div className="p-6 text-center text-gray-500 italic">No se registraron egresos con estos filtros.</div>
                 ) : (
                     <div className="divide-y divide-gray-100">
                         {egresosFiltrados.map(item => {
@@ -473,7 +543,7 @@ const ReporteEstadisticas = () => {
                     <h2 className="text-xl font-bold text-green-800">✅ Ingresos Asignados</h2>
                 </div>
                 {asignadosFiltrados.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500 italic">No hay ingresos asignados.</div>
+                    <div className="p-6 text-center text-gray-500 italic">No hay ingresos asignados con estos filtros.</div>
                 ) : (
                     <div className="divide-y divide-gray-100">
                         {asignadosFiltrados.map(item => (
@@ -490,7 +560,6 @@ const ReporteEstadisticas = () => {
                                         </div>
                                         <div className="text-sm text-gray-500 mt-1 pl-0 md:pl-28">{item.actividad}</div>
                                         
-                                        {/* AQUI MOSTRAMOS LOS PORCENTAJES DE IGNA Y JOSE EN VIVO */}
                                         <div className="pl-0 md:pl-28">
                                             {renderRepartoDesglose(item)}
                                         </div>
