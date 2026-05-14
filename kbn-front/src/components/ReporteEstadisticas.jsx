@@ -418,7 +418,7 @@ const ReporteEstadisticas = () => {
                                             <option value="IGNA">IGNA</option>
                                             <option value="JOSE">JOSE</option>
                                             <option value="AMBOS">AMBOS (Igna y Jose)</option>
-                                            <option value="ALE">ALE</option>
+                                            <option value="ALE">AUSENTES</option>
                                         </select>
                                         <button onClick={() => saveAssignment(item, item.asignadoA)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 font-bold">OK</button>
                                         <button onClick={() => toggleDetails(item.id)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm">▼</button>
