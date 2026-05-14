@@ -71,7 +71,8 @@ const Pasivos = ({ axiosConfig, setView }) => {
         moneda: paymentData.moneda,
         formaPago: paymentData.formaPago,
         detalles: paymentData.detalles || `Pago a cuenta: ${selectedPasivo.titulo}`,
-        actividad: 'Pago a Proveedor/Staff' // Para que en el reporte se entienda
+        actividad: 'Pago Pasivo',
+        instructor: 'Secretaria'
       };
 
       await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload, axiosConfig);
