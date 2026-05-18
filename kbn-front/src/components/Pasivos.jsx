@@ -35,20 +35,13 @@ const Pasivos = ({ axiosConfig, setView }) => {
   };
 
   // ---------------------------------------------
-  // MOTOR DE CÁLCULO DEFINITIVO BLINDADO
+  // MOTOR DE CÁLCULO CORREGIDO
+  // El backend ya aplica cada pago al montoTotal automáticamente.
+  // El historialPagos es solo para mostrar el detalle, NO para recalcular.
+  // Sumar el historial encima causaba doble descuento.
   // ---------------------------------------------
   const getBalanceReal = (pasivo) => {
-    // Forzamos parseFloat porque el backend a veces devuelve Strings (ej: "100")
-    const base = parseFloat(pasivo.montoTotal) || 0;
-    
-    const sumaHistorial = (pasivo.historialPagos || []).reduce((acc, mov) => {
-        // El historial de pagos también lo blindamos con parseFloat por seguridad
-        const montoMovimiento = parseFloat(mov.montoPagado) || 0;
-        return acc + montoMovimiento;
-    }, 0);
-    
-    // Balance final matemático: Deudas (negativas) + Adelantos/Pagos (positivos)
-    return base + sumaHistorial;
+    return parseFloat(pasivo.montoTotal) || 0;
   };
 
   const handleCreatePasivo = async (e) => {
@@ -96,7 +89,10 @@ const Pasivos = ({ axiosConfig, setView }) => {
       const montoMovimiento = parseFloat(transactionData.monto);
 
       if (transactionType === 'ADELANTO') {
-        // Registramos el egreso en la caja (esto impacta en el historial del backend de manera automática)
+        // Registramos el egreso en la caja.
+        // El backend (FinanzasService) se encarga automáticamente de:
+        //   1. Descontar del montoTotal del pasivo
+        //   2. Guardar el movimiento en historialPagos
         const payloadEgreso = {
           tipoTransaccion: 'EGRESO',
           pasivoId: selectedPasivo.id,
@@ -111,10 +107,9 @@ const Pasivos = ({ axiosConfig, setView }) => {
         await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payloadEgreso, axiosConfig);
         
       } else {
-        // ES DEUDA: Modificamos directamente el montoTotal acumulado (base)
+        // ES DEUDA NUEVA: Modificamos directamente el montoTotal acumulado (base)
         const montoActual = parseFloat(selectedPasivo.montoTotal) || 0;
-        const montoAAgregar = -Math.abs(montoMovimiento); 
-        const nuevoMontoTotal = montoActual + montoAAgregar;
+        const nuevoMontoTotal = montoActual - Math.abs(montoMovimiento); 
 
         await axios.put(`https://kbnadmin-production.up.railway.app/api/pasivos/${selectedPasivo.id}`, {
             ...selectedPasivo,
