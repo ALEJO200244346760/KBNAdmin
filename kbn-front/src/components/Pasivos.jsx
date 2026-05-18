@@ -204,7 +204,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
   const transactionConfig = {
     NUEVA_DEUDA: {
       title: 'Registrar Deuda Nueva',
-      subtitle: 'No mueve caja — solo registra que debemos más',
       borderColor: 'border-rose-500',
       btnColor: 'bg-rose-600 hover:bg-rose-700',
       textColor: 'text-rose-600',
@@ -212,7 +211,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
     },
     PAGO_DEUDA: {
       title: 'Registrar Pago de Deuda',
-      subtitle: 'Sale de caja — reducimos lo que debíamos',
       borderColor: 'border-amber-500',
       btnColor: 'bg-amber-500 hover:bg-amber-600',
       textColor: 'text-amber-600',
@@ -220,7 +218,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
     },
     ADELANTO: {
       title: 'Dar Adelanto',
-      subtitle: 'Sale de caja — nos quedan debiendo',
       borderColor: 'border-emerald-500',
       btnColor: 'bg-emerald-600 hover:bg-emerald-700',
       textColor: 'text-emerald-600',
