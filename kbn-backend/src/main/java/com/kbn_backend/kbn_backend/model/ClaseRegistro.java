@@ -2,7 +2,6 @@ package com.kbn_backend.kbn_backend.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDate;
 
 @Entity
 @Data
@@ -13,13 +12,20 @@ public class ClaseRegistro {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long pasivoId; // Nuevo campo para vincular el Egreso con una deuda
+    private Long pasivoId;
 
-    // --- CAMPO NUEVO PARA INGRESOS/EGRESOS ---
     @Column(nullable = false)
-    private String tipoTransaccion; // VALORES: "INGRESO" o "EGRESO"
+    private String tipoTransaccion; // "INGRESO" o "EGRESO"
 
-    // --- CAMPOS QUE RELLENA EL INSTRUCTOR ---
+    /**
+     * Solo se usa cuando tipoTransaccion = "EGRESO" y pasivoId != null.
+     * Valores posibles:
+     *   "ADELANTO"   → Le damos plata al profe, él nos debe. Suma al montoTotal del pasivo (positivo).
+     *   "PAGO_DEUDA" → Pagamos una deuda que teníamos. Suma al montoTotal del pasivo (reduce deuda negativa).
+     * En ambos casos sale plata de caja (EGRESO), pero el efecto en el pasivo es siempre SUMAR.
+     * La diferencia semántica queda en este campo para el historial/reportes.
+     */
+    private String tipoMovimientoPasivo; // "ADELANTO" o "PAGO_DEUDA"
 
     @Column(nullable = false)
     private String fecha;
@@ -33,27 +39,25 @@ public class ClaseRegistro {
     private String vendedor;
 
     @Column(nullable = false)
-    private String instructor; // Nombre del instructor, sea auto-llenado o seleccionado por Admin
+    private String instructor;
 
     @Column(columnDefinition = "TEXT")
     private String detalles;
 
-    private String cantidadHoras;     // Antes Double
-    private String tarifaPorHora;     // Antes Double
-    private String total;             // Antes Double
+    private String cantidadHoras;
+    private String tarifaPorHora;
+    private String total;
 
     @Column(nullable = false)
-    private String moneda; // Valores posibles: "ARS", "CLP", "USD", "BRL", etc.
+    private String moneda;
 
-    private String gastosAsociados;   // Antes Double
-    private String comision;          // Antes Double
+    private String gastosAsociados;
+    private String comision;
 
     private String formaPago;
     private String detalleFormaPago;
 
-    // --- CAMPOS EXCLUSIVOS DEL ADMINISTRADOR ---
-
-    private String asignadoA; // "IGNA", "JOSE", "NINGUNO". Solo aplica a INGRESO.
+    private String asignadoA;
 
     private boolean revisado = false;
 }

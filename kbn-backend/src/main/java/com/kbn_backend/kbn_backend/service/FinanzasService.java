@@ -19,7 +19,8 @@ public class FinanzasService {
 
     @Transactional
     public ClaseRegistro guardarTransaccion(ClaseRegistro registro) {
-        // 1. Lógica de inicialización según tipo
+
+        // 1. Inicialización según tipo de transacción
         if ("INGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
             registro.setAsignadoA(null);
             registro.setRevisado(false);
@@ -28,37 +29,59 @@ public class FinanzasService {
             registro.setRevisado(true);
         }
 
-        // 2. Cálculo de seguridad del Total
-        if (registro.getTotal() == null && registro.getCantidadHoras() != null && registro.getTarifaPorHora() != null) {
+        // 2. Cálculo automático del total si no viene explícito
+        if (registro.getTotal() == null
+                && registro.getCantidadHoras() != null
+                && registro.getTarifaPorHora() != null) {
             try {
                 double h = Double.parseDouble(registro.getCantidadHoras());
                 double t = Double.parseDouble(registro.getTarifaPorHora());
                 registro.setTotal(String.valueOf(h * t));
-            } catch (Exception e) { registro.setTotal("0"); }
+            } catch (Exception e) {
+                registro.setTotal("0");
+            }
         }
 
         // 3. Guardar el movimiento en caja
         ClaseRegistro saved = claseRepository.save(registro);
 
-        // 4. Si es un Egreso vinculado a un Pasivo, actualizamos la deuda
-        if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion()) && registro.getPasivoId() != null) {
+        // 4. Si es un EGRESO vinculado a un Pasivo, actualizamos el saldo del pasivo
+        if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())
+                && registro.getPasivoId() != null) {
+
             pasivoRepository.findById(registro.getPasivoId()).ifPresent(pasivo -> {
-                Double montoPagado = Double.valueOf(registro.getTotal());
 
-                // Restar del saldo (puede quedar negativo si es adelanto)
-                pasivo.setMontoTotal(pasivo.getMontoTotal() - montoPagado);
+                double monto = Double.parseDouble(registro.getTotal());
+                String tipo = registro.getTipoMovimientoPasivo();
 
-                // Crear registro en el historial
+                /*
+                 * LÓGICA DE SALDO:
+                 *
+                 * ADELANTO  → el profe nos debe plata → saldo POSITIVO (a nuestro favor)
+                 *             montoTotal SUMA el monto.
+                 *
+                 * PAGO_DEUDA → pagamos una deuda nuestra → reducimos saldo negativo
+                 *              montoTotal SUMA el monto (la deuda era negativa, sumar la acerca a 0).
+                 *
+                 * En AMBOS casos el efecto matemático sobre montoTotal es SUMAR el monto.
+                 * La diferencia semántica queda registrada en tipoMovimientoPasivo del ClaseRegistro.
+                 */
+                pasivo.setMontoTotal(pasivo.getMontoTotal() + monto);
+
+                // Registrar en el historial del pasivo
                 PagoPasivo pagoHistorial = new PagoPasivo();
-                pagoHistorial.setMontoPagado(montoPagado);
+                pagoHistorial.setMontoPagado(monto);
                 pagoHistorial.setFecha(LocalDate.now());
-                pagoHistorial.setNota(registro.getDetalles() != null ? registro.getDetalles() : "Pago registrado");
+                pagoHistorial.setNota(
+                        registro.getDetalles() != null ? registro.getDetalles() : "Pago registrado"
+                );
                 pagoHistorial.setPasivo(pasivo);
 
                 pagoPasivoRepository.save(pagoHistorial);
                 pasivoRepository.save(pasivo);
             });
         }
+
         return saved;
     }
 }
