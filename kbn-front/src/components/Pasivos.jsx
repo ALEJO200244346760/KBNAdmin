@@ -35,32 +35,15 @@ const Pasivos = ({ axiosConfig, setView }) => {
   };
 
   // ---------------------------------------------
-  // MOTOR DE CÁLCULO MEJORADO (A PRUEBA DE FALLOS)
+  // MOTOR DE CÁLCULO DEFINITIVO
   // ---------------------------------------------
+  // Como el backend ignora las listas hijas en los PUT, acumulamos las Deudas manuales 
+  // en el montoTotal base, y dejamos que el backend sume los Adelantos en el historial.
   const getBalanceReal = (pasivo) => {
     const base = parseFloat(pasivo.montoTotal) || 0;
+    const sumaHistorial = (pasivo.historialPagos || []).reduce((acc, mov) => acc + parseFloat(mov.montoPagado), 0);
     
-    // Si no hay historial, el saldo es exactamente el monto inicial
-    if (!pasivo.historialPagos || pasivo.historialPagos.length === 0) {
-        return base;
-    }
-
-    // Sumamos todo el historial
-    const sumaHistorial = pasivo.historialPagos.reduce((acc, mov) => acc + parseFloat(mov.montoPagado), 0);
-
-    // CASO 1: Por bugs anteriores, a veces el montoTotal se sobreescribía con la suma total.
-    if (Math.abs(base - sumaHistorial) < 0.01) {
-        return sumaHistorial;
-    }
-
-    // CASO 2: Verificamos si el monto base inicial ya está registrado como un movimiento dentro del historial.
-    const baseIntegrada = pasivo.historialPagos.some(mov => Math.abs(parseFloat(mov.montoPagado) - base) < 0.01);
-    if (baseIntegrada) {
-        return sumaHistorial;
-    }
-
-    // CASO 3: (El principal) La base inicial (ej. -200 de deuda) no está en el historial, 
-    // pero el historial tiene los adelantos posteriores (ej. +500). El saldo real es Base + Historial.
+    // El balance real y definitivo es la suma matemática de la base (deudas) + historial (adelantos)
     return base + sumaHistorial;
   };
 
@@ -68,8 +51,10 @@ const Pasivos = ({ axiosConfig, setView }) => {
     e.preventDefault();
     try {
       const montoInicial = parseFloat(newPasivo.montoTotal) || 0;
-      // Las deudas son estrictamente negativas, los adelantos positivos
-      const montoCalculado = newPasivo.tipoRegistro === 'DEUDA' ? -Math.abs(montoInicial) : Math.abs(montoInicial);
+      
+      // Si es Deuda, impacta directamente como negativo en el monto base.
+      // Si es Adelanto, el monto base arranca en 0 porque el egreso se encargará de crear el historial.
+      const montoCalculado = newPasivo.tipoRegistro === 'DEUDA' ? -Math.abs(montoInicial) : 0;
       
       const payload = { 
           ...newPasivo, 
@@ -77,21 +62,13 @@ const Pasivos = ({ axiosConfig, setView }) => {
           historialPagos: [] 
       };
 
-      if (newPasivo.tipoRegistro === 'DEUDA') {
-          payload.historialPagos.push({
-              montoPagado: montoCalculado,
-              fecha: newPasivo.fecha,
-              nota: `Deuda inicial: ${newPasivo.descripcion || newPasivo.titulo}`
-          });
-      }
-
       const res = await axios.post('https://kbnadmin-production.up.railway.app/api/pasivos', payload, axiosConfig);
       
       if (newPasivo.tipoRegistro === 'ADELANTO') {
         const egresoPayload = {
           tipoTransaccion: 'EGRESO',
           pasivoId: res.data.id,
-          total: Math.abs(montoCalculado),
+          total: Math.abs(montoInicial), // Usamos el monto que tipeó el usuario
           fecha: newPasivo.fecha,
           moneda: newPasivo.moneda,
           formaPago: 'Efectivo',
@@ -104,7 +81,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
       
       setShowCreateModal(false);
       setNewPasivo(initialPasivoForm);
-      // Retrasamos el fetch para asegurar que el backend termine de asentar la base de datos
       setTimeout(() => fetchPasivos(), 800); 
     } catch (err) {
       alert("Error al guardar.");
@@ -132,21 +108,14 @@ const Pasivos = ({ axiosConfig, setView }) => {
         await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payloadEgreso, axiosConfig);
         
       } else {
-        // ES DEUDA: Insertamos manualmente al historial y hacemos PUT
-        const nuevoHistorial = [...(selectedPasivo.historialPagos || [])];
-        const montoAAgregar = -Math.abs(montoMovimiento); // Las deudas SIEMPRE restan
-        
-        nuevoHistorial.push({
-            montoPagado: montoAAgregar, 
-            fecha: transactionData.fecha,
-            nota: `DEUDA: ${transactionData.detalles}`
-        });
+        // ES DEUDA: Modificamos el montoTotal base (porque el backend ignora arrays en el PUT)
+        const montoActual = parseFloat(selectedPasivo.montoTotal) || 0;
+        const montoAAgregar = -Math.abs(montoMovimiento); // Las deudas SIEMPRE restan matemáticamente
+        const nuevoMontoTotal = montoActual + montoAAgregar;
 
         await axios.put(`https://kbnadmin-production.up.railway.app/api/pasivos/${selectedPasivo.id}`, {
             ...selectedPasivo,
-            // IMPORTANTE: Jamás sobreescribimos el montoTotal base para no corromper el cálculo
-            montoTotal: selectedPasivo.montoTotal, 
-            historialPagos: nuevoHistorial
+            montoTotal: nuevoMontoTotal
         }, axiosConfig);
       }
 
@@ -276,7 +245,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Descripción / Nota</label>
                 <input 
                   type="text" 
-                  placeholder="Ej: PAGO POR CLASES" 
+                  placeholder="Ej: Pago por clases o detalle..." 
                   className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none" 
                   value={newPasivo.descripcion} 
                   onChange={e => setNewPasivo({...newPasivo, descripcion: e.target.value})} 
@@ -287,7 +256,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
                 <input 
                   type="number" 
                   step="0.01" 
-                  placeholder="Monto Inicial" 
+                  placeholder="Ej: 500" 
                   className="p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none" 
                   value={newPasivo.montoTotal} 
                   onChange={e => setNewPasivo({...newPasivo, montoTotal: e.target.value})} 
@@ -373,9 +342,14 @@ const Pasivos = ({ axiosConfig, setView }) => {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="font-black uppercase text-xl italic text-gray-800">Movimientos: {selectedPasivo.titulo}</h2>
+              <h2 className="font-black uppercase text-xl italic text-gray-800">Pagos / Adelantos</h2>
               <button onClick={() => setShowHistoryModal(false)} className="text-2xl hover:scale-110 transition-transform">✕</button>
             </div>
+            
+            <p className="text-xs text-gray-500 font-bold mb-4 italic text-center">
+              *Nota: Este historial muestra los movimientos de Caja (Adelantos). Las deudas se aplican directamente al saldo general.
+            </p>
+
             <div className="space-y-3 max-h-80 overflow-y-auto pr-2 mb-8">
               {selectedPasivo.historialPagos?.length > 0 ? (
                 [...selectedPasivo.historialPagos].reverse().map((mov, idx) => (
@@ -390,7 +364,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-10 text-gray-400 font-bold italic">Sin movimientos registrados.</div>
+                <div className="text-center py-10 text-gray-400 font-bold italic">Sin movimientos registrados en Caja.</div>
               )}
             </div>
             <button onClick={() => setShowHistoryModal(false)} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase text-xs transition-all hover:bg-black">Cerrar Historial</button>
