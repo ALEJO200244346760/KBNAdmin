@@ -39,7 +39,7 @@ const InstructorForm = () => {
     comision: 0,
     formaPago: 'Efectivo',
     formaPagoOtro: '',
-    moneda: 'USD'
+    moneda: 'BRL'
   });
 
   // 1. CARGA DINÁMICA DE INSTRUCTORES (Para el select del Admin)
