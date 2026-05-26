@@ -1,6 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// ─────────────────────────────────────────────────────────────────
+// Helpers para guardar la tarifa dentro del campo descripcion
+// Formato interno: "__tarifa__:120||Descripción visible"
+// ─────────────────────────────────────────────────────────────────
+const TARIFA_PREFIX = '__tarifa__:';
+
+const encodeTarifa = (tarifaHora, descripcion) => {
+  if (!tarifaHora) return descripcion || '';
+  return `${TARIFA_PREFIX}${tarifaHora}||${descripcion || ''}`;
+};
+
+const decodeTarifa = (descripcionRaw) => {
+  if (!descripcionRaw || !descripcionRaw.startsWith(TARIFA_PREFIX)) {
+    return { tarifaHora: null, descripcion: descripcionRaw || '', esInstructor: false };
+  }
+  const sin = descripcionRaw.slice(TARIFA_PREFIX.length);
+  const sep = sin.indexOf('||');
+  const tarifaHora = parseFloat(sin.slice(0, sep));
+  const descripcion = sin.slice(sep + 2);
+  return { tarifaHora, descripcion, esInstructor: true };
+};
+
 const Pasivos = ({ axiosConfig, setView }) => {
   const [pasivos, setPasivos] = useState([]);
   const [selectedPasivo, setSelectedPasivo] = useState(null);
@@ -10,9 +32,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // ADELANTO    = le damos plata, nos quedan debiendo (saldo positivo, verde)
-  // PAGO_DEUDA  = pagamos lo que debemos (reduce saldo negativo, mueve caja)
-  // NUEVA_DEUDA = registramos que debemos más (NO mueve caja)
   const [transactionType, setTransactionType] = useState('PAGO_DEUDA');
 
   const today = new Date().toISOString().split('T')[0];
@@ -20,6 +39,8 @@ const Pasivos = ({ axiosConfig, setView }) => {
   const initialPasivoForm = {
     titulo: '',
     descripcion: '',
+    tarifaHora: '',
+    esInstructor: false,
     montoInicial: '',
     moneda: 'BRL',
     fecha: today,
@@ -27,13 +48,12 @@ const Pasivos = ({ axiosConfig, setView }) => {
   };
   const [newPasivo, setNewPasivo] = useState(initialPasivoForm);
   const [editPasivo, setEditPasivo] = useState({});
+  const [editDecoded, setEditDecoded] = useState({ tarifaHora: '', descripcion: '', esInstructor: false });
 
   const initialTransactionForm = { monto: '', fecha: today, formaPago: 'Efectivo', detalles: '' };
   const [transactionData, setTransactionData] = useState(initialTransactionForm);
 
-  useEffect(() => {
-    fetchPasivos();
-  }, []);
+  useEffect(() => { fetchPasivos(); }, []);
 
   const fetchPasivos = async () => {
     try {
@@ -44,28 +64,23 @@ const Pasivos = ({ axiosConfig, setView }) => {
     }
   };
 
-  // ---------------------------------------------------------------
-  // FUENTE DE VERDAD: el montoTotal del backend ya está calculado.
-  // Negativo = les debemos (rojo). Positivo = nos deben (verde).
-  // ---------------------------------------------------------------
   const getBalance = (pasivo) => parseFloat(pasivo.montoTotal) || 0;
 
-  // ---------------------------------------------------------------
-  // CREAR PASIVO
-  // DEUDA inicial    → montoTotal negativo. NO mueve caja.
-  // ADELANTO inicial → arranca en 0, el egreso de caja suma y lo deja positivo.
-  // ---------------------------------------------------------------
+  // ─── CREAR ────────────────────────────────────────────────────
   const handleCreatePasivo = async (e) => {
     e.preventDefault();
     try {
       const monto = parseFloat(newPasivo.montoInicial) || 0;
       const esAdelanto = newPasivo.tipoRegistro === 'ADELANTO';
+      const descripcionEncoded = newPasivo.esInstructor
+        ? encodeTarifa(newPasivo.tarifaHora, newPasivo.descripcion)
+        : newPasivo.descripcion;
 
       const pasivoRes = await axios.post(
         'https://kbnadmin-production.up.railway.app/api/pasivos',
         {
           titulo: newPasivo.titulo,
-          descripcion: newPasivo.descripcion,
+          descripcion: descripcionEncoded,
           moneda: newPasivo.moneda,
           fecha: newPasivo.fecha,
           montoTotal: esAdelanto ? 0 : -Math.abs(monto),
@@ -74,8 +89,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
         axiosConfig
       );
 
-      if (esAdelanto) {
-        // El backend suma el monto al pasivo → queda positivo (nos deben)
+      if (esAdelanto && monto > 0) {
         await axios.post(
           'https://kbnadmin-production.up.railway.app/api/clases/guardar',
           {
@@ -103,20 +117,13 @@ const Pasivos = ({ axiosConfig, setView }) => {
     }
   };
 
-  // ---------------------------------------------------------------
-  // TRANSACCIONES SOBRE UN PASIVO EXISTENTE
-  //
-  // NUEVA_DEUDA → Solo actualiza montoTotal del pasivo (resta). NO sale de caja.
-  // PAGO_DEUDA  → EGRESO de caja. Backend suma al montoTotal (reduce deuda negativa).
-  // ADELANTO    → EGRESO de caja. Backend suma al montoTotal (lo lleva a positivo).
-  // ---------------------------------------------------------------
+  // ─── TRANSACCIÓN ──────────────────────────────────────────────
   const handleTransactionSubmit = async (e) => {
     e.preventDefault();
     try {
       const monto = parseFloat(transactionData.monto);
 
       if (transactionType === 'NUEVA_DEUDA') {
-        // No sale plata de caja. Solo crece la deuda.
         const montoActual = parseFloat(selectedPasivo.montoTotal) || 0;
         await axios.put(
           `https://kbnadmin-production.up.railway.app/api/pasivos/${selectedPasivo.id}`,
@@ -124,7 +131,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
           axiosConfig
         );
       } else {
-        // PAGO_DEUDA o ADELANTO: sale plata de caja, backend suma al pasivo
         await axios.post(
           'https://kbnadmin-production.up.railway.app/api/clases/guardar',
           {
@@ -145,22 +151,24 @@ const Pasivos = ({ axiosConfig, setView }) => {
 
       setShowTransactionModal(false);
       setTransactionData(initialTransactionForm);
-      setTimeout(() => {
-        fetchPasivos();
-        alert('Operación realizada con éxito.');
-      }, 1000);
+      setTimeout(() => { fetchPasivos(); alert('Operación realizada con éxito.'); }, 1000);
     } catch (err) {
       console.error(err);
       alert('Error en la transacción.');
     }
   };
 
+  // ─── EDITAR ───────────────────────────────────────────────────
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
+      const descripcionEncoded = editDecoded.esInstructor
+        ? encodeTarifa(editDecoded.tarifaHora, editDecoded.descripcion)
+        : editDecoded.descripcion;
+
       await axios.put(
         `https://kbnadmin-production.up.railway.app/api/pasivos/${editPasivo.id}`,
-        editPasivo,
+        { ...editPasivo, descripcion: descripcionEncoded },
         axiosConfig
       );
       setShowEditModal(false);
@@ -183,9 +191,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
     }
   };
 
-  // ---------------------------------------------------------------
-  // UI HELPERS
-  // ---------------------------------------------------------------
+  // ─── UI HELPERS ───────────────────────────────────────────────
   const getCardStyle = (balance) => {
     if (balance < -0.01) return {
       border: 'border-rose-500', bg: 'bg-rose-50',
@@ -232,7 +238,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
       <div className="flex justify-between items-center mb-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
         <div>
           <h2 className="text-3xl font-black uppercase text-gray-800 italic tracking-tighter">Cuentas Corrientes</h2>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gestión de Deudas y Adelantos</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gestión de Deudas, Adelantos e Instructores</p>
         </div>
         <button onClick={() => setView('INICIO')} className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-6 py-3 rounded-2xl font-black text-xs uppercase transition-all">
           ← Volver
@@ -250,6 +256,9 @@ const Pasivos = ({ axiosConfig, setView }) => {
         <span className="flex items-center gap-2 bg-gray-50 text-gray-500 text-[10px] font-black uppercase px-4 py-2 rounded-full">
           <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" /> Saldado = gris
         </span>
+        <span className="flex items-center gap-2 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase px-4 py-2 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> 🎓 Instructor = tarifa automática
+        </span>
       </div>
 
       {/* BOTÓN CREAR */}
@@ -265,20 +274,35 @@ const Pasivos = ({ axiosConfig, setView }) => {
         {pasivos.map((p) => {
           const balance = getBalance(p);
           const style = getCardStyle(balance);
+          const decoded = decodeTarifa(p.descripcion);
           return (
             <div key={p.id} className={`bg-white rounded-[2.5rem] p-6 shadow-sm border-t-[12px] flex flex-col transition-all hover:shadow-md ${style.border}`}>
               <div className="flex justify-between items-start mb-4">
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${style.badge}`}>
-                  {style.label}
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${style.badge}`}>
+                    {style.label}
+                  </span>
+                  {decoded.esInstructor && (
+                    <span className="text-[10px] font-black px-3 py-1 rounded-full uppercase bg-indigo-100 text-indigo-700">
+                      🎓 Instructor · {decoded.tarifaHora} BRL/h
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-1">
-                  <button onClick={() => { setEditPasivo(p); setShowEditModal(true); }} className="p-2 hover:bg-gray-100 rounded-lg text-lg">✏️</button>
+                  <button
+                    onClick={() => {
+                      setEditPasivo(p);
+                      setEditDecoded(decodeTarifa(p.descripcion));
+                      setShowEditModal(true);
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg text-lg"
+                  >✏️</button>
                   <button onClick={() => handleDelete(p.id)} className="p-2 hover:bg-rose-50 rounded-lg text-lg">🗑️</button>
                 </div>
               </div>
 
               <h3 className="font-black text-gray-800 uppercase text-xl leading-tight mb-1">{p.titulo}</h3>
-              <p className="text-[11px] text-gray-400 font-bold uppercase mb-4 h-8 overflow-hidden">{p.descripcion}</p>
+              <p className="text-[11px] text-gray-400 font-bold uppercase mb-4 h-8 overflow-hidden">{decoded.descripcion}</p>
 
               <div className={`${style.bg} p-5 rounded-3xl mb-6 text-center`}>
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Saldo Actual</span>
@@ -312,40 +336,80 @@ const Pasivos = ({ axiosConfig, setView }) => {
         })}
       </div>
 
-      {/* MODAL CREAR */}
+      {/* ── MODAL CREAR ────────────────────────────────────────── */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 text-gray-800">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="font-black uppercase italic mb-2 text-2xl text-center">Nueva Cuenta</h2>
-            <p className="text-center text-[10px] text-gray-400 font-bold uppercase mb-6">Registrá una deuda o un adelanto inicial</p>
+            <p className="text-center text-[10px] text-gray-400 font-bold uppercase mb-6">Registrá una deuda, adelanto o cuenta de instructor</p>
             <form onSubmit={handleCreatePasivo} className="space-y-4">
+
+              {/* ¿Es instructor? */}
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">Tipo de cuenta</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewPasivo({ ...newPasivo, esInstructor: false })}
+                    className={`py-3 rounded-2xl font-black text-xs uppercase transition-all border-2 ${!newPasivo.esInstructor ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                  >📋 General</button>
+                  <button
+                    type="button"
+                    onClick={() => setNewPasivo({ ...newPasivo, esInstructor: true, tipoRegistro: 'DEUDA' })}
+                    className={`py-3 rounded-2xl font-black text-xs uppercase transition-all border-2 ${newPasivo.esInstructor ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                  >🎓 Instructor</button>
+                </div>
+              </div>
+
               <input
                 type="text"
-                placeholder="Nombre (Ej: Profe Facu)"
+                placeholder={newPasivo.esInstructor ? 'Nombre del instructor (Ej: Facu)' : 'Nombre (Ej: Alquiler Local)'}
                 className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none"
                 value={newPasivo.titulo}
                 onChange={(e) => setNewPasivo({ ...newPasivo, titulo: e.target.value })}
                 required
               />
 
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">¿Qué es?</label>
-                <select
-                  className="w-full p-4 bg-gray-100 rounded-2xl border-none font-bold outline-none"
-                  value={newPasivo.tipoRegistro}
-                  onChange={(e) => setNewPasivo({ ...newPasivo, tipoRegistro: e.target.value })}
-                >
-                  <option value="DEUDA">Deuda — les debemos plata (rojo)</option>
-                  <option value="ADELANTO">Adelanto — nos quedan debiendo (verde)</option>
-                </select>
-              </div>
+              {/* Tarifa por hora — solo si es instructor */}
+              {newPasivo.esInstructor && (
+                <div className="bg-indigo-50 p-4 rounded-2xl space-y-3">
+                  <label className="text-[10px] font-black text-indigo-600 uppercase block">💰 Tarifa por hora (BRL)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ej: 120"
+                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xl outline-none text-indigo-700"
+                    value={newPasivo.tarifaHora}
+                    onChange={(e) => setNewPasivo({ ...newPasivo, tarifaHora: e.target.value })}
+                    required={newPasivo.esInstructor}
+                  />
+                  <p className="text-[10px] text-indigo-400 font-bold uppercase">
+                    Cada clase guardada en Ingreso sumará automáticamente horas × tarifa a esta cuenta.
+                  </p>
+                </div>
+              )}
 
-              {newPasivo.tipoRegistro === 'DEUDA' && (
+              {/* Tipo registro — solo para cuentas generales */}
+              {!newPasivo.esInstructor && (
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">¿Qué es?</label>
+                  <select
+                    className="w-full p-4 bg-gray-100 rounded-2xl border-none font-bold outline-none"
+                    value={newPasivo.tipoRegistro}
+                    onChange={(e) => setNewPasivo({ ...newPasivo, tipoRegistro: e.target.value })}
+                  >
+                    <option value="DEUDA">Deuda — les debemos plata (rojo)</option>
+                    <option value="ADELANTO">Adelanto — nos quedan debiendo (verde)</option>
+                  </select>
+                </div>
+              )}
+
+              {!newPasivo.esInstructor && newPasivo.tipoRegistro === 'DEUDA' && (
                 <div className="bg-rose-50 text-rose-700 text-[10px] font-black uppercase px-4 py-3 rounded-2xl">
                   ⚠️ Solo registra la deuda. No sale plata de caja.
                 </div>
               )}
-              {newPasivo.tipoRegistro === 'ADELANTO' && (
+              {!newPasivo.esInstructor && newPasivo.tipoRegistro === 'ADELANTO' && (
                 <div className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase px-4 py-3 rounded-2xl">
                   ✓ Sale de caja. El saldo queda en verde (nos deben).
                 </div>
@@ -362,26 +426,35 @@ const Pasivos = ({ axiosConfig, setView }) => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Monto"
-                  className="p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none"
-                  value={newPasivo.montoInicial}
-                  onChange={(e) => setNewPasivo({ ...newPasivo, montoInicial: e.target.value })}
-                  required
-                />
-                <select
-                  className="p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none"
-                  value={newPasivo.moneda}
-                  onChange={(e) => setNewPasivo({ ...newPasivo, moneda: e.target.value })}
-                >
-                  <option value="BRL">BRL</option>
-                  <option value="USD">USD</option>
-                  <option value="ARS">ARS</option>
-                </select>
-              </div>
+              {/* Monto inicial — para instructores arranca en 0 automáticamente */}
+              {!newPasivo.esInstructor && (
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Monto inicial"
+                    className="p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none"
+                    value={newPasivo.montoInicial}
+                    onChange={(e) => setNewPasivo({ ...newPasivo, montoInicial: e.target.value })}
+                    required
+                  />
+                  <select
+                    className="p-4 bg-gray-50 rounded-2xl border-none font-bold outline-none"
+                    value={newPasivo.moneda}
+                    onChange={(e) => setNewPasivo({ ...newPasivo, moneda: e.target.value })}
+                  >
+                    <option value="BRL">BRL</option>
+                    <option value="USD">USD</option>
+                    <option value="ARS">ARS</option>
+                  </select>
+                </div>
+              )}
+
+              {newPasivo.esInstructor && (
+                <div className="bg-gray-50 text-gray-500 text-[10px] font-black uppercase px-4 py-3 rounded-2xl">
+                  El saldo arranca en 0. Cada clase registrada acumulará la deuda automáticamente.
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 font-black uppercase text-xs text-gray-400">Cancelar</button>
@@ -392,15 +465,14 @@ const Pasivos = ({ axiosConfig, setView }) => {
         </div>
       )}
 
-      {/* MODAL TRANSACCION */}
+      {/* ── MODAL TRANSACCIÓN ──────────────────────────────────── */}
       {showTransactionModal && selectedPasivo && (() => {
         const cfg = transactionConfig[transactionType];
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 text-gray-800">
             <div className={`bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl border-t-[15px] ${cfg.borderColor}`}>
               <h2 className={`font-black uppercase text-2xl text-center mb-1 ${cfg.textColor}`}>{cfg.title}</h2>
-              <p className="text-center text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">{selectedPasivo.titulo}</p>
-              <p className="text-center text-[10px] font-bold text-gray-300 uppercase mb-8">{cfg.subtitle}</p>
+              <p className="text-center text-[10px] font-black text-gray-400 uppercase mb-8 tracking-widest">{selectedPasivo.titulo}</p>
 
               <form onSubmit={handleTransactionSubmit} className="space-y-4">
                 <div className={`grid gap-4 ${cfg.showFormaPago ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -432,7 +504,6 @@ const Pasivos = ({ axiosConfig, setView }) => {
                   onChange={(e) => setTransactionData({ ...transactionData, detalles: e.target.value })}
                   required
                 />
-
                 <div className="flex gap-3 pt-6">
                   <button type="button" onClick={() => setShowTransactionModal(false)} className="flex-1 font-black uppercase text-xs text-gray-400">Cancelar</button>
                   <button type="submit" className={`flex-[2] py-4 rounded-2xl font-black uppercase text-xs text-white shadow-xl ${cfg.btnColor}`}>
@@ -445,12 +516,30 @@ const Pasivos = ({ axiosConfig, setView }) => {
         );
       })()}
 
-      {/* MODAL EDITAR */}
+      {/* ── MODAL EDITAR ───────────────────────────────────────── */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 text-gray-800">
           <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl border-t-[15px] border-amber-500">
             <h2 className="font-black uppercase italic mb-6 text-2xl text-center text-amber-600">Editar Perfil</h2>
             <form onSubmit={handleEditSubmit} className="space-y-4">
+
+              {/* Toggle instructor en edición */}
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">Tipo de cuenta</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditDecoded({ ...editDecoded, esInstructor: false })}
+                    className={`py-3 rounded-2xl font-black text-xs uppercase transition-all border-2 ${!editDecoded.esInstructor ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                  >📋 General</button>
+                  <button
+                    type="button"
+                    onClick={() => setEditDecoded({ ...editDecoded, esInstructor: true })}
+                    className={`py-3 rounded-2xl font-black text-xs uppercase transition-all border-2 ${editDecoded.esInstructor ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                  >🎓 Instructor</button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nombre / Referencia</label>
                 <input
@@ -461,14 +550,30 @@ const Pasivos = ({ axiosConfig, setView }) => {
                   required
                 />
               </div>
+
+              {editDecoded.esInstructor && (
+                <div className="bg-indigo-50 p-4 rounded-2xl space-y-2">
+                  <label className="text-[10px] font-black text-indigo-600 uppercase block">💰 Tarifa por hora (BRL)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full p-4 bg-white rounded-2xl border-none font-black text-xl outline-none text-indigo-700"
+                    value={editDecoded.tarifaHora || ''}
+                    onChange={(e) => setEditDecoded({ ...editDecoded, tarifaHora: e.target.value })}
+                    required
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Descripción</label>
                 <textarea
                   className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold h-24 outline-none"
-                  value={editPasivo.descripcion || ''}
-                  onChange={(e) => setEditPasivo({ ...editPasivo, descripcion: e.target.value })}
+                  value={editDecoded.descripcion || ''}
+                  onChange={(e) => setEditDecoded({ ...editDecoded, descripcion: e.target.value })}
                 />
               </div>
+
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 font-black uppercase text-xs text-gray-400">Cancelar</button>
                 <button type="submit" className="flex-[2] bg-amber-500 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Guardar Cambios</button>
@@ -478,7 +583,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
         </div>
       )}
 
-      {/* MODAL HISTORIAL */}
+      {/* ── MODAL HISTORIAL ────────────────────────────────────── */}
       {showHistoryModal && selectedPasivo && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 text-gray-800">
           <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl">
@@ -525,3 +630,8 @@ const Pasivos = ({ axiosConfig, setView }) => {
 };
 
 export default Pasivos;
+
+// ─────────────────────────────────────────────────────────────────
+// EXPORTÁ ESTE HELPER PARA USARLO EN Ingreso / App
+// ─────────────────────────────────────────────────────────────────
+export { decodeTarifa, encodeTarifa };
