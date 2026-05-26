@@ -120,28 +120,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
           <InstructorField />
         </div>
 
-        {/* Banner de instructor vinculado ─────────────────────── */}
-        {pasivoVinculado && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
-            <span className="text-2xl">🎓</span>
-            <div>
-              <p className="text-xs font-black text-indigo-700 uppercase">Instructor vinculado a cuenta corriente</p>
-              <p className="text-[11px] text-indigo-500 font-bold mt-0.5">
-                {pasivoVinculado.titulo} · {decodeTarifa(pasivoVinculado.descripcion).tarifaHora} BRL/h
-              </p>
-              {deudaCalculada > 0 && (
-                <p className="text-sm font-black text-indigo-800 mt-1">
-                  Se acumularán <span className="text-rose-600">{deudaCalculada.toFixed(2)} BRL</span> al guardar
-                  ({parseFloat(formData.horas) || 0}h × {decodeTarifa(pasivoVinculado.descripcion).tarifaHora} BRL/h)
-                </p>
-              )}
-              {(!formData.horas || parseFloat(formData.horas) === 0) && (
-                <p className="text-[11px] text-amber-600 font-bold mt-1">⚠️ Ingresá las horas para calcular la deuda.</p>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Sin coincidencia pero hay instructor escrito */}
         {!pasivoVinculado && formData.instructor && formData.instructor !== 'Secretaria' && (
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-[11px] text-gray-400 font-bold">
