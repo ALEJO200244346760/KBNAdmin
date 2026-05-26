@@ -7,10 +7,6 @@ import Egreso from './Egreso';
 import Agenda from './Agenda';
 import Estadisticas from './Estadisticas';
 
-// ─────────────────────────────────────────────────────────────────
-// Helper: decodifica la tarifa guardada en el campo descripcion
-// Formato: "__tarifa__:120||Descripción visible"
-// ─────────────────────────────────────────────────────────────────
 const TARIFA_PREFIX = '__tarifa__:';
 
 const decodeTarifa = (descripcionRaw) => {
@@ -29,10 +25,7 @@ const InstructorForm = () => {
   const [agendaItems, setAgendaItems] = useState([]);
   const [clasesFinalizadas, setClasesFinalizadas] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
-
   const [listaInstructores, setListaInstructores] = useState([]);
-
-  // ── Pasivos cargados una sola vez ─────────────────────────────
   const [pasivos, setPasivos] = useState([]);
 
   const axiosConfig = useMemo(() => ({
@@ -74,19 +67,18 @@ const InstructorForm = () => {
     fetchUsuarios();
   }, [user?.role, token, axiosConfig]);
 
-  // 2. PASIVOS — se cargan al montar para tenerlos disponibles en handleSubmit
-  useEffect(() => {
-    const fetchPasivos = async () => {
-      if (!token) return;
-      try {
-        const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
-        setPasivos(res.data);
-      } catch (err) {
-        console.error('Error cargando pasivos:', err);
-      }
-    };
-    fetchPasivos();
+  // 2. PASIVOS
+  const fetchPasivos = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
+      setPasivos(res.data);
+    } catch (err) {
+      console.error('Error cargando pasivos:', err);
+    }
   }, [token, axiosConfig]);
+
+  useEffect(() => { fetchPasivos(); }, [fetchPasivos]);
 
   // 3. NOMBRE INICIAL
   useEffect(() => {
@@ -174,7 +166,6 @@ const InstructorForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // ── Buscar pasivo de instructor por nombre ────────────────────
   const buscarPasivoInstructor = (nombreInstructor) => {
     return pasivos.find((p) => {
       const { esInstructor } = decodeTarifa(p.descripcion);
@@ -182,15 +173,18 @@ const InstructorForm = () => {
     }) || null;
   };
 
-  // 8. SUBMIT — guarda la clase y acumula deuda al pasivo del instructor
+  // 8. SUBMIT
   const handleSubmit = async e => {
     e.preventDefault();
+
+    const actividad = formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad;
+    const formaPago = formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago;
 
     const payload = {
       ...formData,
       tipoTransaccion: view,
-      actividad: formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad,
-      formaPago: formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago,
+      actividad,
+      formaPago,
       cantidadHoras: String(formData.horas),
       tarifaPorHora: String(formData.tarifa),
       total: String(formData.total),
@@ -199,16 +193,27 @@ const InstructorForm = () => {
     };
 
     try {
-      // A. Guardar el ingreso/egreso normalmente
+      // A. Guardar el ingreso normalmente
       await axios.post(
         'https://kbnadmin-production.up.railway.app/api/clases/guardar',
         payload,
         axiosConfig
       );
 
-      // B. Si es INGRESO y el instructor tiene pasivo vinculado, acumular deuda
+      // B. Si es INGRESO, acumular deuda al pasivo del instructor
       if (view === 'INGRESO') {
-        const pasivoInstructor = buscarPasivoInstructor(formData.instructor);
+        // Refrescar pasivos para tener el estado más actualizado
+        const resPasivos = await axios.get(
+          'https://kbnadmin-production.up.railway.app/api/pasivos',
+          axiosConfig
+        );
+        const pasivosActuales = resPasivos.data;
+        setPasivos(pasivosActuales);
+
+        const pasivoInstructor = pasivosActuales.find((p) => {
+          const { esInstructor } = decodeTarifa(p.descripcion);
+          return esInstructor && p.titulo.toLowerCase() === formData.instructor.toLowerCase();
+        });
 
         if (pasivoInstructor) {
           const { tarifaHora } = decodeTarifa(pasivoInstructor.descripcion);
@@ -217,7 +222,8 @@ const InstructorForm = () => {
 
           if (deuda > 0) {
             const montoActual = parseFloat(pasivoInstructor.montoTotal) || 0;
-            const actividad = formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad;
+            const detalles = formData.detalles ? ` — ${formData.detalles}` : '';
+            const nota = `Pago por ${horas}h de ${actividad}${detalles} · ${horas}h × ${tarifaHora} BRL/h = ${deuda.toFixed(2)} BRL`;
 
             await axios.put(
               `https://kbnadmin-production.up.railway.app/api/pasivos/${pasivoInstructor.id}`,
@@ -229,31 +235,11 @@ const InstructorForm = () => {
                   {
                     montoPagado: -deuda,
                     fecha: formData.fecha,
-                    nota: `${actividad} · ${horas}h × ${tarifaHora} BRL/h`,
+                    nota,
                   },
                 ],
               },
               axiosConfig
-            );
-
-            // Refrescar pasivos locales para que el próximo submit use el saldo actualizado
-            setPasivos(prev =>
-              prev.map(p =>
-                p.id === pasivoInstructor.id
-                  ? {
-                      ...p,
-                      montoTotal: montoActual - deuda,
-                      historialPagos: [
-                        ...(p.historialPagos || []),
-                        {
-                          montoPagado: -deuda,
-                          fecha: formData.fecha,
-                          nota: `${actividad} · ${horas}h × ${tarifaHora} BRL/h`,
-                        },
-                      ],
-                    }
-                  : p
-              )
             );
           }
         }
@@ -281,8 +267,6 @@ const InstructorForm = () => {
   // 9. INSTRUCTOR FIELD
   const InstructorField = () => {
     const isAdmin = user?.role === 'ADMINISTRADOR';
-
-    // Detectar si el instructor seleccionado tiene pasivo vinculado
     const pasivoVinculado = buscarPasivoInstructor(formData.instructor);
     const horas = parseFloat(formData.horas) || 0;
     const deudaPreview = pasivoVinculado
@@ -321,22 +305,30 @@ const InstructorForm = () => {
           />
         )}
 
-        {/* Banner de vinculación — solo visible en vista INGRESO */}
+        {/* Banner: instructor vinculado */}
         {view === 'INGRESO' && pasivoVinculado && (
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-start gap-3">
             <span className="text-lg">🎓</span>
             <div>
-              <p className="text-xs font-black text-indigo-700 uppercase">
-                Cuenta corriente vinculada
-              </p>
+              <p className="text-xs font-black text-indigo-700 uppercase">Cuenta corriente vinculada</p>
               <p className="text-[11px] text-indigo-500 font-bold">
-                {formData.instructor} tiene una cuenta corriente asociada
+                Tarifa: {decodeTarifa(pasivoVinculado.descripcion).tarifaHora} BRL/h
               </p>
+              {horas > 0 ? (
+                <p className="text-xs font-black text-rose-600 mt-0.5">
+                  Se acumularán {deudaPreview.toFixed(2)} BRL al guardar
+                  <span className="text-indigo-400 font-bold"> ({horas}h × {decodeTarifa(pasivoVinculado.descripcion).tarifaHora} BRL/h)</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-500 font-bold mt-0.5">
+                  ⚠️ Ingresá las horas para ver el monto a acumular
+                </p>
+              )}
             </div>
           </div>
         )}
 
-        {/* Aviso si el instructor no tiene cuenta corriente */}
+        {/* Aviso: sin cuenta corriente */}
         {view === 'INGRESO' && !pasivoVinculado && formData.instructor && formData.instructor !== 'Secretaria' && (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-[11px] text-gray-400 font-bold">
             ℹ️ <span className="text-gray-600">{formData.instructor}</span> no tiene cuenta corriente.
