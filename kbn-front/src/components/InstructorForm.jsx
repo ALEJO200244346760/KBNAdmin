@@ -321,6 +321,21 @@ const InstructorForm = () => {
           />
         )}
 
+        {/* Banner de vinculación — solo visible en vista INGRESO */}
+        {view === 'INGRESO' && pasivoVinculado && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-start gap-3">
+            <span className="text-lg">🎓</span>
+            <div>
+              <p className="text-xs font-black text-indigo-700 uppercase">
+                Cuenta corriente vinculada
+              </p>
+              <p className="text-[11px] text-indigo-500 font-bold">
+                {formData.instructor} tiene una cuenta corriente asociada
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Aviso si el instructor no tiene cuenta corriente */}
         {view === 'INGRESO' && !pasivoVinculado && formData.instructor && formData.instructor !== 'Secretaria' && (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-[11px] text-gray-400 font-bold">
