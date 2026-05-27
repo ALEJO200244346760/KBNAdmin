@@ -612,7 +612,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
             </div>
             <p className="text-[10px] font-black text-gray-400 uppercase mb-8 tracking-widest">Historial de movimientos</p>
 
-            <div className="space-y-3 max-h-80 overflow-y-auto pr-2 mb-8">
+            <div className="space-y-4 max-h-[28rem] overflow-y-auto pr-2 mb-8">
               {selectedPasivo.historialPagos?.length > 0 ? (
                 [...selectedPasivo.historialPagos].reverse().map((mov, idx) => {
                   const monto = parseFloat(mov.montoPagado) || 0;
@@ -620,15 +620,17 @@ const Pasivos = ({ axiosConfig, setView }) => {
                   return (
                     <div
                       key={idx}
-                      className={`bg-gray-50 p-5 rounded-3xl flex justify-between items-center border-l-8 ${esPositivo ? 'border-emerald-500' : 'border-rose-500'}`}
+                      className={`bg-gray-50 p-5 rounded-3xl border-l-[6px] ${esPositivo ? 'border-emerald-500' : 'border-rose-500'}`}
                     >
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase">{mov.fecha}</p>
-                        <p className="text-sm font-black text-gray-700">{mov.nota}</p>
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-black text-gray-400 uppercase mb-1">{mov.fecha}</p>
+                          <p className="text-sm font-bold text-gray-700 leading-snug break-words">{mov.nota}</p>
+                        </div>
+                        <span className={`font-black text-xl whitespace-nowrap shrink-0 ${esPositivo ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {esPositivo ? `+${monto.toFixed(2)}` : `-${Math.abs(monto).toFixed(2)}`}
+                        </span>
                       </div>
-                      <span className={`font-black text-lg ${esPositivo ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {esPositivo ? `+ ${monto.toFixed(2)}` : `- ${Math.abs(monto).toFixed(2)}`}
-                      </span>
                     </div>
                   );
                 })
