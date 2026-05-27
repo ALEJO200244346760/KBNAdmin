@@ -123,25 +123,33 @@ const Pasivos = ({ axiosConfig, setView }) => {
     try {
       const monto = parseFloat(transactionData.monto);
 
+      const nota = transactionData.detalles || `${
+        transactionType === 'NUEVA_DEUDA' ? 'Nueva deuda'
+        : transactionType === 'ADELANTO' ? 'Adelanto'
+        : 'Pago'
+      }: ${selectedPasivo.titulo}`;
+
       if (transactionType === 'NUEVA_DEUDA') {
-        const montoActual = parseFloat(selectedPasivo.montoTotal) || 0;
-        await axios.put(
-          `https://kbnadmin-production.up.railway.app/api/pasivos/${selectedPasivo.id}`,
+        // NUEVA_DEUDA: el backend suma al montoTotal, así que mandamos negativo para que reste
+        // y el historial queda registrado con montoPagado negativo (deuda)
+        await axios.post(
+          'https://kbnadmin-production.up.railway.app/api/clases/guardar',
           {
-            ...selectedPasivo,
-            montoTotal: montoActual - Math.abs(monto),
-            historialPagos: [
-              ...(selectedPasivo.historialPagos || []),
-              {
-                montoPagado: -Math.abs(monto),
-                fecha: transactionData.fecha,
-                nota: transactionData.detalles || `Nueva deuda: ${selectedPasivo.titulo}`,
-              },
-            ],
+            tipoTransaccion: 'EGRESO',
+            tipoMovimientoPasivo: 'NUEVA_DEUDA',
+            pasivoId: selectedPasivo.id,
+            total: String(-Math.abs(monto)),   // negativo → backend resta del saldo
+            fecha: transactionData.fecha,
+            moneda: selectedPasivo.moneda,
+            formaPago: 'Efectivo',
+            detalles: nota,
+            actividad: 'Pago Pasivo',
+            instructor: 'Secretaria',
           },
           axiosConfig
         );
       } else {
+        // PAGO_DEUDA / ADELANTO: el backend suma (reduce deuda negativa o acumula adelanto)
         await axios.post(
           'https://kbnadmin-production.up.railway.app/api/clases/guardar',
           {
@@ -151,8 +159,8 @@ const Pasivos = ({ axiosConfig, setView }) => {
             total: String(Math.abs(monto)),
             fecha: transactionData.fecha,
             moneda: selectedPasivo.moneda,
-            formaPago: transactionData.formaPago,
-            detalles: transactionData.detalles || `${transactionType === 'ADELANTO' ? 'Adelanto' : 'Pago'}: ${selectedPasivo.titulo}`,
+            formaPago: transactionData.formaPago || 'Efectivo',
+            detalles: nota,
             actividad: 'Pago Pasivo',
             instructor: 'Secretaria',
           },
