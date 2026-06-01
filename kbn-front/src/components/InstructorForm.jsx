@@ -6,6 +6,7 @@ import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 import Agenda from './Agenda';
 import Estadisticas from './Estadisticas';
+import NotificationBanner from './components/NotificationBanner'
 
 const TARIFA_PREFIX = '__tarifa__:';
 
@@ -343,7 +344,7 @@ const InstructorForm = () => {
           ))}
         </div>
       </div>
-
+      <NotificationBanner axiosConfig={axiosConfig} userId={user?.id} />
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {view === 'AGENDA' && (
           <Agenda
