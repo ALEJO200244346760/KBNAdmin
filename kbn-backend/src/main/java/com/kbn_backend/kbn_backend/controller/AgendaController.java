@@ -7,6 +7,8 @@ import com.kbn_backend.kbn_backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.kbn_backend.kbn_backend.service.PushNotificationService;
+
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +24,8 @@ public class AgendaController {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private PushNotificationService pushService;
 
     // 1. Crear nueva cita (Secretaria)
     @PostMapping("/crear")
@@ -39,6 +43,16 @@ public class AgendaController {
 
             Agenda nuevaAgenda = agendaRepository.save(agenda);
 
+            // Push DESPUÉS del save, con los datos completos
+            String titulo = "📅 Nueva clase asignada";
+            String cuerpo = String.format(
+                    "%s — %s a las %s hs en %s",
+                    nuevaAgenda.getAlumno(),
+                    nuevaAgenda.getFecha().toString(),
+                    nuevaAgenda.getHora() != null ? nuevaAgenda.getHora().toString().substring(0, 5) : "??",
+                    nuevaAgenda.getLugar() != null ? nuevaAgenda.getLugar() : "Sin lugar"
+            );
+            pushService.enviarNotificacion(nuevaAgenda.getInstructorId(), titulo, cuerpo, "/#/instructor");
 
             return ResponseEntity.ok(nuevaAgenda);
 
@@ -82,4 +96,5 @@ public class AgendaController {
 
         }).orElse(ResponseEntity.notFound().build());
     }
+
 }
