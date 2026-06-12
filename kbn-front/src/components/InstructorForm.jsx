@@ -373,7 +373,7 @@ const InstructorForm = () => {
 
             {/* Tab bar — scroll horizontal en mobile, wrap en desktop */}
             <div className="kbn-tabs flex bg-gray-100 p-1 rounded-xl overflow-x-auto gap-1">
-              {['AGENDA', 'INGRESO', 'EGRESO', 'ESTADISTICAS'].map(v => (
+              {['AGENDA', 'ESTADISTICAS'].map(v => (
                 <button
                   key={v}
                   onClick={() => handleViewChange(v)}
