@@ -407,7 +407,7 @@ const InstructorForm = () => {
                 handleStatusChange={handleStatusChange}
               />
             )}
-
+            {/* 
             {view === 'INGRESO' && (
               <Ingreso
                 formData={formData}
@@ -426,7 +426,7 @@ const InstructorForm = () => {
                 InstructorField={InstructorField}
                 setView={handleViewChange}
               />
-            )}
+            )}*/}
 
             {view === 'ESTADISTICAS' && (
               <Estadisticas clases={clasesFinalizadas} />
