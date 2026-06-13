@@ -23,15 +23,11 @@ const decodeTarifa = (descripcionRaw) => {
 // Íconos inline para las tabs (sin dependencia externa)
 const TAB_ICONS = {
   AGENDA:      '🗓️',
-  INGRESO:     '💰',
-  EGRESO:      '💸',
   ESTADISTICAS:'📊',
 };
 
 const TAB_LABELS = {
   AGENDA:      'Agenda',
-  INGRESO:     'Ingreso',
-  EGRESO:      'Egreso',
   ESTADISTICAS:'Stats',
 };
 
