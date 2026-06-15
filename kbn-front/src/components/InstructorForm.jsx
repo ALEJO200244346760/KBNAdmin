@@ -2,23 +2,23 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-import Ingreso from './Ingreso';
-import Egreso from './Egreso';
+// import Ingreso from './Ingreso';
+// import Egreso from './Egreso';
 import Agenda from './Agenda';
 import Estadisticas from './Estadisticas';
 import NotificationBanner from './NotificationBanner';
 
-const TARIFA_PREFIX = '__tarifa__:';
+// const TARIFA_PREFIX = '__tarifa__:';
 
-const decodeTarifa = (descripcionRaw) => {
-  if (!descripcionRaw || !descripcionRaw.startsWith(TARIFA_PREFIX)) {
-    return { tarifaHora: null, esInstructor: false };
-  }
-  const sin = descripcionRaw.slice(TARIFA_PREFIX.length);
-  const sep = sin.indexOf('||');
-  const tarifaHora = parseFloat(sin.slice(0, sep));
-  return { tarifaHora, esInstructor: true };
-};
+// const decodeTarifa = (descripcionRaw) => {
+//   if (!descripcionRaw || !descripcionRaw.startsWith(TARIFA_PREFIX)) {
+//     return { tarifaHora: null, esInstructor: false };
+//   }
+//   const sin = descripcionRaw.slice(TARIFA_PREFIX.length);
+//   const sep = sin.indexOf('||');
+//   const tarifaHora = parseFloat(sin.slice(0, sep));
+//   return { tarifaHora, esInstructor: true };
+// };
 
 // Íconos inline para las tabs (sin dependencia externa)
 const TAB_ICONS = {
@@ -37,77 +37,77 @@ const InstructorForm = () => {
   const [agendaItems, setAgendaItems] = useState([]);
   const [clasesFinalizadas, setClasesFinalizadas] = useState([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
-  const [listaInstructores, setListaInstructores] = useState([]);
-  const [pasivos, setPasivos] = useState([]);
+  // const [listaInstructores, setListaInstructores] = useState([]);
+  // const [pasivos, setPasivos] = useState([]);
   const [fadeKey, setFadeKey] = useState(0); // para trigger de animación CSS pura
 
   const axiosConfig = useMemo(() => ({
     headers: { Authorization: `Bearer ${token}` }
   }), [token]);
 
-  const today = new Date().toISOString().split('T')[0];
+  // const today = new Date().toISOString().split('T')[0];
 
-  const [formData, setFormData] = useState({
-    tipoTransaccion: 'INGRESO',
-    fecha: today,
-    actividad: 'Clase de Kite',
-    actividadOtro: '',
-    vendedor: '',
-    instructor: '',
-    detalles: '',
-    horas: 0,
-    tarifa: 0,
-    total: 0,
-    gastos: 0,
-    comision: 0,
-    formaPago: 'Efectivo',
-    formaPagoOtro: '',
-    moneda: 'BRL',
-  });
+  // const [formData, setFormData] = useState({
+  //   tipoTransaccion: 'INGRESO',
+  //   fecha: today,
+  //   actividad: 'Clase de Kite',
+  //   actividadOtro: '',
+  //   vendedor: '',
+  //   instructor: '',
+  //   detalles: '',
+  //   horas: 0,
+  //   tarifa: 0,
+  //   total: 0,
+  //   gastos: 0,
+  //   comision: 0,
+  //   formaPago: 'Efectivo',
+  //   formaPagoOtro: '',
+  //   moneda: 'BRL',
+  // });
 
   // ── 1. INSTRUCTORES ────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchUsuarios = async () => {
-      if (user?.role === 'ADMINISTRADOR' && token) {
-        try {
-          const res = await axios.get('https://kbnadmin-production.up.railway.app/usuario', axiosConfig);
-          setListaInstructores(res.data);
-        } catch (error) {
-          console.error('Error cargando instructores:', error);
-        }
-      }
-    };
-    fetchUsuarios();
-  }, [user?.role, token, axiosConfig]);
+  // useEffect(() => {
+  //   const fetchUsuarios = async () => {
+  //     if (user?.role === 'ADMINISTRADOR' && token) {
+  //       try {
+  //         const res = await axios.get('https://kbnadmin-production.up.railway.app/usuario', axiosConfig);
+  //         setListaInstructores(res.data);
+  //       } catch (error) {
+  //         console.error('Error cargando instructores:', error);
+  //       }
+  //     }
+  //   };
+  //   fetchUsuarios();
+  // }, [user?.role, token, axiosConfig]);
 
   // ── 2. PASIVOS ─────────────────────────────────────────────────────────────
-  const fetchPasivos = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
-      setPasivos(res.data);
-    } catch (err) {
-      console.error('Error cargando pasivos:', err);
-    }
-  }, [token, axiosConfig]);
+  // const fetchPasivos = useCallback(async () => {
+  //   if (!token) return;
+  //   try {
+  //     const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
+  //     setPasivos(res.data);
+  //   } catch (err) {
+  //     console.error('Error cargando pasivos:', err);
+  //   }
+  // }, [token, axiosConfig]);
 
-  useEffect(() => { fetchPasivos(); }, [fetchPasivos]);
+  // useEffect(() => { fetchPasivos(); }, [fetchPasivos]);
 
   // ── 3. NOMBRE INICIAL ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (user && !formData.instructor) {
-      setFormData(prev => ({ ...prev, instructor: `${user.nombre} ${user.apellido}` }));
-    }
-  }, [user, formData.instructor]);
+  // useEffect(() => {
+  //   if (user && !formData.instructor) {
+  //     setFormData(prev => ({ ...prev, instructor: `${user.nombre} ${user.apellido}` }));
+  //   }
+  // }, [user, formData.instructor]);
 
   // ── 4. CÁLCULOS AUTOMÁTICOS ────────────────────────────────────────────────
-  useEffect(() => {
-    const h = parseFloat(formData.horas) || 0;
-    const t = parseFloat(formData.tarifa) || 0;
-    const g = parseFloat(formData.gastos) || 0;
-    const calculado = (h * t) - g;
-    setFormData(prev => ({ ...prev, total: calculado > 0 ? calculado : 0 }));
-  }, [formData.horas, formData.tarifa, formData.gastos]);
+  // useEffect(() => {
+  //   const h = parseFloat(formData.horas) || 0;
+  //   const t = parseFloat(formData.tarifa) || 0;
+  //   const g = parseFloat(formData.gastos) || 0;
+  //   const calculado = (h * t) - g;
+  //   setFormData(prev => ({ ...prev, total: calculado > 0 ? calculado : 0 }));
+  // }, [formData.horas, formData.tarifa, formData.gastos]);
 
   // ── 5. AGENDA ──────────────────────────────────────────────────────────────
   const fetchAgenda = useCallback(async () => {
@@ -180,144 +180,144 @@ const InstructorForm = () => {
     }
   };
 
-  const handleChange = e => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  // const handleChange = e => {
+  //   const { name, value } = e.target;
+  //   setFormData(prev => ({ ...prev, [name]: value }));
+  // };
 
-  const buscarPasivoInstructor = (nombreInstructor) => {
-    return pasivos.find((p) => {
-      const { esInstructor } = decodeTarifa(p.descripcion);
-      return esInstructor && p.titulo.toLowerCase() === nombreInstructor.toLowerCase();
-    }) || null;
-  };
+  // const buscarPasivoInstructor = (nombreInstructor) => {
+  //   return pasivos.find((p) => {
+  //     const { esInstructor } = decodeTarifa(p.descripcion);
+  //     return esInstructor && p.titulo.toLowerCase() === nombreInstructor.toLowerCase();
+  //   }) || null;
+  // };
 
   // ── 9. SUBMIT ──────────────────────────────────────────────────────────────
-  const handleSubmit = async e => {
-    e.preventDefault();
-
-    const actividad = formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad;
-    const formaPago = formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago;
-
-    const payload = {
-      ...formData,
-      tipoTransaccion: view,
-      actividad,
-      formaPago,
-      cantidadHoras: String(formData.horas),
-      tarifaPorHora: String(formData.tarifa),
-      total: String(formData.total),
-      gastosAsociados: String(formData.gastos || '0'),
-      instructor: formData.instructor,
-    };
-
-    try {
-      await axios.post(
-        'https://kbnadmin-production.up.railway.app/api/clases/guardar',
-        payload,
-        axiosConfig
-      );
-
-      if (view === 'INGRESO') {
-        const resPasivos = await axios.get(
-          'https://kbnadmin-production.up.railway.app/api/pasivos',
-          axiosConfig
-        );
-        const pasivosActuales = resPasivos.data;
-        setPasivos(pasivosActuales);
-
-        const pasivoInstructor = pasivosActuales.find((p) => {
-          const { esInstructor } = decodeTarifa(p.descripcion);
-          return esInstructor && p.titulo.toLowerCase() === formData.instructor.toLowerCase();
-        });
-
-        if (pasivoInstructor) {
-          const { tarifaHora } = decodeTarifa(pasivoInstructor.descripcion);
-          const horas = parseFloat(formData.horas) || 0;
-          const deuda = Math.round(tarifaHora * horas * 100) / 100;
-
-          if (deuda > 0) {
-            const detalles = formData.detalles ? ` — ${formData.detalles}` : '';
-            const nota = `Pago por ${horas}h de ${actividad}${detalles} · ${horas}h × ${tarifaHora} BRL/h = ${deuda.toFixed(2)} BRL`;
-
-            await axios.post(
-              'https://kbnadmin-production.up.railway.app/api/clases/guardar',
-              {
-                tipoTransaccion: 'EGRESO',
-                tipoMovimientoPasivo: 'NUEVA_DEUDA',
-                pasivoId: pasivoInstructor.id,
-                total: String(-deuda),
-                fecha: formData.fecha,
-                moneda: pasivoInstructor.moneda,
-                formaPago: 'Efectivo',
-                detalles: nota,
-                actividad: 'Pago Pasivo',
-                instructor: formData.instructor,
-              },
-              axiosConfig
-            );
-          }
-        }
-      }
-
-      alert(`${view} registrado correctamente.`);
-      setFormData(prev => ({
-        ...prev,
-        detalles: '',
-        horas: 0,
-        tarifa: 0,
-        gastos: 0,
-        total: 0,
-        actividadOtro: '',
-        formaPagoOtro: '',
-        instructor: `${user.nombre} ${user.apellido}`,
-      }));
-      handleViewChange('AGENDA');
-    } catch (error) {
-      console.error(error);
-      alert('Error al guardar registro.');
-    }
-  };
+  // const handleSubmit = async e => {
+  //   e.preventDefault();
+  //
+  //   const actividad = formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad;
+  //   const formaPago = formData.formaPago === 'Otro' ? formData.formaPagoOtro : formData.formaPago;
+  //
+  //   const payload = {
+  //     ...formData,
+  //     tipoTransaccion: view,
+  //     actividad,
+  //     formaPago,
+  //     cantidadHoras: String(formData.horas),
+  //     tarifaPorHora: String(formData.tarifa),
+  //     total: String(formData.total),
+  //     gastosAsociados: String(formData.gastos || '0'),
+  //     instructor: formData.instructor,
+  //   };
+  //
+  //   try {
+  //     await axios.post(
+  //       'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+  //       payload,
+  //       axiosConfig
+  //     );
+  //
+  //     if (view === 'INGRESO') {
+  //       const resPasivos = await axios.get(
+  //         'https://kbnadmin-production.up.railway.app/api/pasivos',
+  //         axiosConfig
+  //       );
+  //       const pasivosActuales = resPasivos.data;
+  //       setPasivos(pasivosActuales);
+  //
+  //       const pasivoInstructor = pasivosActuales.find((p) => {
+  //         const { esInstructor } = decodeTarifa(p.descripcion);
+  //         return esInstructor && p.titulo.toLowerCase() === formData.instructor.toLowerCase();
+  //       });
+  //
+  //       if (pasivoInstructor) {
+  //         const { tarifaHora } = decodeTarifa(pasivoInstructor.descripcion);
+  //         const horas = parseFloat(formData.horas) || 0;
+  //         const deuda = Math.round(tarifaHora * horas * 100) / 100;
+  //
+  //         if (deuda > 0) {
+  //           const detalles = formData.detalles ? ` — ${formData.detalles}` : '';
+  //           const nota = `Pago por ${horas}h de ${actividad}${detalles} · ${horas}h × ${tarifaHora} BRL/h = ${deuda.toFixed(2)} BRL`;
+  //
+  //           await axios.post(
+  //             'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+  //             {
+  //               tipoTransaccion: 'EGRESO',
+  //               tipoMovimientoPasivo: 'NUEVA_DEUDA',
+  //               pasivoId: pasivoInstructor.id,
+  //               total: String(-deuda),
+  //               fecha: formData.fecha,
+  //               moneda: pasivoInstructor.moneda,
+  //               formaPago: 'Efectivo',
+  //               detalles: nota,
+  //               actividad: 'Pago Pasivo',
+  //               instructor: formData.instructor,
+  //             },
+  //             axiosConfig
+  //           );
+  //         }
+  //       }
+  //     }
+  //
+  //     alert(`${view} registrado correctamente.`);
+  //     setFormData(prev => ({
+  //       ...prev,
+  //       detalles: '',
+  //       horas: 0,
+  //       tarifa: 0,
+  //       gastos: 0,
+  //       total: 0,
+  //       actividadOtro: '',
+  //       formaPagoOtro: '',
+  //       instructor: `${user.nombre} ${user.apellido}`,
+  //     }));
+  //     handleViewChange('AGENDA');
+  //   } catch (error) {
+  //     console.error(error);
+  //     alert('Error al guardar registro.');
+  //   }
+  // };
 
   // ── 10. INSTRUCTOR FIELD ───────────────────────────────────────────────────
-  const InstructorField = () => {
-    const isAdmin = user?.role === 'ADMINISTRADOR';
-
-    return (
-      <div className="mb-4 space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
-          Instructor Responsable
-        </label>
-        {isAdmin ? (
-          <select
-            name="instructor"
-            value={formData.instructor}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border p-2 border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white text-sm"
-            required
-          >
-            <option value={`${user.nombre} ${user.apellido}`}>
-              {user.nombre} {user.apellido} (Tú)
-            </option>
-            {listaInstructores
-              .filter(ins => `${ins.nombre} ${ins.apellido}` !== `${user.nombre} ${user.apellido}`)
-              .map(ins => (
-                <option key={ins.id} value={`${ins.nombre} ${ins.apellido}`}>
-                  {ins.nombre} {ins.apellido}
-                </option>
-              ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            value={formData.instructor}
-            readOnly
-            className="mt-1 block w-full rounded-md border p-2 border-gray-300 bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
-          />
-        )}
-      </div>
-    );
-  };
+  // const InstructorField = () => {
+  //   const isAdmin = user?.role === 'ADMINISTRADOR';
+  //
+  //   return (
+  //     <div className="mb-4 space-y-2">
+  //       <label className="block text-sm font-medium text-gray-700">
+  //         Instructor Responsable
+  //       </label>
+  //       {isAdmin ? (
+  //         <select
+  //           name="instructor"
+  //           value={formData.instructor}
+  //           onChange={handleChange}
+  //           className="mt-1 block w-full rounded-md border p-2 border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white text-sm"
+  //           required
+  //         >
+  //           <option value={`${user.nombre} ${user.apellido}`}>
+  //             {user.nombre} {user.apellido} (Tú)
+  //           </option>
+  //           {listaInstructores
+  //             .filter(ins => `${ins.nombre} ${ins.apellido}` !== `${user.nombre} ${user.apellido}`)
+  //             .map(ins => (
+  //               <option key={ins.id} value={`${ins.nombre} ${ins.apellido}`}>
+  //                 {ins.nombre} {ins.apellido}
+  //               </option>
+  //             ))}
+  //         </select>
+  //       ) : (
+  //         <input
+  //           type="text"
+  //           value={formData.instructor}
+  //           readOnly
+  //           className="mt-1 block w-full rounded-md border p-2 border-gray-300 bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
+  //         />
+  //       )}
+  //     </div>
+  //   );
+  // };
 
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (authLoading) return (
@@ -403,6 +403,7 @@ const InstructorForm = () => {
                 handleStatusChange={handleStatusChange}
               />
             )}
+
             {/* 
             {view === 'INGRESO' && (
               <Ingreso
@@ -422,7 +423,8 @@ const InstructorForm = () => {
                 InstructorField={InstructorField}
                 setView={handleViewChange}
               />
-            )}*/}
+            )}
+            */}
 
             {view === 'ESTADISTICAS' && (
               <Estadisticas clases={clasesFinalizadas} />
