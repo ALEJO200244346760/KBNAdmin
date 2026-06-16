@@ -87,7 +87,7 @@ const ReporteEstadisticas = () => {
 
     const fetchPasivos = async () => {
         try {
-            const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
+            const res = await axios.get('https://kbn-admin-production.up.railway.app/api/pasivos', axiosConfig);
             setPasivos(res.data);
         } catch (e) { console.error('Error cargando pasivos', e); }
     };
@@ -95,7 +95,7 @@ const ReporteEstadisticas = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('https://kbnadmin-production.up.railway.app/api/clases/listar', {
+            const response = await axios.get('https://kbn-admin-production.up.railway.app/api/clases/listar', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = response.data;
@@ -196,7 +196,7 @@ const ReporteEstadisticas = () => {
         const nota = `5% de ${item.actividad || 'Clase'} — ${item.fecha} = ${mHans.toFixed(2)} ${item.moneda}`;
         try {
             await axios.post(
-                'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+                'https://kbn-admin-production.up.railway.app/api/clases/guardar',
                 {
                     tipoTransaccion: 'EGRESO',
                     tipoMovimientoPasivo: 'NUEVA_DEUDA',

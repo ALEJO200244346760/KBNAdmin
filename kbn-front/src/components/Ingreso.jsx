@@ -21,7 +21,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
 
   useEffect(() => {
     if (!axiosConfig) return;
-    axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig)
+    axios.get('https://kbn-admin-production.up.railway.app/api/pasivos', axiosConfig)
       .then(res => setPasivos(res.data))
       .catch(err => console.error('Error cargando pasivos:', err));
   }, [axiosConfig]);
@@ -68,7 +68,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
         const detalles = formData.detalles ? ` — ${formData.detalles}` : '';
         const nota = `Pago por ${horas}h de ${actividad}${detalles} · ${horas}h × ${tarifaHora} BRL/h = ${deudaCalculada.toFixed(2)} BRL`;
         await axios.post(
-          'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+          'https://kbn-admin-production.up.railway.app/api/clases/guardar',
           {
             tipoTransaccion: 'EGRESO',
             tipoMovimientoPasivo: 'NUEVA_DEUDA',
@@ -93,7 +93,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
     if (total > 0 && axiosConfig) {
       try {
         const resPasivos = await axios.get(
-          'https://kbnadmin-production.up.railway.app/api/pasivos',
+          'https://kbn-admin-production.up.railway.app/api/pasivos',
           axiosConfig
         );
         const pasivoHans = resPasivos.data.find(
@@ -103,7 +103,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
           const mHans = Math.round(total * HANS_PCT / 100 * 100) / 100;
           const nota = `5% de ${actividad}${formData.detalles ? ' — ' + formData.detalles : ''} = ${mHans.toFixed(2)} ${formData.moneda}`;
           await axios.post(
-            'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+            'https://kbn-admin-production.up.railway.app/api/clases/guardar',
             {
               tipoTransaccion: 'EGRESO',
               tipoMovimientoPasivo: 'NUEVA_DEUDA',

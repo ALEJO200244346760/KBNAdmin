@@ -57,7 +57,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
 
   const fetchPasivos = async () => {
     try {
-      const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
+      const res = await axios.get('https://kbn-admin-production.up.railway.app/api/pasivos', axiosConfig);
       setPasivos(res.data);
     } catch (err) {
       console.error('Error al cargar pasivos', err);
@@ -77,7 +77,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
         : newPasivo.descripcion;
 
       const pasivoRes = await axios.post(
-        'https://kbnadmin-production.up.railway.app/api/pasivos',
+        'https://kbn-admin-production.up.railway.app/api/pasivos',
         {
           titulo: newPasivo.titulo,
           descripcion: descripcionEncoded,
@@ -91,7 +91,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
 
       if (esAdelanto && monto > 0) {
         await axios.post(
-          'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+          'https://kbn-admin-production.up.railway.app/api/clases/guardar',
           {
             tipoTransaccion: 'EGRESO',
             tipoMovimientoPasivo: 'ADELANTO',
@@ -133,7 +133,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
         // NUEVA_DEUDA: el backend suma al montoTotal, así que mandamos negativo para que reste
         // y el historial queda registrado con montoPagado negativo (deuda)
         await axios.post(
-          'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+          'https://kbn-admin-production.up.railway.app/api/clases/guardar',
           {
             tipoTransaccion: 'EGRESO',
             tipoMovimientoPasivo: 'NUEVA_DEUDA',
@@ -151,7 +151,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
       } else {
         // PAGO_DEUDA / ADELANTO: el backend suma (reduce deuda negativa o acumula adelanto)
         await axios.post(
-          'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+          'https://kbn-admin-production.up.railway.app/api/clases/guardar',
           {
             tipoTransaccion: 'EGRESO',
             tipoMovimientoPasivo: transactionType,
@@ -186,7 +186,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
         : editDecoded.descripcion;
 
       await axios.put(
-        `https://kbnadmin-production.up.railway.app/api/pasivos/${editPasivo.id}`,
+        `https://kbn-admin-production.up.railway.app/api/pasivos/${editPasivo.id}`,
         { ...editPasivo, descripcion: descripcionEncoded },
         axiosConfig
       );
@@ -202,7 +202,7 @@ const Pasivos = ({ axiosConfig, setView }) => {
   const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar esta cuenta corriente?')) {
       try {
-        await axios.delete(`https://kbnadmin-production.up.railway.app/api/pasivos/${id}`, axiosConfig);
+        await axios.delete(`https://kbn-admin-production.up.railway.app/api/pasivos/${id}`, axiosConfig);
         fetchPasivos();
       } catch (err) {
         alert('Error al eliminar.');

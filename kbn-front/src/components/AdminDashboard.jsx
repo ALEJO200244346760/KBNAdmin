@@ -28,8 +28,8 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       const [usersRes, rolesRes] = await Promise.all([
-        axios.get('https://kbnadmin-production.up.railway.app/usuario', axiosConfig),
-        axios.get('https://kbnadmin-production.up.railway.app/administracion/roles', axiosConfig)
+        axios.get('https://kbn-admin-production.up.railway.app/usuario', axiosConfig),
+        axios.get('https://kbn-admin-production.up.railway.app/administracion/roles', axiosConfig)
       ]);
       setUsuarios(usersRes.data);
       setRoles(rolesRes.data);
@@ -46,7 +46,7 @@ const AdminDashboard = () => {
   const crearRol = async () => {
     if(!newRoleName.trim()) return;
     try {
-        await axios.post('https://kbnadmin-production.up.railway.app/administracion/roles', 
+        await axios.post('https://kbn-admin-production.up.railway.app/administracion/roles', 
             { nombre: newRoleName.toUpperCase() }, 
             axiosConfig
         );
@@ -67,7 +67,7 @@ const AdminDashboard = () => {
   const guardarCambioRol = async (user) => {
     try {
       await axios.put(
-        `https://kbnadmin-production.up.railway.app/administracion/users/${user.id}/roles`,
+        `https://kbn-admin-production.up.railway.app/administracion/users/${user.id}/roles`,
         { rol: user.rol.nombre },
         axiosConfig
       );
@@ -93,7 +93,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
         await axios.put(
-            `https://kbnadmin-production.up.railway.app/administracion/users/${editingUser.id}`,
+            `https://kbn-admin-production.up.railway.app/administracion/users/${editingUser.id}`,
             editingUser,
             axiosConfig
         );
@@ -110,7 +110,7 @@ const AdminDashboard = () => {
   const eliminarUsuario = async (userId, userName) => {
     if (!window.confirm(`⚠️ ¿ELIMINAR a ${userName}? Esta acción es irreversible.`)) return;
     try {
-      await axios.delete(`https://kbnadmin-production.up.railway.app/administracion/users/${userId}`, axiosConfig);
+      await axios.delete(`https://kbn-admin-production.up.railway.app/administracion/users/${userId}`, axiosConfig);
       setUsuarios(prev => prev.filter(u => u.id !== userId));
     } catch (err) {
       alert("Error al eliminar.");

@@ -46,8 +46,8 @@ const Secretaria = () => {
     setLoading(true);
     try {
       const [resUsers, resAgenda] = await Promise.all([
-        axios.get('https://kbnadmin-production.up.railway.app/usuario', axiosConfig),
-        axios.get('https://kbnadmin-production.up.railway.app/api/agenda/listar', axiosConfig)
+        axios.get('https://kbn-admin-production.up.railway.app/usuario', axiosConfig),
+        axios.get('https://kbn-admin-production.up.railway.app/api/agenda/listar', axiosConfig)
       ]);
       
       setInstructors(resUsers.data);
@@ -94,7 +94,7 @@ const Secretaria = () => {
     };
 
     try {
-      await axios.post('https://kbnadmin-production.up.railway.app/api/agenda/crear', dataToSubmit, axiosConfig);
+      await axios.post('https://kbn-admin-production.up.railway.app/api/agenda/crear', dataToSubmit, axiosConfig);
       alert(agendaData.id ? "Clase reasignada con éxito" : "Clase agendada con éxito");
       setAgendaData(initialAgendaData);
       setView('MONITOR');
@@ -118,7 +118,7 @@ const Secretaria = () => {
         tipoTransaccion: view,
         pasivoId: financeData.pasivoId ? Number(financeData.pasivoId) : null
       };
-      await axios.post('https://kbnadmin-production.up.railway.app/api/clases/guardar', payload, axiosConfig);
+      await axios.post('https://kbn-admin-production.up.railway.app/api/clases/guardar', payload, axiosConfig);
       alert(`${view} registrado correctamente.`);
       setFinanceData(initialFinanceData);
       setView('INICIO');

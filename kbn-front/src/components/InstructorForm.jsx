@@ -84,7 +84,7 @@ const InstructorForm = () => {
   // const fetchPasivos = useCallback(async () => {
   //   if (!token) return;
   //   try {
-  //     const res = await axios.get('https://kbnadmin-production.up.railway.app/api/pasivos', axiosConfig);
+  //     const res = await axios.get('https://kbn-admin-production.up.railway.app/api/pasivos', axiosConfig);
   //     setPasivos(res.data);
   //   } catch (err) {
   //     console.error('Error cargando pasivos:', err);
@@ -115,7 +115,7 @@ const InstructorForm = () => {
     setLoadingAgenda(true);
     try {
       const res = await axios.get(
-        `https://kbnadmin-production.up.railway.app/api/agenda/instructor/${user.id}`,
+        `https://kbn-admin-production.up.railway.app/api/agenda/instructor/${user.id}`,
         axiosConfig
       );
       const sorted = res.data.sort((a, b) => {
@@ -136,7 +136,7 @@ const InstructorForm = () => {
     if (!user || !token) return;
     try {
       const res = await axios.get(
-        'https://kbnadmin-production.up.railway.app/api/clases/listar',
+        'https://kbn-admin-production.up.railway.app/api/clases/listar',
         axiosConfig
       );
       const isAdmin = user?.role === 'ADMINISTRADOR';
@@ -167,7 +167,7 @@ const InstructorForm = () => {
   const handleStatusChange = async (id, nuevoEstado) => {
     try {
       await axios.put(
-        `https://kbnadmin-production.up.railway.app/api/agenda/${id}/estado`,
+        `https://kbn-admin-production.up.railway.app/api/agenda/${id}/estado`,
         nuevoEstado,
         { headers: { ...axiosConfig.headers, 'Content-Type': 'text/plain' } }
       );
@@ -213,14 +213,14 @@ const InstructorForm = () => {
   //
   //   try {
   //     await axios.post(
-  //       'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+  //       'https://kbn-admin-production.up.railway.app/api/clases/guardar',
   //       payload,
   //       axiosConfig
   //     );
   //
   //     if (view === 'INGRESO') {
   //       const resPasivos = await axios.get(
-  //         'https://kbnadmin-production.up.railway.app/api/pasivos',
+  //         'https://kbn-admin-production.up.railway.app/api/pasivos',
   //         axiosConfig
   //       );
   //       const pasivosActuales = resPasivos.data;
@@ -241,7 +241,7 @@ const InstructorForm = () => {
   //           const nota = `Pago por ${horas}h de ${actividad}${detalles} · ${horas}h × ${tarifaHora} BRL/h = ${deuda.toFixed(2)} BRL`;
   //
   //           await axios.post(
-  //             'https://kbnadmin-production.up.railway.app/api/clases/guardar',
+  //             'https://kbn-admin-production.up.railway.app/api/clases/guardar',
   //             {
   //               tipoTransaccion: 'EGRESO',
   //               tipoMovimientoPasivo: 'NUEVA_DEUDA',
