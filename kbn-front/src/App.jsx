@@ -242,7 +242,7 @@ function App() {
               path="/secretaria"
               element={
                 <PrivateRoute allowedRoles={['ADMINISTRADOR', 'SECRETARIA']}>
-                  <Secretaria key={location.pathname} />
+                  <Secretaria key="secretaria" />
                 </PrivateRoute>
               }
             />
