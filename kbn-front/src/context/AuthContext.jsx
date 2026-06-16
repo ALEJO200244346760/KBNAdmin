@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
       if (!initialUser.id && initialUser.email) {
         try {
           const res = await axios.get(
-            'https://kbnadmin-production.up.railway.app/usuario',
+            'https://kbn-admin-production.up.railway.app/usuario',
             {
               headers: {
                 Authorization: `Bearer ${token}`,
