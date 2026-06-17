@@ -32,16 +32,23 @@ public class PasswordResetService {
 
     // ── Solicitar reset ───────────────────────────────────────────
     public void requestPasswordReset(String email) throws Exception {
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new Exception("EMAIL_NOT_FOUND"));
+    Usuario usuario = usuarioRepository.findByEmail(email)
+            .orElseThrow(() -> new Exception("EMAIL_NOT_FOUND"));
 
-        String token = UUID.randomUUID().toString();
-        usuario.setResetToken(token);
-        usuario.setResetTokenExpiry(LocalDateTime.now().plusHours(TOKEN_EXPIRY_HOURS));
-        usuarioRepository.save(usuario);
+    String token = UUID.randomUUID().toString();
+    usuario.setResetToken(token);
+    usuario.setResetTokenExpiry(LocalDateTime.now().plusHours(TOKEN_EXPIRY_HOURS));
+    usuarioRepository.save(usuario);
 
+    try {
         sendResetEmail(email, token, usuario.getNombre());
+        System.out.println("✅ Email enviado a: " + email);
+    } catch (Exception e) {
+        System.err.println("❌ Error enviando email: " + e.getMessage());
+        e.printStackTrace();
+        throw e;
     }
+}
 
     // ── Validar token ─────────────────────────────────────────────
     public boolean validateToken(String token) {
