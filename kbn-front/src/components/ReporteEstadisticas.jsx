@@ -32,7 +32,12 @@ const calcularReparto = (asignadoA, montoBase) => {
   };
 };
 
-const HANS_PASIVO_TITULO = 'Hans Wurbs';
+// ── Nombres EXACTOS de las tarjetas en Pasivos ──────────────────
+const PASIVO_TITULOS = {
+  JOSE: 'José Sánchez',
+  IGNA: 'Igna Krebs',
+  HANS: 'Hans Leonhard Wurbs',
+};
 
 // ── Colores Náutica Atins ─────────────────────────────────────────
 const NA = {
@@ -174,27 +179,26 @@ const ReporteEstadisticas = () => {
   const handlePendienteChange = (id, val) =>
     setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
 
-  const acumularHans = async (item, montoBase) => {
-    const pasivoHans = pasivos.find(p => p.titulo.toLowerCase() === HANS_PASIVO_TITULO.toLowerCase());
-    if (!pasivoHans) return;
-    const mHans = Math.round((montoBase * HANS_PCT / 100) * 100) / 100;
-    if (mHans <= 0) return;
-    const nota = `5% de ${item.actividad || 'Clase'} — ${item.fecha} = ${mHans.toFixed(2)} ${item.moneda}`;
+  const acumularEnPasivo = async (pasivo, monto, item, etiqueta) => {
+    if (!pasivo || monto <= 0) return;
+    const montoRedondeado = Math.round(monto * 100) / 100;
+    const nota = `${etiqueta} de ${item.actividad || 'Clase'} — ${item.fecha} = ${montoRedondeado.toFixed(2)} ${item.moneda}`;
     try {
       await api.post('/api/clases/guardar', {
         tipoTransaccion: 'EGRESO',
         tipoMovimientoPasivo: 'NUEVA_DEUDA',
-        pasivoId: pasivoHans.id,
-        total: String(-mHans),
+        pasivoId: pasivo.id,
+        total: String(-montoRedondeado),
         fecha: item.fecha,
-        moneda: pasivoHans.moneda,
+        moneda: pasivo.moneda,
         formaPago: 'Efectivo',
         detalles: nota,
         actividad: 'Pago Pasivo',
         instructor: 'Sistema',
       });
-      fetchPasivos();
-    } catch (e) { console.error('Error acumulando Hans:', e); }
+    } catch (e) {
+      console.error(`Error acumulando en pasivo de ${pasivo.titulo}:`, e);
+    }
   };
 
   const saveAssignment = async (item, asignadoA) => {
@@ -206,12 +210,43 @@ const ReporteEstadisticas = () => {
     let base = (item.detalles || '').includes('| Reparto:')
       ? item.detalles.split('| Reparto:')[0].trim()
       : item.detalles || '';
+
     try {
       await api.put(`/api/clases/asignar/${item.id}`, { asignadoA, detalles: base + notaPct }, axiosConfig);
-      await acumularHans(item, montoBase);
-      alert('Asignado correctamente.');
+
+      const resPasivos = await api.get('/api/pasivos');
+      const pasivosActuales = resPasivos.data;
+      setPasivos(pasivosActuales);
+
+      const buscar = (titulo) => pasivosActuales.find(p => p.titulo.toLowerCase() === titulo.toLowerCase());
+
+      const pJoseObj = buscar(PASIVO_TITULOS.JOSE);
+      const pIgnaObj = buscar(PASIVO_TITULOS.IGNA);
+      const pHansObj = buscar(PASIVO_TITULOS.HANS);
+
+      const faltantes = [];
+      if (!pJoseObj) faltantes.push(PASIVO_TITULOS.JOSE);
+      if (!pIgnaObj) faltantes.push(PASIVO_TITULOS.IGNA);
+      if (!pHansObj) faltantes.push(PASIVO_TITULOS.HANS);
+
+      await Promise.all([
+        acumularEnPasivo(pJoseObj, mJose, item, `${fmt(pJose)}%`),
+        acumularEnPasivo(pIgnaObj, mIgna, item, `${fmt(pIgna)}%`),
+        acumularEnPasivo(pHansObj, mHans, item, `${fmt(pHans)}%`),
+      ]);
+
+      fetchPasivos();
       fetchData();
-    } catch (e) { alert('Error de red o no autorizado al asignar.'); }
+
+      if (faltantes.length > 0) {
+        alert(`Asignado correctamente, pero no se encontraron estas tarjetas en Pasivos: ${faltantes.join(', ')}. Verificá que el nombre coincida exactamente.`);
+      } else {
+        alert('Asignado correctamente. Montos acumulados en Cuentas Corrientes de José, Igna y Hans.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error de red o no autorizado al asignar.');
+    }
   };
 
   const handleDelete = async (id) => {
@@ -247,7 +282,6 @@ const ReporteEstadisticas = () => {
     </div>
   );
 
-  // ── Estilos inline reutilizables ──────────────────────────────
   const styles = {
     pill: (bg, color) => ({
       background: bg, color, fontSize: 11, fontWeight: 500,
@@ -300,7 +334,6 @@ const ReporteEstadisticas = () => {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 16px 80px', display: 'flex', flexDirection: 'column', gap: 20, background: NA.bg, minHeight: '100%' }}>
 
-      {/* ── HEADER ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 20, borderBottom: `1px solid ${NA.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
@@ -324,17 +357,14 @@ const ReporteEstadisticas = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {/* Total USD */}
           <div style={{ background: NA.dark, color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
             <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>USD</p>
             <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>{formatCurrency(totalesPorMoneda['USD'] || 0)}</p>
           </div>
-          {/* Total BRL */}
           <div style={{ background: '#7B5E00', color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
             <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>BRL</p>
             <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>R$ {formatCurrency(totalesPorMoneda['BRL'] || 0).replace('$', '')}</p>
           </div>
-          {/* Otras monedas */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowOtherCurrencies(!showOtherCurrencies)}
@@ -360,7 +390,6 @@ const ReporteEstadisticas = () => {
         </div>
       </div>
 
-      {/* ── FILTROS ── */}
       {mostrarFiltros && (
         <div style={{ background: '#fff', borderRadius: 14, border: `0.5px solid ${NA.border}`, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottom: `1px solid ${NA.border}` }}>
@@ -432,7 +461,6 @@ const ReporteEstadisticas = () => {
         </div>
       )}
 
-      {/* ── LIQUIDACIÓN ── */}
       {filtros.asignadoA !== '' && (
         <div style={{ background: NA.darker, borderRadius: 14, overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid rgba(255,255,255,.1)`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -463,7 +491,6 @@ const ReporteEstadisticas = () => {
         </div>
       )}
 
-      {/* ── PENDIENTES ── */}
       <div style={styles.sectionCard('#F59E0B')}>
         <div style={styles.sectionHeader('#FFFBEB')}>
           <h2 style={styles.sectionTitle('#92400E')}>
@@ -512,7 +539,6 @@ const ReporteEstadisticas = () => {
         }
       </div>
 
-      {/* ── EGRESOS ── */}
       <div style={styles.sectionCard('#EF4444')}>
         <div style={styles.sectionHeader('#FEF2F2')}>
           <h2 style={styles.sectionTitle('#991B1B')}>
@@ -547,7 +573,6 @@ const ReporteEstadisticas = () => {
         }
       </div>
 
-      {/* ── ASIGNADOS ── */}
       <div style={styles.sectionCard(NA.primary)}>
         <div style={styles.sectionHeader(NA.light)}>
           <h2 style={styles.sectionTitle(NA.darker)}>
@@ -590,7 +615,6 @@ const ReporteEstadisticas = () => {
         }
       </div>
 
-      {/* ── GRÁFICOS ── */}
       <ReportesEstadisticasGraficos asignados={asignadosFiltrados} egresos={egresosFiltrados} />
 
     </div>
