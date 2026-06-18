@@ -8,9 +8,34 @@ import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 import Pasivos from './Pasivos';
 
+// ── Paleta Náutica Atins ───────────────────────────────────────────────────
+const NA = {
+  primary: '#1ABFA0',
+  dark: '#0F6E56',
+  darker: '#085041',
+  light: '#E1F5EE',
+  mid: '#9FE1CB',
+  bg: '#f0faf7',
+  text: '#0a2e27',
+  text2: '#3a6b5e',
+  border: '#c5e8df',
+};
+
+const sx = {
+  label: { fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5, fontWeight: 500 },
+  input: {
+    width: '100%', padding: '11px 13px', borderRadius: 10,
+    border: `0.5px solid ${NA.border}`, background: '#fff',
+    color: NA.text, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+    transition: 'border-color .15s, box-shadow .15s',
+  },
+};
+const focusOn = (e) => { e.target.style.borderColor = NA.primary; e.target.style.boxShadow = `0 0 0 3px ${NA.light}`; };
+const focusOff = (e) => { e.target.style.borderColor = NA.border; e.target.style.boxShadow = 'none'; };
+
 const Secretaria = () => {
   const { user, token } = useAuth(); // Extraemos el token para las peticiones
-  const [view, setView] = useState('INICIO'); 
+  const [view, setView] = useState('INICIO');
   const [instructors, setInstructors] = useState([]);
   const [agendaList, setAgendaList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +47,7 @@ const Secretaria = () => {
   }), [token]);
 
   const today = new Date().toISOString().split('T')[0];
-  
+
   const initialAgendaData = {
     alumno: '', fecha: today, hora: '10:00', instructorId: '',
     lugar: '', tarifa: '', horas: 1, horasPagadas: 0,
@@ -35,7 +60,7 @@ const Secretaria = () => {
     tipoTransaccion: 'INGRESO', fecha: today, actividad: 'Clases',
     actividadOtro: '', vendedor: '', instructor: '', detalles: '',
     horas: 0, tarifa: 0, total: 0, gastos: 0, comision: 0,
-    formaPago: 'Efectivo', formaPagoOtro: '', moneda: 'R$_STONE_IGNA',
+    formaPago: 'Efectivo', formaPagoOtro: '', moneda: 'R$_STONE_JOSE',
     pasivoId: '' // <- CLAVE PARA PAGAR PASIVOS
   };
   const [financeData, setFinanceData] = useState(initialFinanceData);
@@ -49,9 +74,9 @@ const Secretaria = () => {
         axios.get('https://kbn-admin-production.up.railway.app/usuario', axiosConfig),
         axios.get('https://kbn-admin-production.up.railway.app/api/agenda/listar', axiosConfig)
       ]);
-      
+
       setInstructors(resUsers.data);
-      
+
       const sorted = resAgenda.data.sort((a, b) => {
         const order = { 'RECHAZADA': 0, 'PENDIENTE': 1, 'CONFIRMADA': 2 };
         return order[a.estado] - order[b.estado] || new Date(b.fecha) - new Date(a.fecha);
@@ -68,10 +93,6 @@ const Secretaria = () => {
     fetchData();
   }, [fetchData, view]);
 
-// useEffect(() => {
-//   setView('INICIO');
-// }, [location.pathname]);
-  
   useEffect(() => {
     const total = Number(financeData.horas) * Number(financeData.tarifa);
     setFinanceData(prev => ({
@@ -98,9 +119,9 @@ const Secretaria = () => {
       alert(agendaData.id ? "Clase reasignada con éxito" : "Clase agendada con éxito");
       setAgendaData(initialAgendaData);
       setView('MONITOR');
-    } catch (err) { 
+    } catch (err) {
       console.error("Detalle del error:", err.response?.data);
-      alert("Error al guardar en agenda. Verifica los permisos."); 
+      alert("Error al guardar en agenda. Verifica los permisos.");
     }
   };
 
@@ -113,63 +134,78 @@ const Secretaria = () => {
     e.preventDefault();
     try {
       // Si el pasivoId está vacío, lo mandamos como null para que el backend no falle
-      const payload = { 
-        ...financeData, 
+      const payload = {
+        ...financeData,
         tipoTransaccion: view,
         pasivoId: financeData.pasivoId ? Number(financeData.pasivoId) : null
       };
       await axios.post('https://kbn-admin-production.up.railway.app/api/clases/guardar', payload, axiosConfig);
-      alert(`${view} registrado correctamente.`);
       setFinanceData(initialFinanceData);
       setView('INICIO');
-    } catch (err) { 
+    } catch (err) {
       console.error("Error finanzas:", err);
-      alert("Error al registrar movimiento financiero"); 
+      alert("Error al registrar movimiento financiero");
     }
   };
 
   // --- SUB-COMPONENTES ---
   const InstructorSelector = ({ value, onChange, label, name, isFinance = false }) => (
-    <div className="space-y-1">
-      <label className="text-[10px] font-black text-gray-400 uppercase ml-2">{label}</label>
-      <select 
+    <div style={{ marginBottom: 0 }}>
+      <label style={sx.label}>{label}</label>
+      <select
         name={name}
-        value={value} 
-        onChange={onChange} 
-        className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" 
-        required={!isFinance} // Hacemos que no sea obligatorio en egresos generales
+        value={value}
+        onChange={onChange}
+        style={{ ...sx.input, cursor: 'pointer' }}
+        onFocus={focusOn}
+        onBlur={focusOff}
+        required={!isFinance} // No obligatorio en egresos generales
       >
         <option value="">Seleccionar...</option>
-        {instructors.map(i => (
-          <option key={i.id} value={isFinance ? `${i.nombre} ${i.apellido}` : i.id}>
-            {i.nombre} {i.apellido}
-          </option>
-        ))}
+        {instructors.map(i => {
+          const nombreCompleto = `${i.nombre} ${i.apellido}`.replace(/\s+/g, ' ').trim();
+          return (
+            <option key={i.id} value={isFinance ? nombreCompleto : i.id}>
+              {nombreCompleto}
+            </option>
+          );
+        })}
       </select>
     </div>
   );
-  <MenuCard
-  icon="💰"
-  title="Ingreso"
-  sub="Caja"
-  color="bg-emerald-600"
-  onClick={() => {
-    console.log('CLICK INGRESO');
-    setView('INGRESO');
-  }}
-/>
+
+  const MenuCard = ({ icon, title, sub, color, onClick }) => (
+    <button
+      onClick={onClick}
+      style={{
+        background: color, padding: '24px 16px', borderRadius: 16, color: '#fff',
+        textAlign: 'center', border: 'none', cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+        transition: 'transform .15s, box-shadow .15s',
+      }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >
+      <i className={`ti ${icon}`} style={{ fontSize: 30 }} aria-hidden="true" />
+      <div style={{ fontWeight: 500, fontSize: 14 }}>{title}</div>
+      <div style={{ fontSize: 11, opacity: 0.75 }}>{sub}</div>
+    </button>
+  );
 
   // --- RENDERIZADO DE VISTAS ---
   if (view === 'INICIO') {
     return (
-      <div className="max-w-5xl mx-auto p-4 md:p-10 mt-5 animate-fadeIn">
-        <h1 className="text-2xl md:text-3xl font-black text-gray-800 mb-8 text-center uppercase italic tracking-tighter">Panel de Secretaria KBN</h1>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          <MenuCard icon="🖥️" title="Monitor" sub="Estados" color="bg-gray-900" onClick={() => setView('MONITOR')} />
-          <MenuCard icon="📅" title="Agendar" sub="Nueva Clase" color="bg-indigo-600" onClick={() => setView('CALENDARIO')} />
-          <MenuCard icon="📉" title="Pasivos" sub="Deudas" color="bg-amber-500" onClick={() => setView('PASIVOS')} />
-          <MenuCard icon="💰" title="Ingreso" sub="Caja" color="bg-emerald-600" onClick={() => setView('INGRESO')} />
-          <MenuCard icon="💸" title="Egreso" sub="Gastos" color="bg-rose-600" onClick={() => setView('EGRESO')} />
+      <div style={{ maxWidth: 880, margin: '0 auto', padding: '20px 4px 60px' }}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel de Secretaría</h1>
+          <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Gestioná agenda, caja y cuentas corrientes</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+          <MenuCard icon="ti-device-desktop" title="Monitor" sub="Estados" color={NA.darker} onClick={() => setView('MONITOR')} />
+          <MenuCard icon="ti-calendar-plus" title="Agendar" sub="Nueva clase" color={NA.dark} onClick={() => setView('CALENDARIO')} />
+          <MenuCard icon="ti-receipt-2" title="Pasivos" sub="Deudas" color="#92400E" onClick={() => setView('PASIVOS')} />
+          <MenuCard icon="ti-cash" title="Ingreso" sub="Caja" color={NA.primary} onClick={() => setView('INGRESO')} />
+          <MenuCard icon="ti-minus" title="Egreso" sub="Gastos" color="#c23a3a" onClick={() => setView('EGRESO')} />
         </div>
       </div>
     );
@@ -177,46 +213,57 @@ const Secretaria = () => {
 
   if (view === 'MONITOR') {
     return (
-      <div className="max-w-6xl mx-auto p-4 animate-fadeIn">
-        <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-black uppercase text-gray-800 italic">Monitor de Operaciones</h2>
-          <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm uppercase tracking-widest">← VOLVER</button>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 4px 60px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setView('INICIO')}
+              style={{ width: 36, height: 36, borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <i className="ti ti-arrow-left" style={{ fontSize: 17 }} aria-hidden="true" />
+            </button>
+            <h2 style={{ fontSize: 18, fontWeight: 500, color: NA.text, margin: 0 }}>Monitor de operaciones</h2>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading ? <p className="col-span-full text-center py-10 font-bold text-gray-400">Actualizando datos...</p> : 
-            agendaList.map(item => (
-            <div key={item.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-t-8 transition-all ${
-              item.estado === 'RECHAZADA' ? 'border-rose-500 shadow-rose-50' : 
-              item.estado === 'PENDIENTE' ? 'border-amber-400 shadow-amber-50' : 'border-emerald-500 shadow-emerald-50'
-            }`}>
-              <div className="flex justify-between items-start mb-3">
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${
-                  item.estado === 'RECHAZADA' ? 'bg-rose-100 text-rose-700' : 
-                  item.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                }`}>
-                  {item.estado === 'PENDIENTE' ? '⏳ Pendiente' : item.estado}
-                </span>
-                <p className="text-[10px] font-bold text-gray-400 uppercase">{item.fecha}</p>
-              </div>
-              <h3 className="font-black text-gray-800 uppercase text-lg leading-tight mb-1 truncate">{item.alumno}</h3>
-              <p className="text-xs font-bold text-indigo-600 mb-4 tracking-wide italic">🏄‍♂️ {item.nombreInstructor}</p>
-              <div className="grid grid-cols-2 gap-3 text-[11px] bg-gray-50 p-4 rounded-2xl font-bold text-gray-500 mb-4">
-                <p className="truncate">📍 {item.lugar || 'No especif.'}</p>
-                <p className="truncate">🏨 {item.hotelDerivacion || 'Sin Hotel'}</p>
-                <p>⏱️ {item.horas} hs / {item.hora?.substring(0,5)} hs</p>
-                <p className="text-emerald-600 font-black">💵 TARIFA: ${item.tarifa}</p>
-              </div>
-              <div className="flex justify-between items-center border-t border-gray-100 pt-4 mt-auto">
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-400 uppercase font-black">Seña/Pagado</span>
-                  <span className="text-sm font-black text-gray-700">${item.horasPagadas || 0}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {loading ? (
+            <p style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: NA.text2 }}>Actualizando datos...</p>
+          ) : agendaList.map(item => {
+            const estadoColor = item.estado === 'RECHAZADA' ? '#B91C1C' : item.estado === 'PENDIENTE' ? '#92400E' : NA.dark;
+            const estadoBg = item.estado === 'RECHAZADA' ? '#FEF2F2' : item.estado === 'PENDIENTE' ? '#FFFBEB' : NA.light;
+            return (
+              <div key={item.id} style={{ background: '#fff', borderRadius: 16, padding: 18, border: `0.5px solid ${NA.border}`, borderTop: `3px solid ${estadoColor}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 99, background: estadoBg, color: estadoColor, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                    {item.estado === 'PENDIENTE' ? 'Pendiente' : item.estado}
+                  </span>
+                  <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{item.fecha}</p>
                 </div>
-                {item.estado === 'RECHAZADA' && (
-                  <button onClick={() => prepararReasignacion(item)} className="bg-rose-600 text-white text-[10px] px-4 py-2 rounded-xl font-black uppercase hover:scale-105 transition-all shadow-lg shadow-rose-200">Reasignar</button>
-                )}
+                <h3 style={{ fontSize: 16, fontWeight: 500, color: NA.text, margin: '0 0 2px' }}>{item.alumno}</h3>
+                <p style={{ fontSize: 12, color: NA.dark, margin: '0 0 12px' }}>{item.nombreInstructor}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: NA.bg, borderRadius: 10, padding: 12, fontSize: 12, color: NA.text2, marginBottom: 12 }}>
+                  <p style={{ margin: 0 }}>{item.lugar || 'Sin lugar'}</p>
+                  <p style={{ margin: 0 }}>{item.hotelDerivacion || 'Sin hotel'}</p>
+                  <p style={{ margin: 0 }}>{item.horas} hs · {item.hora?.substring(0, 5)}</p>
+                  <p style={{ margin: 0, color: NA.dark, fontWeight: 500 }}>${item.tarifa}</p>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `0.5px solid ${NA.border}`, paddingTop: 10 }}>
+                  <div>
+                    <span style={{ fontSize: 10, color: '#9ca3af', display: 'block' }}>Seña/Pagado</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: NA.text }}>${item.horasPagadas || 0}</span>
+                  </div>
+                  {item.estado === 'RECHAZADA' && (
+                    <button
+                      onClick={() => prepararReasignacion(item)}
+                      style={{ background: '#B91C1C', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}
+                    >
+                      Reasignar
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -224,53 +271,80 @@ const Secretaria = () => {
 
   if (view === 'CALENDARIO') {
     return (
-      <div className="max-w-2xl mx-auto p-6 md:p-10 bg-white shadow-2xl rounded-[2.5rem] mt-5 md:mt-10 border border-gray-100 animate-fadeIn">
-        <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm uppercase tracking-widest mb-4">← VOLVER</button>
-        <h2 className="text-2xl font-black text-center mb-8 uppercase italic tracking-tighter">{agendaData.id ? '🔄 Reasignar Instructor' : '📅 Nueva Asignación'}</h2>
-        <form onSubmit={handleAgendaSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Nombre Alumno</label>
-              <input type="text" placeholder="Juan " value={agendaData.alumno} onChange={e => setAgendaData({...agendaData, alumno: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none focus:ring-2 focus:ring-indigo-500 font-bold" required />
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 4px 60px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <button
+            onClick={() => setView('INICIO')}
+            style={{ width: 36, height: 36, borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <i className="ti ti-arrow-left" style={{ fontSize: 17 }} aria-hidden="true" />
+          </button>
+          <h2 style={{ fontSize: 18, fontWeight: 500, color: NA.text, margin: 0 }}>
+            {agendaData.id ? 'Reasignar instructor' : 'Nueva asignación'}
+          </h2>
+        </div>
+
+        <form onSubmit={handleAgendaSubmit}>
+          <div style={{ background: '#fff', borderRadius: 16, border: `0.5px solid ${NA.border}`, padding: 22, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={sx.label}>Nombre alumno</label>
+                <input type="text" placeholder="Juan" value={agendaData.alumno} onChange={e => setAgendaData({ ...agendaData, alumno: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} required />
+              </div>
+              <InstructorSelector
+                label="Asignar instructor"
+                name="instructorId"
+                value={agendaData.instructorId}
+                onChange={e => setAgendaData({ ...agendaData, instructorId: e.target.value })}
+              />
             </div>
-            <InstructorSelector 
-              label="Asignar Instructor" 
-              name="instructorId" 
-              value={agendaData.instructorId} 
-              onChange={e => setAgendaData({...agendaData, instructorId: e.target.value})} 
-            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={sx.label}>Fecha clase</label>
+                <input type="date" value={agendaData.fecha} onChange={e => setAgendaData({ ...agendaData, fecha: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+              </div>
+              <div>
+                <label style={sx.label}>Horario</label>
+                <input type="time" value={agendaData.hora} onChange={e => setAgendaData({ ...agendaData, hora: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label style={sx.label}>Lugar / Spot</label>
+                <input type="text" value={agendaData.lugar} onChange={e => setAgendaData({ ...agendaData, lugar: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+              </div>
+              <div>
+                <label style={sx.label}>Descripción / Hotel</label>
+                <input type="text" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({ ...agendaData, hotelDerivacion: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Fecha Clase</label>
-              <input type="date" value={agendaData.fecha} onChange={e => setAgendaData({...agendaData, fecha: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Horario</label>
-              <input type="time" value={agendaData.hora} onChange={e => setAgendaData({...agendaData, hora: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="text" placeholder="Lugar / Spot" value={agendaData.lugar} onChange={e => setAgendaData({...agendaData, lugar: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
-            <input type="text" placeholder="Descripción / Hotel" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({...agendaData, hotelDerivacion: e.target.value})} className="p-4 bg-gray-50 rounded-2xl w-full border-none font-bold shadow-inner" />
-          </div>
-          <div className="grid grid-cols-3 gap-3 bg-indigo-50 p-6 rounded-[2rem] border-2 border-indigo-100 shadow-inner">
-            <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Tarifa Pactada</label>
-              <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} className="w-full bg-transparent border p-2 rounded text-xl font-black text-indigo-700 p-0" />
-            </div>
-            <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Solicitadas</label>
-              <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} className="w-full bg-transparent border p-2 rounded text-xl font-black text-indigo-700 p-0" />
-            </div>
-            <div>
-              <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Horas Pagadas</label>
-              <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} className="w-full bg-transparent border p-2 rounded text-xl font-black text-indigo-700 p-0" />
+
+          <div style={{ background: NA.darker, borderRadius: 16, padding: 22, marginBottom: 16 }}>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', textTransform: 'uppercase', letterSpacing: '.08em', margin: '0 0 14px' }}>Condiciones acordadas</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+              <div>
+                <label style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Tarifa pactada</label>
+                <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} style={{ ...sx.input, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.15)', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Horas solicitadas</label>
+                <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} style={{ ...sx.input, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.15)', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Horas pagadas</label>
+                <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} style={{ ...sx.input, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.15)', color: '#fff' }} />
+              </div>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row gap-3 pt-4">
-            <button type="submit" className="flex-[2] bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all">Confirmar Asignación</button>
-            <button type="button" onClick={() => setView('INICIO')} className="flex-1 bg-gray-100 text-gray-400 p-5 rounded-2xl font-black uppercase hover:bg-gray-200 transition-all">Cancelar</button>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" onClick={() => setView('INICIO')} style={{ flex: 1, padding: '14px', borderRadius: 12, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+            <button type="submit" style={{ flex: 2, padding: '14px', borderRadius: 12, border: 'none', background: NA.dark, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              Confirmar asignación
+            </button>
           </div>
         </form>
       </div>
@@ -279,26 +353,25 @@ const Secretaria = () => {
 
   if (view === 'INGRESO' || view === 'EGRESO') {
     const Component = view === 'INGRESO' ? Ingreso : Egreso;
+    // Sin wrapper extra: Ingreso/Egreso ya traen su propio header,
+    // padding y botón de volver con el diseño Náutica Atins.
     return (
-      <div className="max-w-2xl mx-auto p-4 md:p-6 mt-5 animate-fadeIn">
-        <button onClick={() => setView('INICIO')} className="text-indigo-600 font-bold text-sm uppercase tracking-widest mb-4">← VOLVER</button>
-        <Component 
-          formData={financeData} 
-          handleChange={e => setFinanceData({...financeData, [e.target.name]: e.target.value})}
-          handleSubmit={handleFinanceSubmit} 
-          axiosConfig={axiosConfig} /* Pasamos axiosConfig por si Egreso necesita cargar los pasivos */
-          InstructorField={() => (
-            <InstructorSelector 
-              label="Instructor Relacionado (Opcional)" 
-              name="instructor" 
-              isFinance={true}
-              value={financeData.instructor} 
-              onChange={e => setFinanceData({...financeData, instructor: e.target.value})} 
-            />
-          )}
-          setView={setView} 
-        />
-      </div>
+      <Component
+        formData={financeData}
+        handleChange={e => setFinanceData({ ...financeData, [e.target.name]: e.target.value })}
+        handleSubmit={handleFinanceSubmit}
+        axiosConfig={axiosConfig}
+        InstructorField={() => (
+          <InstructorSelector
+            label="Instructor relacionado (opcional)"
+            name="instructor"
+            isFinance={true}
+            value={financeData.instructor}
+            onChange={e => setFinanceData({ ...financeData, instructor: e.target.value })}
+          />
+        )}
+        setView={setView}
+      />
     );
   }
 
@@ -307,13 +380,5 @@ const Secretaria = () => {
   }
   return null;
 };
-
-const MenuCard = ({ icon, title, sub, color, onClick }) => (
-  <button onClick={onClick} className={`${color} p-6 md:p-8 rounded-[2rem] text-white text-center transition-all active:scale-90 shadow-xl hover:shadow-2xl`}>
-    <div className="text-4xl md:text-5xl mb-3">{icon}</div>
-    <div className="font-black uppercase text-sm md:text-xl tracking-tighter">{title}</div>
-    <div className="text-[10px] opacity-60 uppercase font-black tracking-widest mt-1">{sub}</div>
-  </button>
-);
 
 export default Secretaria;
