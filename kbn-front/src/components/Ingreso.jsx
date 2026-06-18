@@ -48,9 +48,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
     }
   }, [formData.instructor, formData.horas, pasivos]);
 
-  const HANS_PASIVO_TITULO = 'Hans Wurbs';
-  const HANS_PCT = 5;
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -58,9 +55,11 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
     await originalHandleSubmit(e);
 
     const actividad = formData.actividad === 'Otro' ? formData.actividadOtro : formData.actividad;
-    const total = parseFloat(formData.total) || 0;
 
     // 2. Acumular deuda al pasivo del instructor (por horas trabajadas)
+    // Nota: el reparto de % (Jose/Igna/Hans) NO se acumula acá — se hace
+    // centralizadamente en ReporteEstadisticas.jsx al momento de asignar
+    // la clase, para tener todos los números en un solo lugar.
     if (pasivoVinculado && deudaCalculada > 0 && axiosConfig) {
       try {
         const { tarifaHora } = decodeTarifa(pasivoVinculado.descripcion);
@@ -86,41 +85,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
       } catch (err) {
         console.error('Error al acumular deuda instructor:', err);
         alert(`⚠️ El ingreso se guardó pero no se pudo acumular a ${pasivoVinculado.titulo}. Revisá en Cuentas Corrientes.`);
-      }
-    }
-
-    // 3. Acumular 5% de Hans en su pasivo (sobre el total del ingreso)
-    if (total > 0 && axiosConfig) {
-      try {
-        const resPasivos = await axios.get(
-          'https://kbn-admin-production.up.railway.app/api/pasivos',
-          axiosConfig
-        );
-        const pasivoHans = resPasivos.data.find(
-          p => p.titulo.toLowerCase() === HANS_PASIVO_TITULO.toLowerCase()
-        );
-        if (pasivoHans) {
-          const mHans = Math.round(total * HANS_PCT / 100 * 100) / 100;
-          const nota = `5% de ${actividad}${formData.detalles ? ' — ' + formData.detalles : ''} = ${mHans.toFixed(2)} ${formData.moneda}`;
-          await axios.post(
-            'https://kbn-admin-production.up.railway.app/api/clases/guardar',
-            {
-              tipoTransaccion: 'EGRESO',
-              tipoMovimientoPasivo: 'NUEVA_DEUDA',
-              pasivoId: pasivoHans.id,
-              total: String(-mHans),
-              fecha: formData.fecha,
-              moneda: pasivoHans.moneda,
-              formaPago: 'Efectivo',
-              detalles: nota,
-              actividad: 'Pago Pasivo',
-              instructor: 'Sistema',
-            },
-            axiosConfig
-          );
-        }
-      } catch (err) {
-        console.error('Error acumulando Hans:', err);
       }
     }
   };
