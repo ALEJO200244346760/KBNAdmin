@@ -40,12 +40,11 @@ export default function ForgotPassword() {
         {/* Logo */}
         <div style={s.logoWrap}>
           <div style={s.logoCircle}>
-            <svg viewBox="0 0 40 40" width="30" height="30">
-              <text x="20" y="15" textAnchor="middle" fontSize="13" fontWeight="700" fill={NA.darker} fontFamily="system-ui">N</text>
-              <path d="M6 20 Q13 16 20 20 Q27 24 34 20" fill="none" stroke={NA.darker} strokeWidth="1.8"/>
-              <path d="M6 20 Q20 31 34 20" fill={NA.darker}/>
-              <text x="20" y="34" textAnchor="middle" fontSize="8" fontWeight="700" fill={NA.primary} fontFamily="system-ui">A</text>
-            </svg>
+            <img
+              src="/logo.png"
+              alt="Náutica Atins"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </div>
           <div>
             <h2 style={s.title}>Recuperar contraseña</h2>
@@ -71,7 +70,7 @@ export default function ForgotPassword() {
               Si <strong>{email}</strong> está registrado, vas a recibir un email con el enlace para restablecer tu contraseña. El enlace es válido por 2 horas.
             </p>
             <p style={{ margin: 0, fontSize: 13, color: NA.text2 }}>
-              ¿No llegó? Revisá la carpeta de SPAM o{' '}
+              ¿No llegó? Revisá la carpeta de spam o{' '}
               <button onClick={() => { setSent(false); setEmail(''); }} style={s.inlineBtn}>
                 intentá de nuevo
               </button>.
@@ -155,6 +154,7 @@ const s = {
   logoCircle: {
     width: 48, height: 48, borderRadius: '50%', background: NA.primary,
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    overflow: 'hidden',
   },
   title: { margin: 0, fontSize: 17, fontWeight: 500, color: NA.text },
   sub:   { margin: '2px 0 0', fontSize: 13, color: NA.text2 },

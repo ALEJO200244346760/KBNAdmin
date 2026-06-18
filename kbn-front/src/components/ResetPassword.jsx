@@ -126,12 +126,11 @@ export default function ResetPassword() {
 
         <div style={s.logoWrap}>
           <div style={s.logoCircle}>
-            <svg viewBox="0 0 40 40" width="30" height="30">
-              <text x="20" y="15" textAnchor="middle" fontSize="13" fontWeight="700" fill={NA.darker} fontFamily="system-ui">N</text>
-              <path d="M6 20 Q13 16 20 20 Q27 24 34 20" fill="none" stroke={NA.darker} strokeWidth="1.8"/>
-              <path d="M6 20 Q20 31 34 20" fill={NA.darker}/>
-              <text x="20" y="34" textAnchor="middle" fontSize="8" fontWeight="700" fill={NA.primary} fontFamily="system-ui">A</text>
-            </svg>
+            <img
+              src="/logo.png"
+              alt="Náutica Atins"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </div>
           <div>
             <h2 style={s.title}>Nueva contraseña</h2>
@@ -239,7 +238,7 @@ const s = {
   page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: NA.bg, padding: '1rem' },
   card: { backgroundColor: '#fff', borderRadius: 16, border: `1px solid ${NA.border}`, padding: '2rem', width: '100%', maxWidth: 420 },
   logoWrap: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.5rem' },
-  logoCircle: { width: 48, height: 48, borderRadius: '50%', background: NA.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  logoCircle: { width: 48, height: 48, borderRadius: '50%', background: NA.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' },
   iconCircle: { width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px' },
   title: { margin: 0, fontSize: 17, fontWeight: 500, color: NA.text },
   sub:   { margin: '2px 0 0', fontSize: 13, color: NA.text2 },
