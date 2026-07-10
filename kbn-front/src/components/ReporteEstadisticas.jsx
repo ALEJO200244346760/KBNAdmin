@@ -32,14 +32,12 @@ const calcularReparto = (asignadoA, montoBase) => {
   };
 };
 
-// ── Nombres EXACTOS de las tarjetas en Pasivos ──────────────────
 const PASIVO_TITULOS = {
   JOSE: 'José Sánchez',
   IGNA: 'Igna Krebs',
   HANS: 'Hans Leonhard Wurbs',
 };
 
-// ── Colores Náutica Atins ─────────────────────────────────────────
 const NA = {
   primary:  '#1ABFA0',
   dark:     '#0F6E56',
@@ -50,6 +48,34 @@ const NA = {
   text:     '#0a2e27',
   text2:    '#3a6b5e',
   border:   '#c5e8df',
+};
+
+// ── FIX 1: Agrupamiento de monedas ─────────────────────────────────────────
+// Los valores de moneda en la DB incluyen variantes como R$_STONE_JOSE,
+// R$_STONE_IGNA, R$_EFECTIVO, USD_EFECTIVO, USD_MARIANA, EUR_WIZE_IGNA.
+// Los agrupamos en sus monedas base para los totales del panel superior,
+// y guardamos el desglose por canal para mostrarlo en el dropdown "Otras".
+
+// Devuelve la moneda base (BRL, USD, EUR, ARS, CLP) de cualquier variante
+const monedaBase = (m) => {
+  if (!m) return 'USD';
+  if (m.startsWith('R$_') || m === 'BRL') return 'BRL';
+  if (m.startsWith('USD') || m === 'USD') return 'USD';
+  if (m.startsWith('EUR') || m === 'EUR') return 'EUR';
+  return m; // ARS, CLP, etc. se muestran tal cual
+};
+
+// Label legible para el canal
+const labelMoneda = (m) => {
+  const MAP = {
+    R$_STONE_JOSE: 'R$ Stone José',
+    R$_STONE_IGNA: 'R$ Stone Igna',
+    R$_EFECTIVO:   'R$ Efectivo',
+    USD_EFECTIVO:  'USD Efectivo',
+    USD_MARIANA:   'USD Mariana',
+    EUR_WIZE_IGNA: '€ Wize Igna',
+  };
+  return MAP[m] || m;
 };
 
 const ReporteEstadisticas = () => {
@@ -70,16 +96,12 @@ const ReporteEstadisticas = () => {
   const [showOtherCurrencies,  setShowOtherCurrencies]  = useState(false);
   const [expandedId,           setExpandedId]           = useState(null);
 
-  // ── Modal de edición de un registro (Ingreso/Egreso) ──────────
   const [editItem, setEditItem] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const guardandoEdicionRef = useRef(false);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
-  // Guard síncrono contra doble-tap al eliminar (ver nota en otros componentes)
   const eliminandoRef = useRef(new Set());
   const [eliminandoIds, setEliminandoIds] = useState(new Set());
-  // Guard síncrono contra doble-tap al asignar (un Set porque hay un botón
-  // "OK" por cada item pendiente, todos pueden estar en distinto estado)
   const asignandoRef = useRef(new Set());
   const [asignandoIds, setAsignandoIds] = useState(new Set());
 
@@ -159,15 +181,22 @@ const ReporteEstadisticas = () => {
   const asignadosFiltrados       = useMemo(() => aplicarFiltros(asignados),         [asignados,  filtros]);
   const asignadosParaLiquidacion = useMemo(() => aplicarFiltros(asignados, true),   [asignados,  filtros]);
 
-  const totalesPorMoneda = useMemo(() => {
-    const totales = {};
+  // ── FIX 1: totales agrupados por moneda BASE + desglose por canal ──────────
+  const { totalesBase, totalesCanal } = useMemo(() => {
+    const base = {};   // { BRL: 1234, USD: 567, ... }
+    const canal = {};  // { R$_STONE_JOSE: 900, R$_STONE_IGNA: 334, ... }
+
     const add = (moneda, monto) => {
       const m = moneda || 'USD';
-      totales[m] = (totales[m] || 0) + monto;
+      const b = monedaBase(m);
+      base[b]  = (base[b]  || 0) + monto;
+      canal[m] = (canal[m] || 0) + monto;
     };
+
     [...pendientesFiltrados, ...asignadosFiltrados].forEach(i => add(i.moneda, parseFloat(i.total) || 0));
     egresosFiltrados.forEach(i => add(i.moneda, -(parseFloat(i.total) || parseFloat(i.gastosAsociados) || 0)));
-    return totales;
+
+    return { totalesBase: base, totalesCanal: canal };
   }, [pendientesFiltrados, egresosFiltrados, asignadosFiltrados]);
 
   const liquidacionInstructores = useMemo(() => {
@@ -193,34 +222,20 @@ const ReporteEstadisticas = () => {
     setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
 
   const acumularEnPasivo = async (pasivo, monto, item, etiqueta) => {
-    if (!pasivo) {
-      console.warn('[saveAssignment] No se acumuló', etiqueta, '— no se encontró la tarjeta de pasivo.');
-      return;
-    }
-    if (monto <= 0) {
-      console.warn('[saveAssignment] No se acumuló', etiqueta, 'en', pasivo.titulo, '— monto calculado es', monto);
-      return;
-    }
+    if (!pasivo) { console.warn('[saveAssignment] No se acumuló', etiqueta, '— tarjeta no encontrada.'); return; }
+    if (monto <= 0) { console.warn('[saveAssignment] monto 0 para', etiqueta); return; }
     const montoRedondeado = Math.round(monto * 100) / 100;
     const nota = `${etiqueta} de ${item.actividad || 'Clase'} — ${item.fecha} = ${montoRedondeado.toFixed(2)} ${item.moneda}`;
-    console.log('[saveAssignment] Acumulando', montoRedondeado, 'en', pasivo.titulo, '(id', pasivo.id + ')');
     try {
-      // /acumular actualiza el saldo + historial de la tarjeta SIN generar
-      // un movimiento de caja: esto es deuda interna, todavía no salió plata.
-      const res = await api.put(`/api/pasivos/${pasivo.id}/acumular`, {
-        monto: -montoRedondeado,
-        nota,
-        fecha: item.fecha,
-      });
-      console.log('[saveAssignment] OK ->', pasivo.titulo, res.status, res.data);
+      const res = await api.put(`/api/pasivos/${pasivo.id}/acumular`, { monto: -montoRedondeado, nota, fecha: item.fecha });
+      console.log('[saveAssignment] OK ->', pasivo.titulo, res.status);
     } catch (e) {
-      console.error(`[saveAssignment] ERROR acumulando en pasivo de ${pasivo.titulo}:`, e.response?.data || e.message);
+      console.error(`[saveAssignment] ERROR en ${pasivo.titulo}:`, e.response?.data || e.message);
     }
   };
 
   const saveAssignment = async (item, asignadoA) => {
     if (!asignadoA || asignadoA === 'NINGUNO') return alert('Selecciona un instructor válido.');
-
     if (asignandoRef.current.has(item.id)) return;
     asignandoRef.current.add(item.id);
     setAsignandoIds(new Set(asignandoRef.current));
@@ -233,47 +248,33 @@ const ReporteEstadisticas = () => {
       ? item.detalles.split('| Reparto:')[0].trim()
       : item.detalles || '';
 
-    console.log('[saveAssignment] Asignando item', item.id, 'a', asignadoA, '| montoBase:', montoBase, '| reparto:', { mJose, mIgna, mHans });
-
     try {
       await api.put(`/api/clases/asignar/${item.id}`, { asignadoA, detalles: base + notaPct });
-
       const resPasivos = await api.get('/api/pasivos');
       const pasivosActuales = resPasivos.data;
       setPasivos(pasivosActuales);
-      console.log('[saveAssignment] Pasivos disponibles:', pasivosActuales.map(p => p.titulo));
-
       const buscar = (titulo) => pasivosActuales.find(p => p.titulo.trim().toLowerCase() === titulo.trim().toLowerCase());
-
       const pJoseObj = buscar(PASIVO_TITULOS.JOSE);
       const pIgnaObj = buscar(PASIVO_TITULOS.IGNA);
       const pHansObj = buscar(PASIVO_TITULOS.HANS);
-
-      console.log('[saveAssignment] Match José:', pJoseObj?.titulo || 'NO ENCONTRADO');
-      console.log('[saveAssignment] Match Igna:', pIgnaObj?.titulo || 'NO ENCONTRADO');
-      console.log('[saveAssignment] Match Hans:', pHansObj?.titulo || 'NO ENCONTRADO');
-
       const faltantes = [];
       if (!pJoseObj) faltantes.push(PASIVO_TITULOS.JOSE);
       if (!pIgnaObj) faltantes.push(PASIVO_TITULOS.IGNA);
       if (!pHansObj) faltantes.push(PASIVO_TITULOS.HANS);
-
       await Promise.all([
         acumularEnPasivo(pJoseObj, mJose, item, `${fmt(pJose)}%`),
         acumularEnPasivo(pIgnaObj, mIgna, item, `${fmt(pIgna)}%`),
         acumularEnPasivo(pHansObj, mHans, item, `${fmt(pHans)}%`),
       ]);
-
       fetchPasivos();
       fetchData();
-
       if (faltantes.length > 0) {
-        alert(`Asignado correctamente, pero no se encontraron estas tarjetas en Pasivos: ${faltantes.join(', ')}. Verificá que el nombre coincida exactamente.`);
+        alert(`Asignado correctamente, pero no se encontraron: ${faltantes.join(', ')}. Verificá el nombre en Pasivos.`);
       } else {
         alert('Asignado correctamente. Montos acumulados en Cuentas Corrientes de José, Igna y Hans.');
       }
     } catch (e) {
-      console.error('[saveAssignment] ERROR general:', e.response?.data || e.message);
+      console.error('[saveAssignment] ERROR:', e.response?.data || e.message);
       alert('Error de red o no autorizado al asignar.');
     } finally {
       asignandoRef.current.delete(item.id);
@@ -287,11 +288,9 @@ const ReporteEstadisticas = () => {
       ? `¿Eliminar este registro? Esto también va a restar ${item.total} ${item.moneda} del saldo de la tarjeta de Pasivos vinculada.`
       : '¿Eliminar este registro? Esta acción no se puede deshacer.';
     if (!window.confirm(advertencia)) return;
-
     if (eliminandoRef.current.has(item.id)) return;
     eliminandoRef.current.add(item.id);
     setEliminandoIds(new Set(eliminandoRef.current));
-
     try {
       await api.delete(`/api/clases/${item.id}`);
       fetchData();
@@ -318,16 +317,13 @@ const ReporteEstadisticas = () => {
     });
   };
 
-  const handleEditFieldChange = (field, value) => {
-    setEditForm(prev => ({ ...prev, [field]: value }));
-  };
+  const handleEditFieldChange = (field, value) => setEditForm(prev => ({ ...prev, [field]: value }));
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (guardandoEdicionRef.current) return;
     guardandoEdicionRef.current = true;
     setGuardandoEdicion(true);
-
     try {
       await api.put(`/api/clases/${editItem.id}`, editForm);
       setEditItem(null);
@@ -353,20 +349,38 @@ const ReporteEstadisticas = () => {
     );
   };
 
-  const RenderDetails = ({ item }) => (
-    <div style={{ background: NA.light, padding: '12px 20px', borderTop: `1px solid ${NA.border}`, fontSize: 13, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
-      <div style={{ gridColumn: '1/-1' }}><span style={{ color: NA.text2, fontWeight: 500 }}>Detalle:</span> {item.detalles || '-'}</div>
-      <div><span style={{ color: NA.text2 }}>Vendedor:</span> {item.vendedor || '-'}</div>
-      <div><span style={{ color: NA.text2 }}>Forma pago:</span> {item.formaPago || '-'}</div>
-      {item.tipoTransaccion === 'INGRESO' && (<>
-        <div><span style={{ color: NA.text2 }}>Horas:</span> {item.cantidadHoras}</div>
-        <div><span style={{ color: NA.text2 }}>Tarifa:</span> {formatCurrency(item.tarifaPorHora)}</div>
-        <div><span style={{ color: NA.text2 }}>Comisión:</span> {formatCurrency(item.comision)}</div>
-        <div><span style={{ color: '#B91C1C' }}>Gastos:</span> {formatCurrency(item.gastosAsociados)}</div>
-      </>)}
-      <div style={{ gridColumn: '1/-1' }}><span style={{ color: NA.text2 }}>Creado por:</span> {item.instructor}</div>
-    </div>
-  );
+  // ── FIX 2: Mostrar instructor de la clase, no "Creado por" ─────────────────
+  // El campo `instructor` en el registro puede ser el instructor que dio la
+  // clase (Hans, Igna, José) o el usuario que cargó el registro ("nautica atins",
+  // "Secretaria"). Mostramos ambos cuando difieren para que quede claro.
+  const RenderDetails = ({ item }) => {
+    const instructorClase = item.instructor && item.instructor !== 'Secretaria' && item.instructor !== 'nautica atins'
+      ? item.instructor
+      : null;
+    // También intentamos extraerlo del campo detalles si empieza con un nombre conocido
+    const detalleTexto = (item.detalles || '').split('|')[0].trim();
+
+    return (
+      <div style={{ background: NA.light, padding: '12px 20px', borderTop: `1px solid ${NA.border}`, fontSize: 13, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
+        <div style={{ gridColumn: '1/-1' }}><span style={{ color: NA.text2, fontWeight: 500 }}>Detalle:</span> {detalleTexto || '-'}</div>
+        {instructorClase && (
+          <div style={{ gridColumn: '1/-1' }}>
+            <span style={{ color: NA.text2, fontWeight: 500 }}>Instructor:</span>{' '}
+            <span style={{ color: NA.dark, fontWeight: 500 }}>{instructorClase}</span>
+          </div>
+        )}
+        <div><span style={{ color: NA.text2 }}>Canal de cobro:</span> {labelMoneda(item.moneda)}</div>
+        <div><span style={{ color: NA.text2 }}>Forma pago:</span> {item.formaPago || '-'}</div>
+        <div><span style={{ color: NA.text2 }}>Vendedor:</span> {item.vendedor || '-'}</div>
+        {item.tipoTransaccion === 'INGRESO' && (<>
+          {item.cantidadHoras && <div><span style={{ color: NA.text2 }}>Horas:</span> {item.cantidadHoras}</div>}
+          {item.tarifaPorHora && <div><span style={{ color: NA.text2 }}>Tarifa:</span> {formatCurrency(item.tarifaPorHora)}</div>}
+          {parseFloat(item.comision) > 0 && <div><span style={{ color: NA.text2 }}>Comisión:</span> {formatCurrency(item.comision)}</div>}
+          {parseFloat(item.gastosAsociados) > 0 && <div><span style={{ color: '#B91C1C' }}>Gastos:</span> {formatCurrency(item.gastosAsociados)}</div>}
+        </>)}
+      </div>
+    );
+  };
 
   const styles = {
     pill: (bg, color) => ({
@@ -374,36 +388,24 @@ const ReporteEstadisticas = () => {
       padding: '2px 10px', borderRadius: 99,
     }),
     sectionCard: (accent) => ({
-      background: '#fff',
-      borderRadius: 14,
-      border: `0.5px solid ${NA.border}`,
-      borderLeft: `4px solid ${accent}`,
-      overflow: 'hidden',
+      background: '#fff', borderRadius: 14,
+      border: `0.5px solid ${NA.border}`, borderLeft: `4px solid ${accent}`, overflow: 'hidden',
     }),
     sectionHeader: (bg) => ({
-      background: bg,
-      padding: '12px 20px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      background: bg, padding: '12px 20px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       borderBottom: `1px solid ${NA.border}`,
     }),
     sectionTitle: (color) => ({
       fontSize: 15, fontWeight: 500, color, display: 'flex', alignItems: 'center', gap: 8,
     }),
     row: {
-      padding: '12px 20px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      flexWrap: 'wrap',
+      padding: '12px 20px', display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
       borderBottom: `0.5px solid ${NA.border}`,
     },
     countBadge: (bg, color) => ({
-      background: bg, color,
-      fontSize: 11, fontWeight: 500,
-      padding: '2px 8px', borderRadius: 99,
+      background: bg, color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 99,
     }),
   };
 
@@ -421,6 +423,7 @@ const ReporteEstadisticas = () => {
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 16px 80px', display: 'flex', flexDirection: 'column', gap: 20, background: NA.bg, minHeight: '100%' }}>
       <style>{`@keyframes kbn-spin { to { transform:rotate(360deg) } }`}</style>
 
+      {/* ── Header con totales ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 20, borderBottom: `1px solid ${NA.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
@@ -443,34 +446,45 @@ const ReporteEstadisticas = () => {
           </div>
         </div>
 
+        {/* ── FIX 1: Paneles de totales agrupados por moneda base ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ background: NA.dark, color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
-            <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>USD</p>
-            <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>{formatCurrency(totalesPorMoneda['USD'] || 0)}</p>
-          </div>
+          {/* BRL siempre visible — agrupa Stone José + Stone Igna + Efectivo BRL */}
           <div style={{ background: '#7B5E00', color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
-            <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>BRL</p>
-            <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>R$ {formatCurrency(totalesPorMoneda['BRL'] || 0).replace('$', '')}</p>
+            <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>R$ (total)</p>
+            <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>R$ {(totalesBase['BRL'] || 0).toFixed(2)}</p>
           </div>
+          {/* USD siempre visible — agrupa USD Efectivo + USD Mariana */}
+          <div style={{ background: NA.dark, color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
+            <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>USD (total)</p>
+            <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>{formatCurrency(totalesBase['USD'] || 0)}</p>
+          </div>
+
+          {/* Desglose por canal en el dropdown */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowOtherCurrencies(!showOtherCurrencies)}
               style={{ background: '#fff', border: `1px solid ${NA.border}`, color: NA.text, borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <i className="ti ti-world" aria-hidden="true" style={{ fontSize: 15 }} /> Otras
+              <i className="ti ti-layout-list" aria-hidden="true" style={{ fontSize: 15 }} /> Desglose
             </button>
             {showOtherCurrencies && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#fff', border: `0.5px solid ${NA.border}`, borderRadius: 10, padding: 12, minWidth: 160, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,.08)' }}>
-                <p style={{ fontSize: 10, color: NA.text2, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '.06em' }}>Otras monedas</p>
-                {Object.entries(totalesPorMoneda).map(([moneda, valor]) => {
-                  if (moneda === 'USD' || moneda === 'BRL') return null;
-                  return (
-                    <div key={moneda} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}>
-                      <span style={{ color: NA.text2 }}>{moneda}</span>
-                      <span style={{ color: valor < 0 ? '#B91C1C' : NA.dark, fontWeight: 500 }}>{formatCurrency(valor)}</span>
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#fff', border: `0.5px solid ${NA.border}`, borderRadius: 10, padding: 12, minWidth: 200, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,.08)' }}>
+                <p style={{ fontSize: 10, color: NA.text2, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '.06em' }}>Por canal</p>
+                {Object.entries(totalesCanal)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([moneda, valor]) => (
+                    <div key={moneda} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: `0.5px solid ${NA.border}` }}>
+                      <span style={{ color: NA.text2 }}>{labelMoneda(moneda)}</span>
+                      <span style={{ color: valor < 0 ? '#B91C1C' : NA.dark, fontWeight: 500 }}>{valor.toFixed(2)}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                {/* Otras monedas base (EUR, ARS, CLP) si las hay */}
+                {Object.entries(totalesBase).filter(([m]) => m !== 'BRL' && m !== 'USD').map(([m, v]) => (
+                  <div key={`base-${m}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                    <span style={{ color: NA.text2, fontWeight: 500 }}>{m} total</span>
+                    <span style={{ color: v < 0 ? '#B91C1C' : NA.dark, fontWeight: 600 }}>{v.toFixed(2)}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -499,8 +513,18 @@ const ReporteEstadisticas = () => {
               <select name="moneda" value={filtros.moneda} onChange={handleFiltroChange}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
                 <option value="">Todas</option>
-                <option value="USD">USD</option><option value="BRL">BRL</option>
-                <option value="EUR">EUR</option><option value="ARS">ARS</option><option value="CLP">CLP</option>
+                <option value="R$_STONE_JOSE">R$ Stone José</option>
+                <option value="R$_STONE_IGNA">R$ Stone Igna</option>
+                <option value="R$_EFECTIVO">R$ Efectivo</option>
+                <option value="USD_EFECTIVO">USD Efectivo</option>
+                <option value="USD_MARIANA">USD Mariana</option>
+                <option value="EUR_WIZE_IGNA">€ Wize Igna</option>
+                <option disabled>──────────</option>
+                <option value="BRL">BRL genérico</option>
+                <option value="USD">USD genérico</option>
+                <option value="EUR">EUR</option>
+                <option value="ARS">ARS</option>
+                <option value="CLP">CLP</option>
               </select>
             </div>
             <div>
@@ -566,8 +590,8 @@ const ReporteEstadisticas = () => {
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</p>
                 {Object.entries(liquidacionInstructores[key]).map(([m, v]) => (
                   <div key={m} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 13 }}>{m}</span>
-                    <span style={{ color, fontSize: 18, fontWeight: 500 }}>{formatCurrency(v)}</span>
+                    <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 13 }}>{labelMoneda(m)}</span>
+                    <span style={{ color, fontSize: 18, fontWeight: 500 }}>{v.toFixed(2)}</span>
                   </div>
                 ))}
                 {Object.keys(liquidacionInstructores[key]).length === 0 &&
@@ -596,17 +620,13 @@ const ReporteEstadisticas = () => {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{item.moneda}</span></span>
+                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
                   </div>
                   <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.actividad} · {item.instructor}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <select
-                    value={item.asignadoA}
-                    onChange={(e) => handlePendienteChange(item.id, e.target.value)}
-                    disabled={asignandoEsteItem}
-                    style={{ padding: '6px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}
-                  >
+                  <select value={item.asignadoA} onChange={(e) => handlePendienteChange(item.id, e.target.value)} disabled={asignandoEsteItem}
+                    style={{ padding: '6px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
                     <option value="NINGUNO">Elegir...</option>
                     <option value="IGNA">Igna (pres)</option>
                     <option value="JOSE">Jose (pres)</option>
@@ -655,7 +675,7 @@ const ReporteEstadisticas = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                      <span style={{ color: '#B91C1C', fontWeight: 500, fontSize: 15 }}>-{formatCurrency(monto)} <span style={{ fontSize: 11, color: NA.text2 }}>{item.moneda}</span></span>
+                      <span style={{ color: '#B91C1C', fontWeight: 500, fontSize: 15 }}>-{formatCurrency(monto)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
                     </div>
                     <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.detalles || 'Egreso general'}</div>
                   </div>
@@ -697,7 +717,7 @@ const ReporteEstadisticas = () => {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{item.moneda}</span></span>
+                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
                     {parseFloat(item.gastosAsociados) > 0 && <span style={{ color: '#B91C1C', fontSize: 11 }}>-{formatCurrency(item.gastosAsociados)} gastos</span>}
                     <span style={styles.pill(NA.mid, NA.darker)}>{item.asignadoA}</span>
                   </div>
@@ -725,7 +745,6 @@ const ReporteEstadisticas = () => {
 
       <ReportesEstadisticasGraficos asignados={asignadosFiltrados} egresos={egresosFiltrados} />
 
-      {/* ── MODAL: EDITAR REGISTRO ── */}
       {editItem && editForm && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(8,80,65,.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}
@@ -739,93 +758,71 @@ const ReporteEstadisticas = () => {
               Editar {editItem.tipoTransaccion === 'INGRESO' ? 'ingreso' : 'egreso'}
             </h2>
             <p style={{ fontSize: 12, color: NA.text2, margin: '0 0 20px' }}>Registro #{editItem.id}</p>
-
             <form onSubmit={handleEditSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
                   <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Fecha</label>
-                  <input
-                    type="date" value={editForm.fecha}
-                    onChange={(e) => handleEditFieldChange('fecha', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}
-                  />
+                  <input type="date" value={editForm.fecha} onChange={(e) => handleEditFieldChange('fecha', e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Total</label>
-                  <input
-                    type="number" step="0.01" value={editForm.total}
-                    onChange={(e) => handleEditFieldChange('total', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}
-                  />
+                  <input type="number" step="0.01" value={editForm.total} onChange={(e) => handleEditFieldChange('total', e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
                   <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Actividad</label>
-                  <input
-                    type="text" value={editForm.actividad}
-                    onChange={(e) => handleEditFieldChange('actividad', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}
-                  />
+                  <input type="text" value={editForm.actividad} onChange={(e) => handleEditFieldChange('actividad', e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Moneda</label>
-                  <input
-                    type="text" value={editForm.moneda}
-                    onChange={(e) => handleEditFieldChange('moneda', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}
-                  />
+                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Canal de cobro</label>
+                  <select value={editForm.moneda} onChange={(e) => handleEditFieldChange('moneda', e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}>
+                    <option value="R$_STONE_JOSE">R$ Stone José</option>
+                    <option value="R$_STONE_IGNA">R$ Stone Igna</option>
+                    <option value="R$_EFECTIVO">R$ Efectivo</option>
+                    <option value="USD_EFECTIVO">USD Efectivo</option>
+                    <option value="USD_MARIANA">USD Mariana</option>
+                    <option value="EUR_WIZE_IGNA">€ Wize Igna</option>
+                    <option disabled>──────────</option>
+                    <option value="BRL">BRL genérico</option>
+                    <option value="USD">USD genérico</option>
+                    <option value="EUR">EUR</option>
+                    <option value="ARS">ARS</option>
+                  </select>
                 </div>
               </div>
-
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Instructor</label>
-                <input
-                  type="text" value={editForm.instructor}
-                  onChange={(e) => handleEditFieldChange('instructor', e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}
-                />
+                <input type="text" value={editForm.instructor} onChange={(e) => handleEditFieldChange('instructor', e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
-
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Forma de pago</label>
-                <input
-                  type="text" value={editForm.formaPago}
-                  onChange={(e) => handleEditFieldChange('formaPago', e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}
-                />
+                <input type="text" value={editForm.formaPago} onChange={(e) => handleEditFieldChange('formaPago', e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
-
               <div style={{ marginBottom: 18 }}>
                 <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Detalles</label>
-                <textarea
-                  rows={3} value={editForm.detalles}
-                  onChange={(e) => handleEditFieldChange('detalles', e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
-                />
+                <textarea rows={3} value={editForm.detalles} onChange={(e) => handleEditFieldChange('detalles', e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
-
               {editItem.tipoTransaccion === 'EGRESO' && editItem.pasivoId && (
                 <div style={{ background: '#FFFBEB', color: '#92400E', fontSize: 12, padding: '10px 14px', borderRadius: 10, marginBottom: 14, lineHeight: 1.4 }}>
                   Este registro está vinculado a una tarjeta de Pasivos. Editar el monto acá NO ajusta automáticamente
                   el saldo de esa tarjeta — si cambiás el total, corregí el saldo manualmente desde Cuentas Corrientes.
                 </div>
               )}
-
               <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => { setEditItem(null); setEditForm(null); }}
-                  style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-                >
+                <button type="button" onClick={() => { setEditItem(null); setEditForm(null); }}
+                  style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={guardandoEdicion}
-                  style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardandoEdicion ? NA.mid : NA.dark, color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardandoEdicion ? 'default' : 'pointer' }}
-                >
+                <button type="submit" disabled={guardandoEdicion}
+                  style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardandoEdicion ? NA.mid : NA.dark, color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardandoEdicion ? 'default' : 'pointer' }}>
                   {guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
                 </button>
               </div>
