@@ -60,7 +60,7 @@ const Secretaria = () => {
     tipoTransaccion: 'INGRESO', fecha: today, actividad: 'Clases',
     actividadOtro: '', vendedor: '', instructor: '', detalles: '',
     horas: 0, tarifa: 0, total: 0, gastos: 0, comision: 0,
-    formaPago: 'Efectivo', formaPagoOtro: '', moneda: 'R$_STONE_JOSE',
+    formaPago: 'Efectivo', formaPagoOtro: '', moneda: 'R$_STONE_IGNA',
     pasivoId: '' // <- CLAVE PARA PAGAR PASIVOS
   };
   const [financeData, setFinanceData] = useState(initialFinanceData);
