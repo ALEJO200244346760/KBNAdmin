@@ -161,7 +161,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
   const esRentalDia   = tipoBase === 'RENTAL' && rentalPeriodo === 'DIA';
   const subtotal      = esRentalDia ? precioNum : horasNum * precioNum;
   const descuentoTarj = formaPago === 'Tarjeta Credito' ? subtotal * 0.05 : 0;
-  const totalFinal    = subtotal - descuentoTarj; // gastos NO restan el total — van aparte
+  const totalFinal = subtotal - descuentoTarj - gastosNum;
 
   // ── Cuenta corriente vinculada ──────────────────────────────────────────────
   const pasivoInstructor = pasivos.find(p => {
@@ -319,10 +319,10 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
                   {/* Privadas */}
                   {[
                     { codigo: 'APK',   emoji: '🪁', sport: 'Kite',     tipo: 'Privada',    p1h: 400, p6h: 350 },
+                    { codigo: 'ASPK',  emoji: '🪁', sport: 'Kite',     tipo: 'Semiprivada',p1h: 530, p6h: 460 },                    
                     { codigo: 'APWF',  emoji: '🦅', sport: 'Wingfoil', tipo: 'Privada',    p1h: 420, p6h: 370 },
-                    { codigo: 'APWS',  emoji: '🌊', sport: 'Windsurf', tipo: 'Privada',    p1h: 370, p6h: 330 },
-                    { codigo: 'ASPK',  emoji: '🪁', sport: 'Kite',     tipo: 'Semiprivada',p1h: 530, p6h: 460 },
                     { codigo: 'ASPWF', emoji: '🦅', sport: 'Wingfoil', tipo: 'Semiprivada',p1h: 550, p6h: 480 },
+                    { codigo: 'APWS',  emoji: '🌊', sport: 'Windsurf', tipo: 'Privada',    p1h: 370, p6h: 330 },
                     { codigo: 'ASPWS', emoji: '🌊', sport: 'Windsurf', tipo: 'Semiprivada',p1h: 500, p6h: 440 },
                   ].map(({ codigo, emoji, sport, tipo, p1h, p6h }) => (
                     <Chip
@@ -400,8 +400,19 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
 
           {/* ── Fecha ── */}
           <Section title="Fecha">
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-              style={sx.input} onFocus={focusOn} onBlur={focusOff} required />
+            <input
+              type="date"
+              value={fecha}
+              onChange={e => setFecha(e.target.value)}
+              style={{
+                ...sx.input,
+                minWidth: 0,
+                fontSize: window.innerWidth < 480 ? 14 : 15,
+              }}
+              onFocus={focusOn}
+              onBlur={focusOff}
+              required
+            />
           </Section>
 
           {/* ── Alumno / Instructor ── */}
