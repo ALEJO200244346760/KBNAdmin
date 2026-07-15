@@ -29,8 +29,8 @@ const decodeTarifa = (descripcionRaw) => {
 const ACTIVIDADES = ['Clase de Kite', 'Clase de Wing', 'Clase de Windsurf', 'Rental', 'Otro'];
 
 const MONEDAS = [
-  { value: 'R$_STONE_JOSE', label: 'R$ Stone José' },
   { value: 'R$_STONE_IGNA', label: 'R$ Stone Igna' },
+  { value: 'R$_STONE_JOSE', label: 'R$ Stone José' },
   { value: 'R$_EFECTIVO', label: 'R$ Efectivo' },
   { value: 'USD_EFECTIVO', label: 'USD Efectivo' },
   { value: 'USD_MARIANA', label: 'USD Mariana' },
