@@ -1,838 +1,615 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-} from 'chart.js';
-import api from '../axiosConfig';
-import { useAuth } from '../context/AuthContext';
-import ReportesEstadisticasGraficos from './ReportesEstadisticasGraficos';
-
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
-
-const HANS_PCT = 5;
-
-const calcularReparto = (asignadoA, montoBase) => {
-  let pIgna = 8, pJose = 8;
-  if (asignadoA === 'IGNA')       { pIgna = 16; pJose = 8; }
-  else if (asignadoA === 'JOSE')  { pIgna = 8;  pJose = 16; }
-  else if (asignadoA === 'AMBOS') { pIgna = 12.5; pJose = 12.5; }
-  else                            { pIgna = 10; pJose = 10; }
-  const pHans = HANS_PCT;
-  return {
-    pIgna, pJose, pHans,
-    mIgna: (montoBase * pIgna) / 100,
-    mJose: (montoBase * pJose) / 100,
-    mHans: (montoBase * pHans) / 100,
-  };
-};
-
-const PASIVO_TITULOS = {
-  JOSE: 'José Sánchez',
-  IGNA: 'Igna Krebs',
-  HANS: 'Hans Leonhard Wurbs',
-};
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 
 const NA = {
-  primary:  '#1ABFA0',
-  dark:     '#0F6E56',
-  darker:   '#085041',
-  light:    '#E1F5EE',
-  mid:      '#9FE1CB',
-  bg:       '#f0faf7',
-  text:     '#0a2e27',
-  text2:    '#3a6b5e',
-  border:   '#c5e8df',
+  primary: '#1ABFA0', dark: '#0F6E56', darker: '#085041',
+  light: '#E1F5EE', mid: '#9FE1CB', bg: '#f0faf7',
+  text: '#0a2e27', text2: '#3a6b5e', border: '#c5e8df',
 };
 
-// ── FIX 1: Agrupamiento de monedas ─────────────────────────────────────────
-// Los valores de moneda en la DB incluyen variantes como R$_STONE_JOSE,
-// R$_STONE_IGNA, R$_EFECTIVO, USD_EFECTIVO, USD_MARIANA, EUR_WIZE_IGNA.
-// Los agrupamos en sus monedas base para los totales del panel superior,
-// y guardamos el desglose por canal para mostrarlo en el dropdown "Otras".
-
-// Devuelve la moneda base (BRL, USD, EUR, ARS, CLP) de cualquier variante
-const monedaBase = (m) => {
-  if (!m) return 'USD';
-  if (m.startsWith('R$_') || m === 'BRL') return 'BRL';
-  if (m.startsWith('USD') || m === 'USD') return 'USD';
-  if (m.startsWith('EUR') || m === 'EUR') return 'EUR';
-  return m; // ARS, CLP, etc. se muestran tal cual
+const sx = {
+  label: { fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5, fontWeight: 500 },
+  input: {
+    width: '100%', padding: '13px 14px', borderRadius: 12,
+    border: `0.5px solid ${NA.border}`, background: '#fff',
+    color: NA.text, fontSize: 15, fontFamily: 'inherit', boxSizing: 'border-box',
+    outline: 'none',
+  },
 };
 
-// Label legible para el canal
-const labelMoneda = (m) => {
-  const MAP = {
-    R$_STONE_JOSE: 'R$ Stone José',
-    R$_STONE_IGNA: 'R$ Stone Igna',
-    R$_EFECTIVO:   'R$ Efectivo',
-    USD_EFECTIVO:  'USD Efectivo',
-    USD_MARIANA:   'USD Mariana',
-    EUR_WIZE_IGNA: '€ Wize Igna',
-  };
-  return MAP[m] || m;
+const focusOn  = (e) => { e.target.style.borderColor = NA.primary; e.target.style.boxShadow = `0 0 0 3px ${NA.light}`; };
+const focusOff = (e) => { e.target.style.borderColor = NA.border;  e.target.style.boxShadow = 'none'; };
+
+// ── Tarifas de la foto ──────────────────────────────────────────────────────
+// precio/h según modalidad + deporte + duración (1h vs paquete ≥6h)
+const TARIFAS = {
+  APK:   { label: 'Aula Privada Kite',        codigo: 'APK',   tarifa1h: 400, tarifa6h: 350, instructorFijo: null },
+  ASPK:  { label: 'Aula Semiprivada Kite',    codigo: 'ASPK',  tarifa1h: 530, tarifa6h: 460, instructorFijo: 150 },
+  APWF:  { label: 'Aula Privada Wingfoil',    codigo: 'APWF',  tarifa1h: 420, tarifa6h: 370, instructorFijo: null },
+  ASPWF: { label: 'Aula Semiprivada Wingfoil',codigo: 'ASPWF', tarifa1h: 550, tarifa6h: 480, instructorFijo: 150 },
+  APWS:  { label: 'Aula Privada Windsurf',    codigo: 'APWS',  tarifa1h: 370, tarifa6h: 330, instructorFijo: null },
+  ASPWS: { label: 'Aula Semiprivada Windsurf',codigo: 'ASPWS', tarifa1h: 500, tarifa6h: 440, instructorFijo: 150 },
 };
 
-const ReporteEstadisticas = () => {
-  const { token } = useAuth();
+const RENTAL_PRECIOS = {
+  KITE:    { label: 'Rental Kite',     hora: 360, dia: 830  },
+  WINGFOIL:{ label: 'Rental Wingfoil', hora: 370, dia: 900  },
+  WINDSURF:{ label: 'Rental Windsurf', hora: 330, dia: 820  },
+};
 
-  const axiosConfig = useMemo(() => ({
-    headers: { Authorization: `Bearer ${token}` }
-  }), [token]);
+const MONEDAS = [
+  { value: 'R$_STONE_JOSE', label: 'R$ Stone José' },
+  { value: 'R$_STONE_IGNA', label: 'R$ Stone Igna' },
+  { value: 'R$_EFECTIVO',   label: 'R$ Efectivo'   },
+  { value: 'USD_EFECTIVO',  label: 'USD Efectivo'  },
+  { value: 'USD_MARIANA',   label: 'USD Mariana'   },
+  { value: 'EUR_WIZE_IGNA', label: '€ Wize Igna'  },
+  { divider: true },
+  { value: 'BRL', label: 'Reales (BRL)'   },
+  { value: 'USD', label: 'Dólares (USD)'  },
+  { value: 'EUR', label: 'Euros (EUR)'    },
+  { value: 'ARS', label: 'Pesos (ARS)'   },
+];
 
-  const [allData,    setAllData]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [pendientes, setPendientes] = useState([]);
-  const [egresos,    setEgresos]    = useState([]);
-  const [asignados,  setAsignados]  = useState([]);
-  const [pasivos,    setPasivos]    = useState([]);
+const FORMAS_PAGO = [
+  { value: 'Efectivo',        label: 'Efectivo',         desc: 'Sin cargo extra'  },
+  { value: 'Transferencia',   label: 'Transferencia',    desc: 'Sin cargo extra'  },
+  { value: 'MercadoPago',     label: 'Mercado Pago',     desc: 'Sin cargo extra'  },
+  { value: 'Tarjeta Credito', label: 'Tarjeta Crédito',  desc: '-5% del banco'   },
+];
 
-  const [mostrarFiltros,       setMostrarFiltros]       = useState(false);
-  const [showOtherCurrencies,  setShowOtherCurrencies]  = useState(false);
-  const [expandedId,           setExpandedId]           = useState(null);
+const TARIFA_PREFIX = '__tarifa__:';
+const decodeTarifa = (raw) => {
+  if (!raw || !raw.startsWith(TARIFA_PREFIX)) return { tarifaHora: null, esInstructor: false };
+  const sin = raw.slice(TARIFA_PREFIX.length);
+  const sep = sin.indexOf('||');
+  return { tarifaHora: parseFloat(sin.slice(0, sep)), esInstructor: true };
+};
 
-  const [editItem, setEditItem] = useState(null);
-  const [editForm, setEditForm] = useState(null);
-  const guardandoEdicionRef = useRef(false);
-  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
-  const eliminandoRef = useRef(new Set());
-  const [eliminandoIds, setEliminandoIds] = useState(new Set());
-  const asignandoRef = useRef(new Set());
-  const [asignandoIds, setAsignandoIds] = useState(new Set());
+// ── Chip de botón reutilizable ───────────────────────────────────────────────
+const Chip = ({ label, sub, active, onClick, accent = NA.dark }) => (
+  <button
+    type="button" onClick={onClick}
+    style={{
+      padding: '12px 10px', borderRadius: 14, border: `1.5px solid ${active ? accent : NA.border}`,
+      background: active ? accent : '#fff', color: active ? '#fff' : NA.text,
+      cursor: 'pointer', textAlign: 'center', transition: 'all .15s',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+    }}
+  >
+    <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+    {sub && <span style={{ fontSize: 10, opacity: active ? .85 : .55 }}>{sub}</span>}
+  </button>
+);
 
-  const [filtros, setFiltros] = useState({
-    moneda: '', formaPago: '', instructor: '',
-    actividad: '', fechaInicio: '', fechaFin: '', asignadoA: ''
-  });
+const Section = ({ title, children }) => (
+  <div style={{ marginBottom: 20 }}>
+    <p style={{ fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 10px', fontWeight: 600 }}>{title}</p>
+    {children}
+  </div>
+);
+
+// ── Componente principal ─────────────────────────────────────────────────────
+const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, InstructorField, setView, axiosConfig }) => {
+
+  // ── Pasos del wizard ──
+  // 0 = tipo de clase  |  1 = detalles + pago  |  2 = confirmación
+  const [paso, setPaso]           = useState(0);
+  const [guardando, setGuardando] = useState(false);
+  const enviandoRef               = useRef(false);
+
+  // ── Selecciones del paso 0 ──
+  const [tipoBase, setTipoBase]   = useState(null); // 'AULA' | 'RENTAL' | 'OTRO'
+  const [codigoAula, setCodigoAula] = useState(null); // 'APK' | 'ASPK' | etc.
+  const [rentalTipo, setRentalTipo] = useState(null); // 'KITE' | 'WINGFOIL' | 'WINDSURF'
+  const [rentalPeriodo, setRentalPeriodo] = useState(null); // 'HORA' | 'DIA'
+
+  // ── Datos del paso 1 ──
+  const today = new Date().toISOString().split('T')[0];
+  const [fecha,      setFecha]      = useState(formData.fecha || today);
+  const [horas,      setHoras]      = useState('');
+  const [precioUnitario, setPrecioUnitario] = useState(''); // precio/h o precio/día editable
+  const [moneda,     setMoneda]     = useState(formData.moneda || 'R$_STONE_IGNA');
+  const [formaPago,  setFormaPago]  = useState('Efectivo');
+  const [detalles,   setDetalles]   = useState('');
+  const [vendedor,   setVendedor]   = useState('');
+  const [gastos,     setGastos]     = useState('');
+  const [nombreAlumno, setNombreAlumno] = useState('');
+  const [instructor, setInstructor] = useState('');
+
+  // ── Pasivos para vínculo de cuenta corriente ──
+  const [pasivos, setPasivos] = useState([]);
 
   useEffect(() => {
-    if (token) { fetchData(); fetchPasivos(); }
-  }, [token]);
+    if (!axiosConfig) return;
+    axios.get('https://kbn-admin-production.up.railway.app/api/pasivos', axiosConfig)
+      .then(r => setPasivos(r.data))
+      .catch(console.error);
+  }, [axiosConfig]);
 
-  const fetchPasivos = async () => {
-    try {
-      const res = await api.get('/api/pasivos');
-      setPasivos(res.data);
-    } catch (e) { console.error('Error cargando pasivos', e); }
-  };
+  // ── Cálculos derivados ──────────────────────────────────────────────────────
+  const aula   = codigoAula ? TARIFAS[codigoAula] : null;
+  const rental = rentalTipo ? RENTAL_PRECIOS[rentalTipo] : null;
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/api/clases/listar', axiosConfig);
-      const data = response.data;
-      const listPendientes = [], listEgresos = [], listAsignados = [];
-      data.forEach(item => {
-        if (item.tipoTransaccion === 'EGRESO') {
-          listEgresos.push(item);
-        } else if (item.tipoTransaccion === 'INGRESO') {
-          if (!item.asignadoA || item.asignadoA.trim() === '' || item.asignadoA.toUpperCase() === 'NINGUNO') {
-            item.asignadoA = 'NINGUNO';
-            listPendientes.push(item);
-          } else {
-            listAsignados.push(item);
-          }
-        }
-      });
-      setAllData(data);
-      setPendientes(listPendientes);
-      setEgresos(listEgresos);
-      setAsignados(listAsignados);
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
-    } finally {
-      setLoading(false);
+  // Cuando cambia el código de aula o rental, sugiere el precio por defecto
+  useEffect(() => {
+    if (aula) {
+      // Si ya hay horas cargadas y son ≥6, usar tarifa6h; si no, tarifa1h
+      const h = parseFloat(horas) || 1;
+      setPrecioUnitario(String(h >= 6 ? aula.tarifa6h : aula.tarifa1h));
     }
-  };
+  }, [codigoAula]);
 
-  const instructoresDisponibles = useMemo(() => {
-    const set = new Set(allData.map(i => i.instructor).filter(Boolean));
-    return Array.from(set);
-  }, [allData]);
+  useEffect(() => {
+    if (rental && rentalPeriodo) {
+      setPrecioUnitario(String(rentalPeriodo === 'DIA' ? rental.dia : rental.hora));
+    }
+  }, [rentalTipo, rentalPeriodo]);
 
-  const handleFiltroChange = (e) => {
-    const { name, value } = e.target;
-    setFiltros(prev => ({ ...prev, [name]: value }));
-  };
+  // Cuando cambian horas, ajustar precio sugerido de aula
+  useEffect(() => {
+    if (!aula) return;
+    const h = parseFloat(horas) || 0;
+    if (h >= 6) setPrecioUnitario(String(aula.tarifa6h));
+    else if (h > 0) setPrecioUnitario(String(aula.tarifa1h));
+  }, [horas]);
 
-  const limpiarFiltros = () => setFiltros({
-    moneda: '', formaPago: '', instructor: '',
-    actividad: '', fechaInicio: '', fechaFin: '', asignadoA: ''
+  const horasNum  = parseFloat(horas)  || 0;
+  const precioNum = parseFloat(precioUnitario) || 0;
+  const gastosNum = parseFloat(gastos) || 0;
+
+  const esRentalDia   = tipoBase === 'RENTAL' && rentalPeriodo === 'DIA';
+  const subtotal      = esRentalDia ? precioNum : horasNum * precioNum;
+  const descuentoTarj = formaPago === 'Tarjeta Credito' ? subtotal * 0.05 : 0;
+  const totalFinal    = subtotal - descuentoTarj; // gastos NO restan el total — van aparte
+
+  // ── Cuenta corriente vinculada ──────────────────────────────────────────────
+  const pasivoInstructor = pasivos.find(p => {
+    const { esInstructor } = decodeTarifa(p.descripcion);
+    if (!esInstructor) return false;
+    const norm = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+    return norm(p.titulo) === norm(instructor);
   });
 
-  const aplicarFiltros = (lista, ignorarAsignadoA = false) => lista.filter(item => {
-    if (filtros.moneda      && item.moneda      !== filtros.moneda)      return false;
-    if (filtros.formaPago   && item.formaPago   !== filtros.formaPago)   return false;
-    if (filtros.instructor  && item.instructor  !== filtros.instructor)  return false;
-    if (filtros.actividad   && item.actividad   !== filtros.actividad)   return false;
-    if (filtros.fechaInicio && item.fecha < filtros.fechaInicio)         return false;
-    if (filtros.fechaFin    && item.fecha > filtros.fechaFin)            return false;
-    if (!ignorarAsignadoA && filtros.asignadoA && item.asignadoA !== filtros.asignadoA) return false;
+  // Para semiprivadas el instructor cobra 150 R$/h fijo, no su tarifa de pasivo
+  const esSemiprivada = aula && aula.instructorFijo !== null;
+  const tarifaInstructorEfectiva = esSemiprivada
+    ? aula.instructorFijo
+    : pasivoInstructor ? decodeTarifa(pasivoInstructor.descripcion).tarifaHora : null;
+
+  const deudaInstructor = tarifaInstructorEfectiva && horasNum > 0
+    ? Math.round(tarifaInstructorEfectiva * horasNum * 100) / 100
+    : 0;
+
+  // ── Etiqueta de actividad para guardar ─────────────────────────────────────
+  const actividadLabel = () => {
+    if (tipoBase === 'AULA' && aula)   return aula.label;
+    if (tipoBase === 'RENTAL' && rental) return rental.label;
+    return detalles || 'Otro';
+  };
+
+  // ── Validación antes de confirmar ──────────────────────────────────────────
+  const puedeConfirmar = () => {
+    if (!fecha) return false;
+    if (tipoBase === 'AULA' && !codigoAula) return false;
+    if (tipoBase === 'RENTAL' && (!rentalTipo || !rentalPeriodo)) return false;
+    if (!esRentalDia && horasNum <= 0) return false;
+    if (precioNum <= 0) return false;
     return true;
-  });
-
-  const pendientesFiltrados      = useMemo(() => aplicarFiltros(pendientes),        [pendientes, filtros]);
-  const egresosFiltrados         = useMemo(() => aplicarFiltros(egresos),           [egresos,    filtros]);
-  const asignadosFiltrados       = useMemo(() => aplicarFiltros(asignados),         [asignados,  filtros]);
-  const asignadosParaLiquidacion = useMemo(() => aplicarFiltros(asignados, true),   [asignados,  filtros]);
-
-  // ── FIX 1: totales agrupados por moneda BASE + desglose por canal ──────────
-  const { totalesBase, totalesCanal } = useMemo(() => {
-    const base = {};   // { BRL: 1234, USD: 567, ... }
-    const canal = {};  // { R$_STONE_JOSE: 900, R$_STONE_IGNA: 334, ... }
-
-    const add = (moneda, monto) => {
-      const m = moneda || 'USD';
-      const b = monedaBase(m);
-      base[b]  = (base[b]  || 0) + monto;
-      canal[m] = (canal[m] || 0) + monto;
-    };
-
-    [...pendientesFiltrados, ...asignadosFiltrados].forEach(i => add(i.moneda, parseFloat(i.total) || 0));
-    egresosFiltrados.forEach(i => add(i.moneda, -(parseFloat(i.total) || parseFloat(i.gastosAsociados) || 0)));
-
-    return { totalesBase: base, totalesCanal: canal };
-  }, [pendientesFiltrados, egresosFiltrados, asignadosFiltrados]);
-
-  const liquidacionInstructores = useMemo(() => {
-    const totales = { IGNA: {}, JOSE: {}, HANS: {} };
-    asignadosParaLiquidacion.forEach(item => {
-      const base   = parseFloat(item.total) || 0;
-      const moneda = item.moneda || 'USD';
-      const { mIgna, mJose, mHans } = calcularReparto(item.asignadoA, base);
-      totales.IGNA[moneda] = (totales.IGNA[moneda] || 0) + mIgna;
-      totales.JOSE[moneda] = (totales.JOSE[moneda] || 0) + mJose;
-      totales.HANS[moneda] = (totales.HANS[moneda] || 0) + mHans;
-    });
-    return totales;
-  }, [asignadosParaLiquidacion]);
-
-  const toggleDetails = (id) => setExpandedId(prev => prev === id ? null : id);
-
-  const formatCurrency = (val) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-      .format(parseFloat(val) || 0).replace('US', '');
-
-  const handlePendienteChange = (id, val) =>
-    setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
-
-  const acumularEnPasivo = async (pasivo, monto, item, etiqueta) => {
-    if (!pasivo) { console.warn('[saveAssignment] No se acumuló', etiqueta, '— tarjeta no encontrada.'); return; }
-    if (monto <= 0) { console.warn('[saveAssignment] monto 0 para', etiqueta); return; }
-    const montoRedondeado = Math.round(monto * 100) / 100;
-    const nota = `${etiqueta} de ${item.actividad || 'Clase'} — ${item.fecha} = ${montoRedondeado.toFixed(2)} ${item.moneda}`;
-    try {
-      const res = await api.put(`/api/pasivos/${pasivo.id}/acumular`, { monto: -montoRedondeado, nota, fecha: item.fecha });
-      console.log('[saveAssignment] OK ->', pasivo.titulo, res.status);
-    } catch (e) {
-      console.error(`[saveAssignment] ERROR en ${pasivo.titulo}:`, e.response?.data || e.message);
-    }
   };
 
-  const saveAssignment = async (item, asignadoA) => {
-    if (!asignadoA || asignadoA === 'NINGUNO') return alert('Selecciona un instructor válido.');
-    if (asignandoRef.current.has(item.id)) return;
-    asignandoRef.current.add(item.id);
-    setAsignandoIds(new Set(asignandoRef.current));
-
-    const montoBase = parseFloat(item.total) || 0;
-    const { pIgna, pJose, pHans, mIgna, mJose, mHans } = calcularReparto(asignadoA, montoBase);
-    const fmt = n => n.toString().replace('.', ',');
-    const notaPct = ` | Reparto: IGNA ${fmt(pIgna)}% ($${mIgna.toFixed(2)}) - JOSE ${fmt(pJose)}% ($${mJose.toFixed(2)}) - HANS ${fmt(pHans)}% ($${mHans.toFixed(2)})`;
-    let base = (item.detalles || '').includes('| Reparto:')
-      ? item.detalles.split('| Reparto:')[0].trim()
-      : item.detalles || '';
-
-    try {
-      await api.put(`/api/clases/asignar/${item.id}`, { asignadoA, detalles: base + notaPct });
-      const resPasivos = await api.get('/api/pasivos');
-      const pasivosActuales = resPasivos.data;
-      setPasivos(pasivosActuales);
-      const buscar = (titulo) => pasivosActuales.find(p => p.titulo.trim().toLowerCase() === titulo.trim().toLowerCase());
-      const pJoseObj = buscar(PASIVO_TITULOS.JOSE);
-      const pIgnaObj = buscar(PASIVO_TITULOS.IGNA);
-      const pHansObj = buscar(PASIVO_TITULOS.HANS);
-      const faltantes = [];
-      if (!pJoseObj) faltantes.push(PASIVO_TITULOS.JOSE);
-      if (!pIgnaObj) faltantes.push(PASIVO_TITULOS.IGNA);
-      if (!pHansObj) faltantes.push(PASIVO_TITULOS.HANS);
-      await Promise.all([
-        acumularEnPasivo(pJoseObj, mJose, item, `${fmt(pJose)}%`),
-        acumularEnPasivo(pIgnaObj, mIgna, item, `${fmt(pIgna)}%`),
-        acumularEnPasivo(pHansObj, mHans, item, `${fmt(pHans)}%`),
-      ]);
-      fetchPasivos();
-      fetchData();
-      if (faltantes.length > 0) {
-        alert(`Asignado correctamente, pero no se encontraron: ${faltantes.join(', ')}. Verificá el nombre en Pasivos.`);
-      } else {
-        alert('Asignado correctamente. Montos acumulados en Cuentas Corrientes de José, Igna y Hans.');
-      }
-    } catch (e) {
-      console.error('[saveAssignment] ERROR:', e.response?.data || e.message);
-      alert('Error de red o no autorizado al asignar.');
-    } finally {
-      asignandoRef.current.delete(item.id);
-      setAsignandoIds(new Set(asignandoRef.current));
-    }
-  };
-
-  const handleDelete = async (item) => {
-    const esDeudaInterna = item.tipoTransaccion === 'EGRESO' && item.pasivoId;
-    const advertencia = esDeudaInterna
-      ? `¿Eliminar este registro? Esto también va a restar ${item.total} ${item.moneda} del saldo de la tarjeta de Pasivos vinculada.`
-      : '¿Eliminar este registro? Esta acción no se puede deshacer.';
-    if (!window.confirm(advertencia)) return;
-    if (eliminandoRef.current.has(item.id)) return;
-    eliminandoRef.current.add(item.id);
-    setEliminandoIds(new Set(eliminandoRef.current));
-    try {
-      await api.delete(`/api/clases/${item.id}`);
-      fetchData();
-      fetchPasivos();
-    } catch (e) {
-      console.error('[handleDelete] ERROR:', e.response?.data || e.message);
-      alert('No se pudo eliminar el registro. Probá de nuevo.');
-    } finally {
-      eliminandoRef.current.delete(item.id);
-      setEliminandoIds(new Set(eliminandoRef.current));
-    }
-  };
-
-  const handleEdit = (item) => {
-    setEditItem(item);
-    setEditForm({
-      fecha: item.fecha || '',
-      actividad: item.actividad || '',
-      total: item.total || '',
-      moneda: item.moneda || 'BRL',
-      formaPago: item.formaPago || '',
-      detalles: item.detalles || '',
-      instructor: item.instructor || '',
-    });
-  };
-
-  const handleEditFieldChange = (field, value) => setEditForm(prev => ({ ...prev, [field]: value }));
-
-  const handleEditSubmit = async (e) => {
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (guardandoEdicionRef.current) return;
-    guardandoEdicionRef.current = true;
-    setGuardandoEdicion(true);
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+    setGuardando(true);
+
     try {
-      await api.put(`/api/clases/${editItem.id}`, editForm);
-      setEditItem(null);
-      setEditForm(null);
-      fetchData();
-    } catch (e) {
-      console.error('[handleEditSubmit] ERROR:', e.response?.data || e.message);
-      alert('No se pudo guardar la edición. Probá de nuevo.');
+      // Construimos el payload manualmente para tener control total
+      const payload = {
+        tipoTransaccion: 'INGRESO',
+        fecha,
+        actividad: actividadLabel(),
+        detalles: [nombreAlumno, detalles].filter(Boolean).join(' · '),
+        vendedor,
+        instructor,
+        cantidadHoras: esRentalDia ? null : String(horasNum),
+        tarifaPorHora: String(precioNum),
+        total: String(totalFinal),
+        gastosAsociados: String(gastosNum),
+        comision: String(descuentoTarj),
+        moneda,
+        formaPago,
+        detalleFormaPago: formaPago === 'Tarjeta Credito' ? '-5% banco' : null,
+      };
+
+      await axios.post(
+        'https://kbn-admin-production.up.railway.app/api/clases/guardar',
+        payload,
+        axiosConfig
+      );
+
+      // Acumular deuda del instructor si corresponde
+      if (deudaInstructor > 0 && axiosConfig) {
+        const pasivoTarget = esSemiprivada
+          ? pasivos.find(p => { const n = (s) => s.toLowerCase().replace(/\s+/g,' ').trim(); return n(p.titulo) === n(instructor); })
+          : pasivoInstructor;
+
+        if (pasivoTarget) {
+          const nota = `${actividadLabel()} · ${horasNum}h × ${tarifaInstructorEfectiva} BRL/h = ${deudaInstructor.toFixed(2)} BRL${nombreAlumno ? ` (${nombreAlumno})` : ''} — ${fecha}`;
+          await axios.put(
+            `https://kbn-admin-production.up.railway.app/api/pasivos/${pasivoTarget.id}/acumular`,
+            { monto: -deudaInstructor, nota, fecha },
+            axiosConfig
+          );
+        }
+      }
+
+      setView();
+    } catch (err) {
+      console.error('Error guardando ingreso:', err);
+      alert('No se pudo guardar el ingreso. Revisá la conexión y probá de nuevo.');
     } finally {
-      guardandoEdicionRef.current = false;
-      setGuardandoEdicion(false);
+      enviandoRef.current = false;
+      setGuardando(false);
     }
   };
 
-  const renderRepartoDesglose = (item) => {
-    const { pIgna, pJose, pHans, mIgna, mJose, mHans } = calcularReparto(item.asignadoA, parseFloat(item.total) || 0);
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-        <span style={styles.pill('#E1F5EE', NA.darker)}>IGNA {pIgna}%: {formatCurrency(mIgna)} {item.moneda}</span>
-        <span style={styles.pill('#E1F5EE', NA.dark)}>JOSE {pJose}%: {formatCurrency(mJose)} {item.moneda}</span>
-        <span style={styles.pill('#FFF8E1', '#7B5E00')}>HANS {pHans}%: {formatCurrency(mHans)} {item.moneda}</span>
-      </div>
-    );
-  };
-
-  // ── FIX 2: Mostrar instructor de la clase, no "Creado por" ─────────────────
-  // El campo `instructor` en el registro puede ser el instructor que dio la
-  // clase (Hans, Igna, José) o el usuario que cargó el registro ("nautica atins",
-  // "Secretaria"). Mostramos ambos cuando difieren para que quede claro.
-  const RenderDetails = ({ item }) => {
-    const instructorClase = item.instructor && item.instructor !== 'Secretaria' && item.instructor !== 'nautica atins'
-      ? item.instructor
-      : null;
-    // También intentamos extraerlo del campo detalles si empieza con un nombre conocido
-    const detalleTexto = (item.detalles || '').split('|')[0].trim();
-
-    return (
-      <div style={{ background: NA.light, padding: '12px 20px', borderTop: `1px solid ${NA.border}`, fontSize: 13, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
-        <div style={{ gridColumn: '1/-1' }}><span style={{ color: NA.text2, fontWeight: 500 }}>Detalle:</span> {detalleTexto || '-'}</div>
-        {instructorClase && (
-          <div style={{ gridColumn: '1/-1' }}>
-            <span style={{ color: NA.text2, fontWeight: 500 }}>Instructor:</span>{' '}
-            <span style={{ color: NA.dark, fontWeight: 500 }}>{instructorClase}</span>
-          </div>
-        )}
-        <div><span style={{ color: NA.text2 }}>Canal de cobro:</span> {labelMoneda(item.moneda)}</div>
-        <div><span style={{ color: NA.text2 }}>Forma pago:</span> {item.formaPago || '-'}</div>
-        <div><span style={{ color: NA.text2 }}>Vendedor:</span> {item.vendedor || '-'}</div>
-        {item.tipoTransaccion === 'INGRESO' && (<>
-          {item.cantidadHoras && <div><span style={{ color: NA.text2 }}>Horas:</span> {item.cantidadHoras}</div>}
-          {item.tarifaPorHora && <div><span style={{ color: NA.text2 }}>Tarifa:</span> {formatCurrency(item.tarifaPorHora)}</div>}
-          {parseFloat(item.comision) > 0 && <div><span style={{ color: NA.text2 }}>Comisión:</span> {formatCurrency(item.comision)}</div>}
-          {parseFloat(item.gastosAsociados) > 0 && <div><span style={{ color: '#B91C1C' }}>Gastos:</span> {formatCurrency(item.gastosAsociados)}</div>}
-        </>)}
-      </div>
-    );
-  };
-
-  const styles = {
-    pill: (bg, color) => ({
-      background: bg, color, fontSize: 11, fontWeight: 500,
-      padding: '2px 10px', borderRadius: 99,
-    }),
-    sectionCard: (accent) => ({
-      background: '#fff', borderRadius: 14,
-      border: `0.5px solid ${NA.border}`, borderLeft: `4px solid ${accent}`, overflow: 'hidden',
-    }),
-    sectionHeader: (bg) => ({
-      background: bg, padding: '12px 20px',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      borderBottom: `1px solid ${NA.border}`,
-    }),
-    sectionTitle: (color) => ({
-      fontSize: 15, fontWeight: 500, color, display: 'flex', alignItems: 'center', gap: 8,
-    }),
-    row: {
-      padding: '12px 20px', display: 'flex', alignItems: 'center',
-      justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
-      borderBottom: `0.5px solid ${NA.border}`,
-    },
-    countBadge: (bg, color) => ({
-      background: bg, color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 99,
-    }),
-  };
-
-  if (loading) return (
-    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: NA.bg }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 36, height: 36, border: `3px solid ${NA.mid}`, borderTopColor: NA.dark, borderRadius: '50%', animation: 'kbn-spin .7s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 12, color: NA.text2, letterSpacing: '.1em', textTransform: 'uppercase' }}>Cargando datos...</p>
-        <style>{`@keyframes kbn-spin { to { transform:rotate(360deg) } }`}</style>
-      </div>
-    </div>
-  );
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 16px 80px', display: 'flex', flexDirection: 'column', gap: 20, background: NA.bg, minHeight: '100%' }}>
-      <style>{`@keyframes kbn-spin { to { transform:rotate(360deg) } }`}</style>
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 0 80px', fontFamily: 'system-ui, sans-serif' }}>
+      <style>{`@keyframes kbn-spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Header con totales ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 20, borderBottom: `1px solid ${NA.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => setMostrarFiltros(!mostrarFiltros)}
-            style={{
-              width: 36, height: 36, borderRadius: 10,
-              border: `1px solid ${mostrarFiltros ? NA.dark : NA.border}`,
-              background: mostrarFiltros ? NA.dark : '#fff',
-              color: mostrarFiltros ? '#fff' : NA.text2,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', fontSize: 16,
-            }}
-            title="Filtros"
-          >
-            <i className="ti ti-adjustments-horizontal" aria-hidden="true" />
-          </button>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel Financiero</h1>
-            <p style={{ fontSize: 11, color: NA.text2, margin: 0 }}>Estadísticas · Náutica Atins</p>
-          </div>
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22, padding: '0 2px' }}>
+        <button
+          type="button"
+          onClick={() => paso === 0 ? setView() : setPaso(p => p - 1)}
+          style={{ width: 38, height: 38, borderRadius: 11, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+        >
+          <i className="ti ti-arrow-left" style={{ fontSize: 18 }} />
+        </button>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 600, color: NA.text, margin: 0 }}>Nuevo ingreso</h1>
+          <p style={{ fontSize: 11, color: NA.text2, margin: '2px 0 0' }}>
+            {paso === 0 ? 'Paso 1 — ¿Qué fue?' : paso === 1 ? 'Paso 2 — Detalles y pago' : 'Paso 3 — Confirmar'}
+          </p>
         </div>
+        {/* Indicador de pasos */}
+        <div style={{ display: 'flex', gap: 5 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{ width: i === paso ? 22 : 8, height: 8, borderRadius: 99, background: i <= paso ? NA.dark : NA.border, transition: 'all .2s' }} />
+          ))}
+        </div>
+      </div>
 
-        {/* ── FIX 1: Paneles de totales agrupados por moneda base ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {/* BRL siempre visible — agrupa Stone José + Stone Igna + Efectivo BRL */}
-          <div style={{ background: '#7B5E00', color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
-            <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>R$ (total)</p>
-            <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>R$ {(totalesBase['BRL'] || 0).toFixed(2)}</p>
-          </div>
-          {/* USD siempre visible — agrupa USD Efectivo + USD Mariana */}
-          <div style={{ background: NA.dark, color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
-            <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>USD (total)</p>
-            <p style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>{formatCurrency(totalesBase['USD'] || 0)}</p>
-          </div>
+      {/* ════════════════════════════════════════════════════════
+          PASO 0 — Tipo de clase
+          ════════════════════════════════════════════════════════ */}
+      {paso === 0 && (
+        <div>
+          {/* Selector de tipo base */}
+          <Section title="Tipo de actividad">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+              <Chip label="🪁 Aula"   active={tipoBase === 'AULA'}   onClick={() => { setTipoBase('AULA');   setCodigoAula(null); setRentalTipo(null); }} />
+              <Chip label="🏄 Rental" active={tipoBase === 'RENTAL'} onClick={() => { setTipoBase('RENTAL'); setCodigoAula(null); }} />
+              <Chip label="✏️ Otro"   active={tipoBase === 'OTRO'}   onClick={() => { setTipoBase('OTRO');   setCodigoAula(null); setRentalTipo(null); }} />
+            </div>
+          </Section>
 
-          {/* Desglose por canal en el dropdown */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowOtherCurrencies(!showOtherCurrencies)}
-              style={{ background: '#fff', border: `1px solid ${NA.border}`, color: NA.text, borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <i className="ti ti-layout-list" aria-hidden="true" style={{ fontSize: 15 }} /> Desglose
-            </button>
-            {showOtherCurrencies && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#fff', border: `0.5px solid ${NA.border}`, borderRadius: 10, padding: 12, minWidth: 200, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,.08)' }}>
-                <p style={{ fontSize: 10, color: NA.text2, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '.06em' }}>Por canal</p>
-                {Object.entries(totalesCanal)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([moneda, valor]) => (
-                    <div key={moneda} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: `0.5px solid ${NA.border}` }}>
-                      <span style={{ color: NA.text2 }}>{labelMoneda(moneda)}</span>
-                      <span style={{ color: valor < 0 ? '#B91C1C' : NA.dark, fontWeight: 500 }}>{valor.toFixed(2)}</span>
-                    </div>
+          {/* Sub-opciones de aula */}
+          {tipoBase === 'AULA' && (
+            <>
+              <Section title="Deporte">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                  {[
+                    { k: 'kite',     label: '🪁 Kite'     },
+                    { k: 'wingfoil', label: '🦅 Wingfoil' },
+                    { k: 'windsurf', label: '🌊 Windsurf' },
+                  ].map(({ k, label }) => {
+                    const deporteActivo = codigoAula && codigoAula.toLowerCase().includes(k === 'kite' ? 'k' : k === 'wingfoil' ? 'wf' : 'ws');
+                    return <Chip key={k} label={label} active={deporteActivo} onClick={() => {}} />;
+                  })}
+                </div>
+              </Section>
+
+              <Section title="Modalidad">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 12 }}>
+                  {/* Privadas */}
+                  {[
+                    { codigo: 'APK',   emoji: '🪁', sport: 'Kite',     tipo: 'Privada',    p1h: 400, p6h: 350 },
+                    { codigo: 'APWF',  emoji: '🦅', sport: 'Wingfoil', tipo: 'Privada',    p1h: 420, p6h: 370 },
+                    { codigo: 'APWS',  emoji: '🌊', sport: 'Windsurf', tipo: 'Privada',    p1h: 370, p6h: 330 },
+                    { codigo: 'ASPK',  emoji: '🪁', sport: 'Kite',     tipo: 'Semiprivada',p1h: 530, p6h: 460 },
+                    { codigo: 'ASPWF', emoji: '🦅', sport: 'Wingfoil', tipo: 'Semiprivada',p1h: 550, p6h: 480 },
+                    { codigo: 'ASPWS', emoji: '🌊', sport: 'Windsurf', tipo: 'Semiprivada',p1h: 500, p6h: 440 },
+                  ].map(({ codigo, emoji, sport, tipo, p1h, p6h }) => (
+                    <Chip
+                      key={codigo}
+                      label={`${emoji} ${sport} — ${tipo}`}
+                      sub={`${p1h} R$/h · 6h=${p6h}/h`}
+                      active={codigoAula === codigo}
+                      onClick={() => setCodigoAula(codigo)}
+                    />
                   ))}
-                {/* Otras monedas base (EUR, ARS, CLP) si las hay */}
-                {Object.entries(totalesBase).filter(([m]) => m !== 'BRL' && m !== 'USD').map(([m, v]) => (
-                  <div key={`base-${m}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
-                    <span style={{ color: NA.text2, fontWeight: 500 }}>{m} total</span>
-                    <span style={{ color: v < 0 ? '#B91C1C' : NA.dark, fontWeight: 600 }}>{v.toFixed(2)}</span>
+                </div>
+              </Section>
+            </>
+          )}
+
+          {/* Sub-opciones de rental */}
+          {tipoBase === 'RENTAL' && (
+            <>
+              <Section title="Equipo">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                  {Object.entries(RENTAL_PRECIOS).map(([k, v]) => (
+                    <Chip key={k} label={v.label.replace('Rental ','')} active={rentalTipo === k} onClick={() => setRentalTipo(k)} />
+                  ))}
+                </div>
+              </Section>
+              {rentalTipo && (
+                <Section title="Período">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <Chip label="Por hora" sub={`R$ ${RENTAL_PRECIOS[rentalTipo].hora}/h`} active={rentalPeriodo === 'HORA'} onClick={() => setRentalPeriodo('HORA')} />
+                    <Chip label="Diario"   sub={`R$ ${RENTAL_PRECIOS[rentalTipo].dia}/día`} active={rentalPeriodo === 'DIA'}  onClick={() => setRentalPeriodo('DIA')}  />
                   </div>
-                ))}
+                </Section>
+              )}
+            </>
+          )}
+
+          {tipoBase === 'OTRO' && (
+            <Section title="Descripción">
+              <input
+                type="text" placeholder="Ej: Curso teórico, downwind..." value={detalles}
+                onChange={e => setDetalles(e.target.value)}
+                style={{ ...sx.input }} onFocus={focusOn} onBlur={focusOff}
+              />
+            </Section>
+          )}
+
+          <button
+            type="button"
+            disabled={
+              !tipoBase ||
+              (tipoBase === 'AULA' && !codigoAula) ||
+              (tipoBase === 'RENTAL' && (!rentalTipo || !rentalPeriodo))
+            }
+            onClick={() => setPaso(1)}
+            style={{
+              width: '100%', padding: '16px', borderRadius: 14, border: 'none',
+              background: (
+                !tipoBase ||
+                (tipoBase === 'AULA' && !codigoAula) ||
+                (tipoBase === 'RENTAL' && (!rentalTipo || !rentalPeriodo))
+              ) ? NA.border : NA.dark,
+              color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 10,
+            }}
+          >
+            Continuar →
+          </button>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          PASO 1 — Detalles y pago
+          ════════════════════════════════════════════════════════ */}
+      {paso === 1 && (
+        <form onSubmit={(e) => { e.preventDefault(); if (puedeConfirmar()) setPaso(2); }}>
+
+          {/* ── Fecha ── */}
+          <Section title="Fecha">
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+              style={sx.input} onFocus={focusOn} onBlur={focusOff} required />
+          </Section>
+
+          {/* ── Alumno / Instructor ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            <div>
+              <p style={sx.label}>Nombre alumno</p>
+              <input type="text" placeholder="Juan..." value={nombreAlumno} onChange={e => setNombreAlumno(e.target.value)}
+                style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+            </div>
+            <div>
+              <p style={sx.label}>Instructor</p>
+              <div onChange={e => { if (e.target.tagName === 'SELECT') setInstructor(e.target.value); }}>
+                <InstructorField />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Horas + precio editable ── */}
+          <div style={{ background: NA.darker, borderRadius: 16, padding: 18, marginBottom: 18 }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 14px', fontWeight: 600 }}>
+              {aula ? aula.label : rental ? rental.label : 'Monto'}
+            </p>
+
+            {!esRentalDia && (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Horas</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[0.5, 1, 1.5, 2, 3, 4, 5, 6].map(h => (
+                    <button key={h} type="button" onClick={() => setHoras(String(h))}
+                      style={{
+                        flex: 1, padding: '10px 4px', borderRadius: 10, border: 'none',
+                        background: parseFloat(horas) === h ? NA.primary : 'rgba(255,255,255,.12)',
+                        color: parseFloat(horas) === h ? NA.darker : 'rgba(255,255,255,.7)',
+                        fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                      }}>
+                      {h}
+                    </button>
+                  ))}
+                </div>
+                <input type="number" step="0.5" placeholder="Otra cantidad..." value={horas}
+                  onChange={e => setHoras(e.target.value)}
+                  style={{ ...sx.input, marginTop: 8, background: 'rgba(255,255,255,.1)', border: '0.5px solid rgba(255,255,255,.2)', color: '#fff', fontSize: 13 }}
+                  onFocus={focusOn} onBlur={focusOff}
+                />
               </div>
             )}
-          </div>
-        </div>
-      </div>
 
-      {mostrarFiltros && (
-        <div style={{ background: '#fff', borderRadius: 14, border: `0.5px solid ${NA.border}`, padding: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottom: `1px solid ${NA.border}` }}>
-            <span style={{ fontSize: 12, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.08em' }}>Filtros</span>
-            <button onClick={limpiarFiltros} style={{ fontSize: 12, color: NA.dark, background: 'none', border: 'none', cursor: 'pointer' }}>Limpiar todo</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <p style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>
+                  {esRentalDia ? 'Precio/día' : 'Precio/hora'} (editable)
+                </p>
+                <input type="number" step="0.01" value={precioUnitario} onChange={e => setPrecioUnitario(e.target.value)}
+                  style={{ ...sx.input, background: 'rgba(255,255,255,.1)', border: '0.5px solid rgba(255,255,255,.2)', color: '#fff', fontSize: 16, fontWeight: 600 }}
+                  onFocus={focusOn} onBlur={focusOff}
+                />
+              </div>
+              <div>
+                <p style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Subtotal</p>
+                <div style={{ padding: '13px 14px', borderRadius: 12, background: NA.primary, color: NA.darker, fontSize: 20, fontWeight: 700, textAlign: 'center' }}>
+                  {subtotal.toFixed(2)}
+                </div>
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
+
+          {/* ── Canal de cobro ── */}
+          <Section title="Canal de cobro">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {MONEDAS.filter(m => !m.divider).map(m => (
+                <Chip key={m.value} label={m.label} active={moneda === m.value}
+                  onClick={() => setMoneda(m.value)} accent={NA.dark} />
+              ))}
+            </div>
+          </Section>
+
+          {/* ── Forma de pago ── */}
+          <Section title="Forma de pago">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+              {FORMAS_PAGO.map(f => (
+                <Chip key={f.value} label={f.label} sub={f.desc}
+                  active={formaPago === f.value}
+                  onClick={() => setFormaPago(f.value)}
+                  accent={f.value === 'Tarjeta Credito' ? '#B91C1C' : NA.dark}
+                />
+              ))}
+            </div>
+            {formaPago === 'Tarjeta Credito' && (
+              <div style={{ background: '#FEF2F2', color: '#B91C1C', fontSize: 12, padding: '10px 14px', borderRadius: 10, marginTop: 10 }}>
+                Se descuenta el 5% del banco: -{descuentoTarj.toFixed(2)} R$
+              </div>
+            )}
+          </Section>
+
+          {/* ── Gastos y vendedor ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+            <div>
+              <p style={sx.label}>Gastos (no restan)</p>
+              <input type="number" step="0.01" placeholder="0" value={gastos} onChange={e => setGastos(e.target.value)}
+                style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+            </div>
+            <div>
+              <p style={sx.label}>Vendedor (opcional)</p>
+              <input type="text" placeholder="Nombre..." value={vendedor} onChange={e => setVendedor(e.target.value)}
+                style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+            </div>
+          </div>
+
+          {/* ── Detalles adicionales ── */}
+          <Section title="Detalles adicionales (opcional)">
+            <textarea rows={2} placeholder="Ej: alumno con experiencia previa..."
+              value={detalles} onChange={e => setDetalles(e.target.value)}
+              style={{ ...sx.input, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+              onFocus={focusOn} onBlur={focusOff}
+            />
+          </Section>
+
+          <button type="submit" disabled={!puedeConfirmar()}
+            style={{
+              width: '100%', padding: '16px', borderRadius: 14, border: 'none',
+              background: puedeConfirmar() ? NA.dark : NA.border,
+              color: '#fff', fontSize: 15, fontWeight: 600, cursor: puedeConfirmar() ? 'pointer' : 'default',
+            }}>
+            Ver resumen →
+          </button>
+        </form>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          PASO 2 — Confirmación
+          ════════════════════════════════════════════════════════ */}
+      {paso === 2 && (
+        <form onSubmit={handleSubmit}>
+          {/* ── Resumen en card ── */}
+          <div style={{ background: '#fff', borderRadius: 18, border: `0.5px solid ${NA.border}`, overflow: 'hidden', marginBottom: 16 }}>
+
+            {/* Header del resumen */}
+            <div style={{ background: NA.darker, padding: '16px 20px' }}>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '0 0 4px' }}>Actividad</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>{actividadLabel()}</p>
+              {nombreAlumno && <p style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', margin: '4px 0 0' }}>{nombreAlumno}</p>}
+            </div>
+
+            {/* Filas de datos */}
             {[
-              { label: 'Desde', name: 'fechaInicio', type: 'date' },
-              { label: 'Hasta',  name: 'fechaFin',    type: 'date' },
-            ].map(f => (
-              <div key={f.name}>
-                <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 4 }}>{f.label}</label>
-                <input type={f.type} name={f.name} value={filtros[f.name]} onChange={handleFiltroChange}
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }} />
+              { label: 'Fecha',         value: fecha },
+              { label: 'Instructor',    value: instructor || '—' },
+              { label: 'Canal de cobro',value: MONEDAS.find(m => m.value === moneda)?.label || moneda },
+              { label: 'Forma de pago', value: formaPago },
+              !esRentalDia && { label: 'Horas',          value: `${horasNum}h` },
+              { label: 'Precio',        value: `R$ ${precioUnitario}/h${esRentalDia ? 'día' : ''}` },
+              subtotal !== totalFinal && { label: 'Descuento tarjeta', value: `-R$ ${descuentoTarj.toFixed(2)}` },
+              gastosNum > 0 && { label: 'Gastos (aparte)',  value: `R$ ${gastosNum.toFixed(2)}` },
+              vendedor && { label: 'Vendedor', value: vendedor },
+              detalles && { label: 'Detalles', value: detalles },
+            ].filter(Boolean).map(({ label, value }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 20px', borderBottom: `0.5px solid ${NA.border}` }}>
+                <span style={{ fontSize: 13, color: NA.text2 }}>{label}</span>
+                <span style={{ fontSize: 13, color: NA.text, fontWeight: 500, textAlign: 'right', maxWidth: '55%' }}>{value}</span>
               </div>
             ))}
-            <div>
-              <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 4 }}>Moneda</label>
-              <select name="moneda" value={filtros.moneda} onChange={handleFiltroChange}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
-                <option value="">Todas</option>
-                <option value="R$_STONE_JOSE">R$ Stone José</option>
-                <option value="R$_STONE_IGNA">R$ Stone Igna</option>
-                <option value="R$_EFECTIVO">R$ Efectivo</option>
-                <option value="USD_EFECTIVO">USD Efectivo</option>
-                <option value="USD_MARIANA">USD Mariana</option>
-                <option value="EUR_WIZE_IGNA">€ Wize Igna</option>
-                <option disabled>──────────</option>
-                <option value="BRL">BRL genérico</option>
-                <option value="USD">USD genérico</option>
-                <option value="EUR">EUR</option>
-                <option value="ARS">ARS</option>
-                <option value="CLP">CLP</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 4 }}>Forma de pago</label>
-              <select name="formaPago" value={filtros.formaPago} onChange={handleFiltroChange}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
-                <option value="">Todas</option>
-                <option value="Efectivo">Efectivo</option>
-                <option value="MercadoPago">MercadoPago</option>
-                <option value="Transferencia">Transferencia</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 4 }}>Instructor</label>
-              <select name="instructor" value={filtros.instructor} onChange={handleFiltroChange}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
-                <option value="">Todos</option>
-                {instructoresDisponibles.map(inst => <option key={inst} value={inst}>{inst}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 4 }}>Actividad</label>
-              <select name="actividad" value={filtros.actividad} onChange={handleFiltroChange}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
-                <option value="">Todas</option>
-                <option value="Clase de Kite">Clase de Kite</option>
-                <option value="Clase de Wing">Clase de Wing</option>
-                <option value="Clase de Windsurf">Clase de Windsurf</option>
-                <option value="Rental">Rental</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: NA.dark, display: 'block', marginBottom: 4, fontWeight: 500 }}>Asignado a</label>
-              <select name="asignadoA" value={filtros.asignadoA} onChange={handleFiltroChange}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `1px solid ${NA.mid}`, background: NA.light, color: NA.darker, fontSize: 13, fontWeight: 500 }}>
-                <option value="">Todos</option>
-                <option value="IGNA">Igna (pres 16% / aus 8%)</option>
-                <option value="JOSE">Jose (pres 16% / aus 8%)</option>
-                <option value="AMBOS">Ambos presentes (12,5% c/u)</option>
-                <option value="ALE">Ambos ausentes (10% c/u)</option>
-              </select>
+
+            {/* Total grande */}
+            <div style={{ padding: '18px 20px', background: NA.light, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 14, color: NA.darker, fontWeight: 600 }}>TOTAL A COBRAR</span>
+              <span style={{ fontSize: 26, color: NA.darker, fontWeight: 800 }}>R$ {totalFinal.toFixed(2)}</span>
             </div>
           </div>
-        </div>
+
+          {/* ── Vínculo con cuenta corriente del instructor ── */}
+          {deudaInstructor > 0 && (
+            <div style={{ background: NA.light, borderRadius: 14, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <i className="ti ti-link" style={{ fontSize: 18, color: NA.dark, marginTop: 1 }} />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: NA.darker, margin: '0 0 2px' }}>
+                  Cuenta corriente de {instructor}
+                </p>
+                <p style={{ fontSize: 12, color: NA.text2, margin: 0 }}>
+                  Se acumularán <strong>R$ {deudaInstructor.toFixed(2)}</strong> ({horasNum}h × {tarifaInstructorEfectiva} BRL/h
+                  {esSemiprivada ? ' — tarifa semiprivada fija' : ''})
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Botones ── */}
+          <button type="submit" disabled={guardando}
+            style={{
+              width: '100%', padding: '17px', borderRadius: 14, border: 'none',
+              background: guardando ? NA.mid : NA.dark, color: '#fff',
+              fontSize: 16, fontWeight: 700, cursor: guardando ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            }}>
+            {guardando ? (
+              <><i className="ti ti-loader-2" style={{ fontSize: 19, animation: 'kbn-spin .7s linear infinite' }} /> Guardando...</>
+            ) : (
+              <><i className="ti ti-check" style={{ fontSize: 19 }} /> Confirmar ingreso</>
+            )}
+          </button>
+
+          <button type="button" onClick={() => setPaso(1)}
+            style={{ width: '100%', padding: '13px', borderRadius: 14, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 14, fontWeight: 500, cursor: 'pointer', marginTop: 10 }}>
+            ← Volver a editar
+          </button>
+        </form>
       )}
-
-      {filtros.asignadoA !== '' && (
-        <div style={{ background: NA.darker, borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px', borderBottom: `1px solid rgba(255,255,255,.1)`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: 15, fontWeight: 500, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="ti ti-cash" aria-hidden="true" /> Liquidación a pagar
-            </h2>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>Hans 5% · Igna/Jose: pres 16% / aus 8% / ambos 12,5%</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 1, background: 'rgba(255,255,255,.05)' }}>
-            {[
-              { key: 'IGNA', label: 'Igna', color: NA.mid },
-              { key: 'JOSE', label: 'Jose', color: NA.primary },
-              { key: 'HANS', label: 'Hans · 5%', color: '#F6C94E' },
-            ].map(({ key, label, color }) => (
-              <div key={key} style={{ padding: '16px 20px', background: NA.darker }}>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</p>
-                {Object.entries(liquidacionInstructores[key]).map(([m, v]) => (
-                  <div key={m} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 13 }}>{labelMoneda(m)}</span>
-                    <span style={{ color, fontSize: 18, fontWeight: 500 }}>{v.toFixed(2)}</span>
-                  </div>
-                ))}
-                {Object.keys(liquidacionInstructores[key]).length === 0 &&
-                  <span style={{ color: 'rgba(255,255,255,.3)', fontSize: 13 }}>Sin montos</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={styles.sectionCard('#F59E0B')}>
-        <div style={styles.sectionHeader('#FFFBEB')}>
-          <h2 style={styles.sectionTitle('#92400E')}>
-            <i className="ti ti-bell" aria-hidden="true" style={{ fontSize: 17 }} />
-            Pendientes de asignación
-            <span style={styles.countBadge('#FDE68A', '#92400E')}>{pendientesFiltrados.length}</span>
-          </h2>
-        </div>
-        {pendientesFiltrados.length === 0
-          ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No hay ingresos pendientes.</div>
-          : pendientesFiltrados.map(item => {
-            const asignandoEsteItem = asignandoIds.has(item.id);
-            return (
-            <div key={item.id}>
-              <div style={styles.row}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
-                  </div>
-                  <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.actividad} · {item.instructor}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <select value={item.asignadoA} onChange={(e) => handlePendienteChange(item.id, e.target.value)} disabled={asignandoEsteItem}
-                    style={{ padding: '6px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
-                    <option value="NINGUNO">Elegir...</option>
-                    <option value="IGNA">Igna (pres)</option>
-                    <option value="JOSE">Jose (pres)</option>
-                    <option value="AMBOS">Ambos presentes</option>
-                    <option value="ALE">Ausentes</option>
-                  </select>
-                  <button onClick={() => saveAssignment(item, item.asignadoA)} disabled={asignandoEsteItem}
-                    style={{ padding: '6px 14px', background: asignandoEsteItem ? NA.mid : NA.dark, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: asignandoEsteItem ? 'default' : 'pointer', fontWeight: 500 }}>
-                    {asignandoEsteItem ? '...' : 'OK'}
-                  </button>
-                  <button onClick={() => handleEdit(item)} disabled={eliminandoIds.has(item.id)}
-                    style={{ width: 32, height: 32, borderRadius: 8, background: '#fff', color: '#92400E', border: `0.5px solid ${NA.border}`, cursor: eliminandoIds.has(item.id) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="ti ti-edit" aria-hidden="true" style={{ fontSize: 14 }} />
-                  </button>
-                  <button onClick={() => handleDelete(item)} disabled={eliminandoIds.has(item.id)}
-                    style={{ width: 32, height: 32, borderRadius: 8, background: '#fff', color: '#B91C1C', border: `0.5px solid ${NA.border}`, cursor: eliminandoIds.has(item.id) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className={`ti ${eliminandoIds.has(item.id) ? 'ti-loader-2' : 'ti-trash'}`} aria-hidden="true" style={{ fontSize: 14, ...(eliminandoIds.has(item.id) ? { animation: 'kbn-spin .7s linear infinite' } : {}) }} />
-                  </button>
-                  <button onClick={() => toggleDetails(item.id)}
-                    style={{ padding: '6px 10px', background: '#fff', color: NA.text2, border: `0.5px solid ${NA.border}`, borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
-                    <i className={`ti ti-chevron-${expandedId === item.id ? 'up' : 'down'}`} aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              {expandedId === item.id && <RenderDetails item={item} />}
-            </div>
-          );})
-        }
-      </div>
-
-      <div style={styles.sectionCard('#EF4444')}>
-        <div style={styles.sectionHeader('#FEF2F2')}>
-          <h2 style={styles.sectionTitle('#991B1B')}>
-            <i className="ti ti-trending-down" aria-hidden="true" style={{ fontSize: 17 }} />
-            Egresos
-            <span style={styles.countBadge('#FECACA', '#991B1B')}>{egresosFiltrados.length}</span>
-          </h2>
-        </div>
-        {egresosFiltrados.length === 0
-          ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No se registraron egresos con estos filtros.</div>
-          : egresosFiltrados.map(item => {
-            const monto = parseFloat(item.total) || parseFloat(item.gastosAsociados) || 0;
-            return (
-              <div key={item.id}>
-                <div style={styles.row}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                      <span style={{ color: '#B91C1C', fontWeight: 500, fontSize: 15 }}>-{formatCurrency(monto)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
-                    </div>
-                    <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.detalles || 'Egreso general'}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => toggleDetails(item.id)}
-                      style={{ padding: '5px 12px', background: '#FEF2F2', color: '#991B1B', border: '0.5px solid #FECACA', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
-                      Ver detalle
-                    </button>
-                    <button onClick={() => handleEdit(item)} disabled={eliminandoIds.has(item.id)}
-                      style={{ width: 32, height: 32, borderRadius: 8, border: '0.5px solid #FECACA', background: '#fff', color: '#92400E', cursor: eliminandoIds.has(item.id) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
-                      <i className="ti ti-edit" aria-hidden="true" />
-                    </button>
-                    <button onClick={() => handleDelete(item)} disabled={eliminandoIds.has(item.id)}
-                      style={{ width: 32, height: 32, borderRadius: 8, border: '0.5px solid #FECACA', background: '#fff', color: '#B91C1C', cursor: eliminandoIds.has(item.id) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
-                      <i className={`ti ${eliminandoIds.has(item.id) ? 'ti-loader-2' : 'ti-trash'}`} aria-hidden="true" style={eliminandoIds.has(item.id) ? { animation: 'kbn-spin .7s linear infinite' } : undefined} />
-                    </button>
-                  </div>
-                </div>
-                {expandedId === item.id && <RenderDetails item={item} />}
-              </div>
-            );
-          })
-        }
-      </div>
-
-      <div style={styles.sectionCard(NA.primary)}>
-        <div style={styles.sectionHeader(NA.light)}>
-          <h2 style={styles.sectionTitle(NA.darker)}>
-            <i className="ti ti-circle-check" aria-hidden="true" style={{ fontSize: 17 }} />
-            Ingresos asignados
-            <span style={styles.countBadge(NA.mid, NA.darker)}>{asignadosFiltrados.length}</span>
-          </h2>
-        </div>
-        {asignadosFiltrados.length === 0
-          ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No hay ingresos asignados con estos filtros.</div>
-          : asignadosFiltrados.map(item => (
-            <div key={item.id}>
-              <div style={styles.row}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
-                    {parseFloat(item.gastosAsociados) > 0 && <span style={{ color: '#B91C1C', fontSize: 11 }}>-{formatCurrency(item.gastosAsociados)} gastos</span>}
-                    <span style={styles.pill(NA.mid, NA.darker)}>{item.asignadoA}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.actividad}</div>
-                  {renderRepartoDesglose(item)}
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[
-                    { icon: 'ti-eye',   fn: () => toggleDetails(item.id),  color: NA.dark },
-                    { icon: 'ti-edit',  fn: () => handleEdit(item),        color: '#92400E' },
-                    { icon: eliminandoIds.has(item.id) ? 'ti-loader-2' : 'ti-trash', fn: () => handleDelete(item), color: '#B91C1C' },
-                  ].map(({ icon, fn, color }) => (
-                    <button key={icon} onClick={fn} disabled={eliminandoIds.has(item.id)}
-                      style={{ width: 32, height: 32, borderRadius: 8, border: `0.5px solid ${NA.border}`, background: '#fff', color, cursor: eliminandoIds.has(item.id) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
-                      <i className={`ti ${icon}`} aria-hidden="true" style={icon === 'ti-loader-2' ? { animation: 'kbn-spin .7s linear infinite' } : undefined} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {expandedId === item.id && <RenderDetails item={item} />}
-            </div>
-          ))
-        }
-      </div>
-
-      <ReportesEstadisticasGraficos asignados={asignadosFiltrados} egresos={egresosFiltrados} />
-
-      {editItem && editForm && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(8,80,65,.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}
-          onClick={() => { setEditItem(null); setEditForm(null); }}
-        >
-          <div
-            style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ fontSize: 17, fontWeight: 500, color: NA.text, margin: '0 0 4px' }}>
-              Editar {editItem.tipoTransaccion === 'INGRESO' ? 'ingreso' : 'egreso'}
-            </h2>
-            <p style={{ fontSize: 12, color: NA.text2, margin: '0 0 20px' }}>Registro #{editItem.id}</p>
-            <form onSubmit={handleEditSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <div>
-                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Fecha</label>
-                  <input type="date" value={editForm.fecha} onChange={(e) => handleEditFieldChange('fecha', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Total</label>
-                  <input type="number" step="0.01" value={editForm.total} onChange={(e) => handleEditFieldChange('total', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-                <div>
-                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Actividad</label>
-                  <input type="text" value={editForm.actividad} onChange={(e) => handleEditFieldChange('actividad', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Canal de cobro</label>
-                  <select value={editForm.moneda} onChange={(e) => handleEditFieldChange('moneda', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }}>
-                    <option value="R$_STONE_JOSE">R$ Stone José</option>
-                    <option value="R$_STONE_IGNA">R$ Stone Igna</option>
-                    <option value="R$_EFECTIVO">R$ Efectivo</option>
-                    <option value="USD_EFECTIVO">USD Efectivo</option>
-                    <option value="USD_MARIANA">USD Mariana</option>
-                    <option value="EUR_WIZE_IGNA">€ Wize Igna</option>
-                    <option disabled>──────────</option>
-                    <option value="BRL">BRL genérico</option>
-                    <option value="USD">USD genérico</option>
-                    <option value="EUR">EUR</option>
-                    <option value="ARS">ARS</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Instructor</label>
-                <input type="text" value={editForm.instructor} onChange={(e) => handleEditFieldChange('instructor', e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Forma de pago</label>
-                <input type="text" value={editForm.formaPago} onChange={(e) => handleEditFieldChange('formaPago', e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Detalles</label>
-                <textarea rows={3} value={editForm.detalles} onChange={(e) => handleEditFieldChange('detalles', e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
-              </div>
-              {editItem.tipoTransaccion === 'EGRESO' && editItem.pasivoId && (
-                <div style={{ background: '#FFFBEB', color: '#92400E', fontSize: 12, padding: '10px 14px', borderRadius: 10, marginBottom: 14, lineHeight: 1.4 }}>
-                  Este registro está vinculado a una tarjeta de Pasivos. Editar el monto acá NO ajusta automáticamente
-                  el saldo de esa tarjeta — si cambiás el total, corregí el saldo manualmente desde Cuentas Corrientes.
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" onClick={() => { setEditItem(null); setEditForm(null); }}
-                  style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-                  Cancelar
-                </button>
-                <button type="submit" disabled={guardandoEdicion}
-                  style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardandoEdicion ? NA.mid : NA.dark, color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardandoEdicion ? 'default' : 'pointer' }}>
-                  {guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
 
-export default ReporteEstadisticas;
+export default Ingreso;
