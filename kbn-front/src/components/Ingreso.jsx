@@ -400,19 +400,22 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
 
           {/* ── Fecha ── */}
           <Section title="Fecha">
-            <input
-              type="date"
-              value={fecha}
-              onChange={e => setFecha(e.target.value)}
-              style={{
-                ...sx.input,
-                minWidth: 0,
-                fontSize: window.innerWidth < 480 ? 14 : 15,
-              }}
-              onFocus={focusOn}
-              onBlur={focusOff}
-              required
-            />
+            <div style={{ width: '100%', overflow: 'hidden' }}>
+              <input
+                type="date"
+                value={fecha}
+                onChange={e => setFecha(e.target.value)}
+                style={{
+                  ...sx.input,
+                  width: '100%',
+                  minWidth: 0,
+                  boxSizing: 'border-box',
+                }}
+                onFocus={focusOn}
+                onBlur={focusOff}
+                required
+              />
+            </div>
           </Section>
 
           {/* ── Alumno / Instructor ── */}
