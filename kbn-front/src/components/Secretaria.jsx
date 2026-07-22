@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 import Pasivos from './Pasivos';
+import Monitor from './Monitor';
 
 // ── Paleta Náutica Atins ───────────────────────────────────────────────────
 const NA = {
@@ -213,59 +214,13 @@ const Secretaria = () => {
 
   if (view === 'MONITOR') {
     return (
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 4px 60px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => setView('INICIO')}
-              style={{ width: 36, height: 36, borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            >
-              <i className="ti ti-arrow-left" style={{ fontSize: 17 }} aria-hidden="true" />
-            </button>
-            <h2 style={{ fontSize: 18, fontWeight: 500, color: NA.text, margin: 0 }}>Monitor de operaciones</h2>
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {loading ? (
-            <p style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: NA.text2 }}>Actualizando datos...</p>
-          ) : agendaList.map(item => {
-            const estadoColor = item.estado === 'RECHAZADA' ? '#B91C1C' : item.estado === 'PENDIENTE' ? '#92400E' : NA.dark;
-            const estadoBg = item.estado === 'RECHAZADA' ? '#FEF2F2' : item.estado === 'PENDIENTE' ? '#FFFBEB' : NA.light;
-            return (
-              <div key={item.id} style={{ background: '#fff', borderRadius: 16, padding: 18, border: `0.5px solid ${NA.border}`, borderTop: `3px solid ${estadoColor}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 99, background: estadoBg, color: estadoColor, textTransform: 'uppercase', letterSpacing: '.04em' }}>
-                    {item.estado === 'PENDIENTE' ? 'Pendiente' : item.estado}
-                  </span>
-                  <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{item.fecha}</p>
-                </div>
-                <h3 style={{ fontSize: 16, fontWeight: 500, color: NA.text, margin: '0 0 2px' }}>{item.alumno}</h3>
-                <p style={{ fontSize: 12, color: NA.dark, margin: '0 0 12px' }}>{item.nombreInstructor}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: NA.bg, borderRadius: 10, padding: 12, fontSize: 12, color: NA.text2, marginBottom: 12 }}>
-                  <p style={{ margin: 0 }}>{item.lugar || 'Sin lugar'}</p>
-                  <p style={{ margin: 0 }}>{item.hotelDerivacion || 'Sin hotel'}</p>
-                  <p style={{ margin: 0 }}>{item.horas} hs · {item.hora?.substring(0, 5)}</p>
-                  <p style={{ margin: 0, color: NA.dark, fontWeight: 500 }}>${item.tarifa}</p>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `0.5px solid ${NA.border}`, paddingTop: 10 }}>
-                  <div>
-                    <span style={{ fontSize: 10, color: '#9ca3af', display: 'block' }}>Seña/Pagado</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: NA.text }}>${item.horasPagadas || 0}</span>
-                  </div>
-                  {item.estado === 'RECHAZADA' && (
-                    <button
-                      onClick={() => prepararReasignacion(item)}
-                      style={{ background: '#B91C1C', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}
-                    >
-                      Reasignar
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <Monitor
+        agendaList={agendaList}
+        loading={loading}
+        prepararReasignacion={prepararReasignacion}
+        setView={setView}
+        NA={NA}
+      />
     );
   }
 
