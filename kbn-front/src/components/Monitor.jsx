@@ -276,7 +276,7 @@ const Monitor = () => {
       detalles:   '',
       instructor: prefill.instructor || '',
       actividad:  'Clase de Kite',
-      asignadoA:  'IGNA',
+      asignadoA:  'JOSE',
     });
     setShowIngreso(true);
   };
@@ -827,8 +827,8 @@ const Monitor = () => {
                   <label style={{ fontSize:11, color:NA.text2, display:'block', marginBottom:4, fontWeight:500 }}>Asignado a</label>
                   <select value={ingresoForm.asignadoA} onChange={e => setIngresoForm(p => ({...p, asignadoA:e.target.value}))}
                     style={{ width:'100%', padding:'10px 10px', borderRadius:10, border:`0.5px solid ${NA.border}`, fontSize:13, color:NA.text, background:'#fff', boxSizing:'border-box' }}>
-                    <option value="IGNA">IGNA</option>
                     <option value="JOSE">JOSE</option>
+                    <option value="IGNA">IGNA</option>
                     <option value="AMBOS">AMBOS</option>
                     <option value="ALE">ALE (ausentes)</option>
                     <option value="NINGUNO">Sin asignar</option>
