@@ -59,5 +59,10 @@ public class ClaseRegistro {
 
     private String asignadoA;
 
+    // IDs de las clases de agenda cubiertas por este ingreso (ej: "3,7,12")
+    // Permite que un solo pago de un padre cubra múltiples clases de sus hijos.
+    @Column(columnDefinition = "TEXT")
+    private String agendaIds;
+
     private boolean revisado = false;
 }

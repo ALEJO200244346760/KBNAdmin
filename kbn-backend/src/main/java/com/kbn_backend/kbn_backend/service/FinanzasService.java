@@ -16,6 +16,8 @@ public class FinanzasService {
     private PasivoRepository pasivoRepository;
     @Autowired
     private PagoPasivoRepository pagoPasivoRepository;
+    @Autowired
+    private AgendaRepository agendaRepository;
 
     @Transactional
     public ClaseRegistro guardarTransaccion(ClaseRegistro registro) {
@@ -45,7 +47,27 @@ public class FinanzasService {
         // 3. Guardar el movimiento en caja
         ClaseRegistro saved = claseRepository.save(registro);
 
-        // 4. Si es un EGRESO vinculado a un Pasivo, actualizamos el saldo del pasivo
+        // 4. Si es un INGRESO con agendaIds, marcar esas clases como cobradas
+        if ("INGRESO".equalsIgnoreCase(registro.getTipoTransaccion())
+                && registro.getAgendaIds() != null
+                && !registro.getAgendaIds().isBlank()) {
+            try {
+                String[] ids = registro.getAgendaIds().split(",");
+                for (String idStr : ids) {
+                    long agendaId = Long.parseLong(idStr.trim());
+                    agendaRepository.findById(agendaId).ifPresent(a -> {
+                        a.setCobrada(true);
+                        a.setIngresoId(saved.getId());
+                        agendaRepository.save(a);
+                    });
+                }
+            } catch (Exception e) {
+                // IDs malformados — no bloquear el guardado del ingreso
+                System.err.println("FinanzasService: error parseando agendaIds: " + e.getMessage());
+            }
+        }
+
+        // 5. Si es un EGRESO vinculado a un Pasivo, actualizamos el saldo del pasivo
         if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())
                 && registro.getPasivoId() != null) {
 
@@ -54,21 +76,8 @@ public class FinanzasService {
                 double monto = Double.parseDouble(registro.getTotal());
                 String tipo = registro.getTipoMovimientoPasivo();
 
-                /*
-                 * LÓGICA DE SALDO:
-                 *
-                 * ADELANTO  → el profe nos debe plata → saldo POSITIVO (a nuestro favor)
-                 *             montoTotal SUMA el monto.
-                 *
-                 * PAGO_DEUDA → pagamos una deuda nuestra → reducimos saldo negativo
-                 *              montoTotal SUMA el monto (la deuda era negativa, sumar la acerca a 0).
-                 *
-                 * En AMBOS casos el efecto matemático sobre montoTotal es SUMAR el monto.
-                 * La diferencia semántica queda registrada en tipoMovimientoPasivo del ClaseRegistro.
-                 */
                 pasivo.setMontoTotal(pasivo.getMontoTotal() + monto);
 
-                // Registrar en el historial del pasivo
                 PagoPasivo pagoHistorial = new PagoPasivo();
                 pagoHistorial.setMontoPagado(monto);
                 pagoHistorial.setFecha(LocalDate.now());

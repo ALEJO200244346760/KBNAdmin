@@ -97,4 +97,80 @@ public class AgendaController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // 5. Actualizar campos de la clase (tipoAula, horaSalida, horas, lugar, etc.)
+    public static class ActualizarClaseRequest {
+        private String tipoAula;
+        private String horaSalida;
+        private Double horas;
+        private String lugar;
+        private String hotelDerivacion;
+        private Double tarifa;
+        private Double horasPagadas;
+        private String estado;
+
+        public String getTipoAula() { return tipoAula; }
+        public void setTipoAula(String tipoAula) { this.tipoAula = tipoAula; }
+        public String getHoraSalida() { return horaSalida; }
+        public void setHoraSalida(String horaSalida) { this.horaSalida = horaSalida; }
+        public Double getHoras() { return horas; }
+        public void setHoras(Double horas) { this.horas = horas; }
+        public String getLugar() { return lugar; }
+        public void setLugar(String lugar) { this.lugar = lugar; }
+        public String getHotelDerivacion() { return hotelDerivacion; }
+        public void setHotelDerivacion(String hotelDerivacion) { this.hotelDerivacion = hotelDerivacion; }
+        public Double getTarifa() { return tarifa; }
+        public void setTarifa(Double tarifa) { this.tarifa = tarifa; }
+        public Double getHorasPagadas() { return horasPagadas; }
+        public void setHorasPagadas(Double horasPagadas) { this.horasPagadas = horasPagadas; }
+        public String getEstado() { return estado; }
+        public void setEstado(String estado) { this.estado = estado; }
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> actualizarClase(
+            @PathVariable Long id,
+            @RequestBody ActualizarClaseRequest req
+    ) {
+        return agendaRepository.findById(id).map(agenda -> {
+            if (req.getTipoAula()         != null) agenda.setTipoAula(req.getTipoAula());
+            if (req.getHoraSalida()       != null) {
+                try {
+                    agenda.setHoraSalida(java.time.LocalTime.parse(req.getHoraSalida()));
+                } catch (Exception ignored) {}
+            }
+            if (req.getHoras()            != null) agenda.setHoras(req.getHoras());
+            if (req.getLugar()            != null) agenda.setLugar(req.getLugar());
+            if (req.getHotelDerivacion()  != null) agenda.setHotelDerivacion(req.getHotelDerivacion());
+            if (req.getTarifa()           != null) agenda.setTarifa(req.getTarifa());
+            if (req.getHorasPagadas()     != null) agenda.setHorasPagadas(req.getHorasPagadas());
+            if (req.getEstado()           != null) agenda.setEstado(req.getEstado());
+            return ResponseEntity.ok(agendaRepository.save(agenda));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 6. Marcar clase(s) como cobradas — llamado al registrar un ingreso vinculado
+    public static class CobrarRequest {
+        private Long ingresoId;
+        private java.util.List<Long> agendaIds;
+        public Long getIngresoId() { return ingresoId; }
+        public void setIngresoId(Long ingresoId) { this.ingresoId = ingresoId; }
+        public java.util.List<Long> getAgendaIds() { return agendaIds; }
+        public void setAgendaIds(java.util.List<Long> agendaIds) { this.agendaIds = agendaIds; }
+    }
+
+    @PostMapping("/cobrar")
+    public ResponseEntity<?> marcarCobradas(@RequestBody CobrarRequest req) {
+        if (req.getAgendaIds() == null || req.getAgendaIds().isEmpty()) {
+            return ResponseEntity.badRequest().body("agendaIds requerido");
+        }
+        req.getAgendaIds().forEach(aid ->
+            agendaRepository.findById(aid).ifPresent(a -> {
+                a.setCobrada(true);
+                a.setIngresoId(req.getIngresoId());
+                agendaRepository.save(a);
+            })
+        );
+        return ResponseEntity.ok("Clases marcadas como cobradas");
+    }
+
 }

@@ -32,9 +32,23 @@ public class Agenda {
     // Estados: PENDIENTE, CONFIRMADA, RECHAZADA, FINALIZADA
     private String estado;
 
+    // ── Campos nuevos ────────────────────────────────────────────────────────
+    // Hora de salida (fin de la clase)
+    private LocalTime horaSalida;
+
+    // Tipo de aula: APK, ASPK, APWF, ASPWF, APWS, ASPWS, RENTAL, OTRO
+    private String tipoAula;
+
+    // Marca si esta clase ya fue cobrada (vinculada a un ClaseRegistro de ingreso)
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean cobrada = false;
+
+    // ID del ClaseRegistro de ingreso que pagó esta clase (nullable)
+    private Long ingresoId;
+
     public Agenda() {}
 
-    // Getters y Setters para TODOS los campos
+    // Getters y Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getAlumno() { return alumno; }
@@ -43,6 +57,14 @@ public class Agenda {
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
     public LocalTime getHora() { return hora; }
     public void setHora(LocalTime hora) { this.hora = hora; }
+    public LocalTime getHoraSalida() { return horaSalida; }
+    public void setHoraSalida(LocalTime horaSalida) { this.horaSalida = horaSalida; }
+    public String getTipoAula() { return tipoAula; }
+    public void setTipoAula(String tipoAula) { this.tipoAula = tipoAula; }
+    public boolean isCobrada() { return cobrada; }
+    public void setCobrada(boolean cobrada) { this.cobrada = cobrada; }
+    public Long getIngresoId() { return ingresoId; }
+    public void setIngresoId(Long ingresoId) { this.ingresoId = ingresoId; }
     public Long getInstructorId() { return instructorId; }
     public void setInstructorId(Long instructorId) { this.instructorId = instructorId; }
     public String getNombreInstructor() { return nombreInstructor; }
