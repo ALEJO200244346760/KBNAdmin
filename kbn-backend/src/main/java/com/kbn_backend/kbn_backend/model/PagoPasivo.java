@@ -15,6 +15,9 @@ public class PagoPasivo {
     private Double montoPagado;
     private LocalDate fecha;
     private String nota;
+    // Moneda en la que se hizo este movimiento (BRL, EUR_WIZE_IGNA, USD_EFECTIVO, etc.)
+    // Null = BRL legacy (antes de este campo)
+    private String moneda;
 
     @ManyToOne
     @JoinColumn(name = "pasivo_id")
