@@ -1,10 +1,16 @@
 import React from 'react';
-import { NA, getEstado, decodeTarifa } from './PasivosShared';
+import { NA, getEstado, decodeTarifa, simboloMoneda, labelMoneda } from './PasivosShared';
 
 const PasivosCard = ({ p, onTransaction, onHistory, onEdit, onDelete }) => {
   const balance = parseFloat(p.montoTotal) || 0;
   const estado  = getEstado(balance);
   const decoded = decodeTarifa(p.descripcion);
+
+  // saldosPorMoneda viene del backend (calculado del historial)
+  const saldos = p.saldosPorMoneda || {};
+  const saldosEntries = Object.entries(saldos).filter(([, v]) => Math.abs(v) > 0.001);
+  const tieneMultiMoneda = saldosEntries.length > 1 ||
+    (saldosEntries.length === 1 && !['BRL', 'R$_STONE_JOSE', 'R$_STONE_IGNA', 'R$_EFECTIVO'].includes(saldosEntries[0][0]));
 
   return (
     <div style={{
@@ -51,12 +57,33 @@ const PasivosCard = ({ p, onTransaction, onHistory, onEdit, onDelete }) => {
       </p>
 
       {/* ── Saldo ── */}
-      <div style={{ background: estado.bg, borderRadius: 12, padding: '14px', textAlign: 'center', marginBottom: 16 }}>
-        <span style={{ display: 'block', fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Saldo actual</span>
-        <span style={{ fontSize: 24, fontWeight: 600, color: estado.color }}>
-          {p.moneda} {Math.abs(balance).toFixed(2)}
-        </span>
-      </div>
+      {tieneMultiMoneda ? (
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ display: 'block', fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Saldo por moneda</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {saldosEntries.map(([mon, val]) => {
+              const esNeg = val < -0.001;
+              const c  = esNeg ? '#B91C1C' : NA.dark;
+              const bg = esNeg ? '#FEF2F2' : NA.light;
+              return (
+                <div key={mon} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: bg, borderRadius: 10, padding: '8px 12px' }}>
+                  <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(mon)}</span>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: c }}>
+                    {simboloMoneda(mon)} {Math.abs(val).toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: estado.bg, borderRadius: 12, padding: '14px', textAlign: 'center', marginBottom: 16 }}>
+          <span style={{ display: 'block', fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Saldo actual</span>
+          <span style={{ fontSize: 24, fontWeight: 600, color: estado.color }}>
+            {p.moneda} {Math.abs(balance).toFixed(2)}
+          </span>
+        </div>
+      )}
 
       {/* ── Botones de transacción ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 8 }}>

@@ -71,6 +71,30 @@ export const TX_CONFIG = {
   ADELANTO:    { title: 'Dar adelanto',             color: NA.dark,   bg: NA.light,  icon: 'ti-trending-up',  showCaja: true  },
 };
 
+// ── Helpers de moneda ──────────────────────────────────────────────────────
+const MONEDA_LABELS = {
+  R$_STONE_JOSE: 'R$ Stone José',
+  R$_STONE_IGNA: 'R$ Stone Igna',
+  R$_EFECTIVO:   'R$ Efectivo',
+  USD_EFECTIVO:  'USD Efectivo',
+  USD_MARIANA:   'USD Mariana',
+  EUR_WIZE_IGNA: '€ Wize Igna',
+  BRL: 'Reales (BRL)',
+  USD: 'Dólares (USD)',
+  EUR: 'Euros (EUR)',
+  ARS: 'Pesos (ARS)',
+};
+export const labelMoneda = (m) => MONEDA_LABELS[m] || m || 'BRL';
+
+// Devuelve el símbolo corto para mostrar en chips de saldo
+export const simboloMoneda = (m) => {
+  if (!m || m === 'BRL' || m.startsWith('R$_')) return 'R$';
+  if (m.startsWith('USD')) return 'US$';
+  if (m.startsWith('EUR')) return '€';
+  if (m === 'ARS') return '$';
+  return m;
+};
+
 // ── Canales de caja (mismo orden que en Ingreso/Egreso) ────────────────────
 // Solo se muestran en PAGO_DEUDA y ADELANTO, ya que son los únicos donde
 // sale plata real del pozo. Permite saber de qué caja salió el dinero.

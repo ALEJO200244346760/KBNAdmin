@@ -1,10 +1,14 @@
 import React from 'react';
-import { NA, sx } from './PasivosShared';
+import { NA, sx, labelMoneda, simboloMoneda } from './PasivosShared';
 
 const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, onClose }) => {
   if (!selectedPasivo) return null;
 
   const historial = [...(selectedPasivo.historialPagos || [])].reverse();
+
+  // Saldos por moneda para el header del modal
+  const saldos = selectedPasivo.saldosPorMoneda || {};
+  const saldosEntries = Object.entries(saldos).filter(([, v]) => Math.abs(v) > 0.001);
 
   return (
     <div style={sx.overlay} onClick={onClose}>
@@ -18,7 +22,25 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
             <i className="ti ti-x" style={{ fontSize: 15 }} aria-hidden="true" />
           </button>
         </div>
-        <p style={{ fontSize: 12, color: NA.text2, margin: '0 0 18px' }}>Historial de movimientos</p>
+
+        {/* ── Saldos por moneda ── */}
+        {saldosEntries.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0 14px' }}>
+            {saldosEntries.map(([mon, val]) => {
+              const esNeg = val < -0.001;
+              return (
+                <span key={mon} style={{
+                  fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 99,
+                  background: esNeg ? '#FEF2F2' : NA.light,
+                  color: esNeg ? '#B91C1C' : NA.dark,
+                }}>
+                  {labelMoneda(mon)}: {esNeg ? '-' : '+'}{simboloMoneda(mon)} {Math.abs(val).toFixed(2)}
+                </span>
+              );
+            })}
+          </div>
+        )}
+        <p style={{ fontSize: 12, color: NA.text2, margin: '0 0 14px' }}>Historial de movimientos</p>
 
         {/* ── Lista ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto', marginBottom: 18 }}>
