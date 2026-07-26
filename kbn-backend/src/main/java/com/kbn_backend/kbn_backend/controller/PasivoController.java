@@ -32,13 +32,41 @@ public class PasivoController {
         public String getMoneda() { return moneda; } public void setMoneda(String m) { moneda = m; }
     }
 
+    // ── Códigos de moneda conocidos (para parsear notas legacy) ───────────────
+    private static final java.util.Set<String> MONEDAS_CONOCIDAS = new java.util.HashSet<>(java.util.Arrays.asList(
+        "BRL", "USD", "EUR", "ARS", "CLP",
+        "R$_STONE_JOSE", "R$_STONE_IGNA", "R$_EFECTIVO",
+        "USD_EFECTIVO", "USD_MARIANA", "EUR_WIZE_IGNA"
+    ));
+
+    // Si un movimiento no tiene moneda guardada (legacy), intenta detectarla
+    // leyendo la nota. Formato típico: "16% de Clase — fecha = 58.24 EUR_WIZE_IGNA"
+    private String detectarMonedaDeLaNota(String nota) {
+        if (nota == null || nota.isBlank()) return "BRL";
+        String[] partes = nota.trim().split("\\s+");
+        if (partes.length > 0) {
+            String ultimo = partes[partes.length - 1];
+            if (MONEDAS_CONOCIDAS.contains(ultimo)) return ultimo;
+        }
+        return "BRL";
+    }
+
     // ── Helper: calcula saldos por moneda a partir del historial ─────────────
-    // Retorna un Map<moneda, saldo> ignorando entradas sin moneda (legacy BRL).
+    // Para movimientos con campo moneda guardado, lo usa directamente.
+    // Para movimientos legacy (moneda == null), parsea la nota para inferirla.
     private Map<String, Double> calcularSaldosPorMoneda(Pasivo pasivo) {
         Map<String, Double> saldos = new LinkedHashMap<>();
         if (pasivo.getHistorialPagos() == null) return saldos;
         for (PagoPasivo p : pasivo.getHistorialPagos()) {
-            String mon = (p.getMoneda() != null && !p.getMoneda().isBlank()) ? p.getMoneda() : "BRL";
+            String mon;
+            if (p.getMoneda() != null && !p.getMoneda().isBlank()) {
+                mon = p.getMoneda();
+            } else {
+                // Legacy: inferir de la nota
+                mon = detectarMonedaDeLaNota(p.getNota());
+            }
+            // Normalizar variantes de R$ a BRL para el agrupamiento de saldo base
+            // pero mantener el canal específico para mostrar en detalle
             double monto = p.getMontoPagado() != null ? p.getMontoPagado() : 0;
             saldos.merge(mon, monto, Double::sum);
         }
@@ -182,6 +210,38 @@ public class PasivoController {
     public ResponseEntity<Map<String, Object>> obtenerPasivoPorId(@PathVariable Long id) {
         return pasivoRepository.findById(id)
                 .map(p -> ResponseEntity.ok(enriquecerPasivo(p)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // 6. RECALCULAR montoTotal de una tarjeta ────────────────────────────────
+    // Suma solo los movimientos en BRL (la moneda base de la tarjeta) del
+    // historial, ignorando movimientos en EUR/USD que estaban mal acumulados
+    // antes del fix multi-moneda. Llamar una sola vez por tarjeta afectada.
+    @Transactional
+    @PostMapping("/{id}/recalcular")
+    public ResponseEntity<?> recalcularMontoTotal(@PathVariable Long id) {
+        return pasivoRepository.findById(id)
+                .map(pasivo -> {
+                    if (pasivo.getHistorialPagos() == null) {
+                        return ResponseEntity.ok(enriquecerPasivo(pasivo));
+                    }
+                    double totalBRL = 0;
+                    for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                        String mon;
+                        if (p.getMoneda() != null && !p.getMoneda().isBlank()) {
+                            mon = p.getMoneda();
+                        } else {
+                            mon = detectarMonedaDeLaNota(p.getNota());
+                        }
+                        // Solo sumar al montoTotal los movimientos en BRL o R$_*
+                        boolean esBRL = mon.equals("BRL") || mon.startsWith("R$_");
+                        if (esBRL) {
+                            totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                        }
+                    }
+                    pasivo.setMontoTotal(totalBRL);
+                    return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivo)));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 }
