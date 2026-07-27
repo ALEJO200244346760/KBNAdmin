@@ -376,6 +376,41 @@ const Monitor = () => {
     <div style={{ maxWidth:940, margin:'0 auto', padding:'0 4px 80px', fontFamily:'system-ui,sans-serif' }}>
       <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+  <button
+    onClick={() => setView('INICIO')}
+    style={{
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      border: `0.5px solid ${NA.border}`,
+      background: '#fff',
+      color: NA.text2,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer'
+    }}
+  >
+    <i
+      className="ti ti-arrow-left"
+      style={{ fontSize: 17 }}
+      aria-hidden="true"
+    />
+  </button>
+
+  <h2
+    style={{
+      fontSize: 18,
+      fontWeight: 500,
+      color: NA.text,
+      margin: 0
+    }}
+  >
+    Monitor
+  </h2>
+</div>
+
       {/* ── BANNER ALERTAS ── */}
       {alertas.length > 0 && (
         <details style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderRadius:14, padding:'12px 16px', marginBottom:14 }}>
