@@ -284,9 +284,6 @@ const Monitor = () => {
   const toggleClaseSelec = (id) => {
     setClasesSelec(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   };
-  const volver = () => {
-  setView('INICIO'); 
-};
 
   // Cuando se seleccionan clases, inferir instructor/total automáticamente
   useEffect(() => {
@@ -380,27 +377,27 @@ const Monitor = () => {
       <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-  <button
-    onClick={() => setView('INICIO')}
-    style={{
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      border: `0.5px solid ${NA.border}`,
-      background: '#fff',
-      color: NA.text2,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer'
-    }}
-  >
-    <i
-      className="ti ti-arrow-left"
-      style={{ fontSize: 17 }}
-      aria-hidden="true"
-    />
-  </button>
+      <button
+        onClick={() => setView('INICIO')}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          border: `0.5px solid ${NA.border}`,
+          background: '#fff',
+          color: NA.text2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+      >
+        <i
+          className="ti ti-arrow-left"
+          style={{ fontSize: 17 }}
+          aria-hidden="true"
+        />
+      </button>
 
   <h2
     style={{
