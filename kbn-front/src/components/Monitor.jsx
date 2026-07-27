@@ -434,6 +434,25 @@ const Monitor = () => {
       {/* ── CALENDARIO ── */}
       <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
         {/* Header mes */}
+        <button
+          onClick={() => window.history.back()}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            border: `0.5px solid ${NA.border}`,
+            background: '#fff',
+            color: NA.text2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+          aria-label="Volver"
+        >
+          <i className="ti ti-arrow-left" style={{ fontSize: 17 }} aria-hidden="true" />
+        </button>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
           <button onClick={() => navMes(-1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <i className="ti ti-chevron-left" style={{ fontSize:15, color:NA.text2 }}/>
