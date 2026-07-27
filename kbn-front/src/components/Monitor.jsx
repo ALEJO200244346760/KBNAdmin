@@ -284,6 +284,9 @@ const Monitor = () => {
   const toggleClaseSelec = (id) => {
     setClasesSelec(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   };
+  const volver = () => {
+  setView('INICIO'); 
+};
 
   // Cuando se seleccionan clases, inferir instructor/total automáticamente
   useEffect(() => {
