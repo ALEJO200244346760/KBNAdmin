@@ -84,13 +84,21 @@ const MONEDA_LABELS = {
   EUR: 'Euros (EUR)',
   ARS: 'Pesos (ARS)',
 };
-export const labelMoneda = (m) => MONEDA_LABELS[m] || m || 'BRL';
+export const labelMoneda = (m) => {
+  if (!m) return 'BRL';
+  if (m === 'BRL' || m.startsWith('R$_')) return 'Reales (BRL)';
+  if (m === 'USD' || m.startsWith('USD')) return 'Dólares (USD)';
+  if (m === 'EUR' || m.startsWith('EUR')) return 'Euros (EUR)';
+  if (m === 'ARS') return 'Pesos (ARS)';
+  if (m === 'CLP') return 'Pesos CLP';
+  return m;
+};
 
 // Devuelve el símbolo corto para mostrar en chips de saldo
 export const simboloMoneda = (m) => {
   if (!m || m === 'BRL' || m.startsWith('R$_')) return 'R$';
-  if (m.startsWith('USD')) return 'US$';
-  if (m.startsWith('EUR')) return '€';
+  if (m === 'USD' || m.startsWith('USD')) return 'US$';
+  if (m === 'EUR' || m.startsWith('EUR')) return '€';
   if (m === 'ARS') return '$';
   return m;
 };

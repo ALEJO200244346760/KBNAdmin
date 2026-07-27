@@ -51,24 +51,34 @@ public class PasivoController {
         return "BRL";
     }
 
-    // ── Helper: calcula saldos por moneda a partir del historial ─────────────
-    // Para movimientos con campo moneda guardado, lo usa directamente.
-    // Para movimientos legacy (moneda == null), parsea la nota para inferirla.
+    // ── Helper: convierte cualquier canal a moneda base ───────────────────────
+    private String monedaBaseDeCanal(String canal) {
+        if (canal == null || canal.isBlank() || canal.equals("BRL") || canal.startsWith("R$_")) return "BRL";
+        if (canal.startsWith("USD")) return "USD";
+        if (canal.startsWith("EUR")) return "EUR";
+        if (canal.equals("ARS")) return "ARS";
+        if (canal.equals("CLP")) return "CLP";
+        return canal;
+    }
+
+    // ── Helper: calcula saldos por moneda BASE (BRL/USD/EUR) ─────────────────
+    // Agrupa R$_STONE_JOSE, R$_STONE_IGNA, R$_EFECTIVO → BRL
+    //         USD_EFECTIVO, USD_MARIANA                 → USD
+    //         EUR_WIZE_IGNA                             → EUR
+    // Para movimientos legacy (moneda == null), parsea la nota.
     private Map<String, Double> calcularSaldosPorMoneda(Pasivo pasivo) {
         Map<String, Double> saldos = new LinkedHashMap<>();
         if (pasivo.getHistorialPagos() == null) return saldos;
         for (PagoPasivo p : pasivo.getHistorialPagos()) {
-            String mon;
+            String canal;
             if (p.getMoneda() != null && !p.getMoneda().isBlank()) {
-                mon = p.getMoneda();
+                canal = p.getMoneda();
             } else {
-                // Legacy: inferir de la nota
-                mon = detectarMonedaDeLaNota(p.getNota());
+                canal = detectarMonedaDeLaNota(p.getNota());
             }
-            // Normalizar variantes de R$ a BRL para el agrupamiento de saldo base
-            // pero mantener el canal específico para mostrar en detalle
+            String monedaBase = monedaBaseDeCanal(canal);
             double monto = p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-            saldos.merge(mon, monto, Double::sum);
+            saldos.merge(monedaBase, monto, Double::sum);
         }
         return saldos;
     }
@@ -227,14 +237,13 @@ public class PasivoController {
                     }
                     double totalBRL = 0;
                     for (PagoPasivo p : pasivo.getHistorialPagos()) {
-                        String mon;
+                        String canal;
                         if (p.getMoneda() != null && !p.getMoneda().isBlank()) {
-                            mon = p.getMoneda();
+                            canal = p.getMoneda();
                         } else {
-                            mon = detectarMonedaDeLaNota(p.getNota());
+                            canal = detectarMonedaDeLaNota(p.getNota());
                         }
-                        // Solo sumar al montoTotal los movimientos en BRL o R$_*
-                        boolean esBRL = mon.equals("BRL") || mon.startsWith("R$_");
+                        boolean esBRL = monedaBaseDeCanal(canal).equals("BRL");
                         if (esBRL) {
                             totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
                         }
