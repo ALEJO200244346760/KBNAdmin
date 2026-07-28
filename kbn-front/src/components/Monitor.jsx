@@ -77,11 +77,11 @@ const Input = ({ label, ...props }) => (
 );
 
 // ── Monitor ───────────────────────────────────────────────────────────────────
-const Monitor = (agendaList,
-  loading,
+const Monitor = ({
+  agendaList,
   prepararReasignacion,
-  setView,
-  NA) => {
+  setView
+}) => {
   const [mes, setMes] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [agenda,   setAgenda]   = useState([]);
   const [clases,   setClases]   = useState([]);
@@ -413,7 +413,7 @@ const Monitor = (agendaList,
       >
         Monitor
       </h2>
-    </div>
+      </div>
 
       {/* ── BANNER ALERTAS ── */}
       {alertas.length > 0 && (
