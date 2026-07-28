@@ -77,7 +77,11 @@ const Input = ({ label, ...props }) => (
 );
 
 // ── Monitor ───────────────────────────────────────────────────────────────────
-const Monitor = (setView) => {
+const Monitor = (agendaList,
+  loading,
+  prepararReasignacion,
+  setView,
+  NA) => {
   const [mes, setMes] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [agenda,   setAgenda]   = useState([]);
   const [clases,   setClases]   = useState([]);
