@@ -399,17 +399,17 @@ const Monitor = () => {
         />
       </button>
 
-  <h2
-    style={{
-      fontSize: 18,
-      fontWeight: 500,
-      color: NA.text,
-      margin: 0
-    }}
-  >
-    Monitor
-  </h2>
-</div>
+      <h2
+        style={{
+          fontSize: 18,
+          fontWeight: 500,
+          color: NA.text,
+          margin: 0
+        }}
+      >
+        Monitor
+      </h2>
+    </div>
 
       {/* ── BANNER ALERTAS ── */}
       {alertas.length > 0 && (
