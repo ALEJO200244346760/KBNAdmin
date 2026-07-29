@@ -139,17 +139,19 @@ const Monitor = ({
     return Array.from(set).filter(Boolean).sort();
   }, [agenda, usuarios]);
 
-  // Clase agenda → ingreso vinculado (por cobrada+ingresoId o por fecha+instructor)
+  // Clase agenda → ingreso vinculado.
+  // SOLO usa el link explícito (cobrada=true + ingresoId).
+  // El fallback por fecha+instructor fue eliminado porque causaba
+  // que todas las clases del mismo instructor en el mismo día
+  // aparecieran como cobradas con el primer ingreso que hubiera.
   const ingresoDeClase = useCallback((clase) => {
     if (clase.cobrada && clase.ingresoId) {
       return ingresos.find(i => i.id === clase.ingresoId) || null;
     }
-    // Fallback: heurística fecha + instructor
-    const f = clase.fecha?.toString();
-    return ingresos.find(i => i.fecha === f && normName(i.instructor) === normName(clase.nombreInstructor)) || null;
+    return null;
   }, [ingresos]);
 
-  const tieneCobro = (clase) => clase.cobrada || !!ingresoDeClase(clase);
+  const tieneCobro = (clase) => !!(clase.cobrada && clase.ingresoId);
 
   // ── Alertas: clases pasadas sin cobro ────────────────────────────────────
   const alertas = useMemo(() => agenda.filter(a => {
@@ -246,20 +248,34 @@ const Monitor = ({
       horas:      clase.horas || '',
       lugar:      clase.lugar || '',
       tarifa:     clase.tarifa || '',
+      // Para vincular cobro manualmente
+      ingresoIdSelec: clase.ingresoId || '',
+      cobrada:    clase.cobrada || false,
     });
   };
+
+  // Ingresos disponibles del día de la clase que se está editando (para vincular)
+  const ingresosDelDiaEdit = useMemo(() => {
+    if (!editClase) return [];
+    const f = editClase.fecha?.toString();
+    return ingresos.filter(i => i.fecha === f);
+  }, [editClase, ingresos]);
 
   const guardarEditClase = async () => {
     if (guardandoEditRef.current) return;
     guardandoEditRef.current = true;
     setGuardandoEdit(true);
     try {
+      const ingresoIdNum = editForm.ingresoIdSelec ? parseInt(editForm.ingresoIdSelec) : null;
       const payload = {
-        tipoAula: editForm.tipoAula || null,
-        horaSalida: editForm.horaSalida || null,
-        horas: editForm.horas ? parseFloat(editForm.horas) : null,
-        lugar: editForm.lugar || null,
-        tarifa: editForm.tarifa ? parseFloat(editForm.tarifa) : null,
+        tipoAula:  editForm.tipoAula  || null,
+        horaSalida:editForm.horaSalida|| null,
+        horas:     editForm.horas     ? parseFloat(editForm.horas)  : null,
+        lugar:     editForm.lugar     || null,
+        tarifa:    editForm.tarifa    ? parseFloat(editForm.tarifa) : null,
+        // Vínculo de cobro: si eligió un ingreso, marca cobrada=true
+        cobrada:   !!ingresoIdNum,
+        ingresoId: ingresoIdNum || null,
       };
       const res = await api.patch(`/api/agenda/${editClase.id}`, payload);
       setAgenda(p => p.map(a => a.id === editClase.id ? res.data : a));
