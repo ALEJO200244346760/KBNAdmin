@@ -254,11 +254,21 @@ const Monitor = ({
     });
   };
 
-  // Ingresos disponibles del día de la clase que se está editando (para vincular)
-  const ingresosDelDiaEdit = useMemo(() => {
+  // Ingresos disponibles para vincular con la clase que se está editando.
+  // Muestra TODOS los ingresos del mismo instructor (o sin instructor asignado),
+  // porque un padre puede pagar N clases futuras por adelantado, o pagar
+  // al final de varias clases juntas — la fecha del pago no coincide con
+  // la fecha de cada clase individual.
+  const ingresosDisponiblesEdit = useMemo(() => {
     if (!editClase) return [];
-    const f = editClase.fecha?.toString();
-    return ingresos.filter(i => i.fecha === f);
+    const normInst = normName(editClase.nombreInstructor);
+    return ingresos
+      .filter(i => {
+        // Incluir si el instructor del ingreso coincide, o si no tiene instructor asignado
+        const iNorm = normName(i.instructor);
+        return iNorm === normInst || iNorm === '' || iNorm === 'secretaria' || iNorm === 'nautica atins';
+      })
+      .sort((a, b) => b.fecha.localeCompare(a.fecha)); // más recientes primero
   }, [editClase, ingresos]);
 
   const guardarEditClase = async () => {
@@ -723,46 +733,400 @@ const Monitor = ({
           MODAL: EDITAR CLASE (tipoAula, horaSalida, horas, etc.)
           ════════════════════════════════════════════════════════ */}
       {editClase && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(8,80,65,.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:16 }}
-          onClick={() => setEditClase(null)}>
-          <div style={{ background:'#fff', borderRadius:20, padding:24, width:'100%', maxWidth:420, maxHeight:'90vh', overflowY:'auto', boxSizing:'border-box' }}
-            onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontSize:17, fontWeight:700, color:NA.text, margin:'0 0 4px' }}>Editar clase</h2>
-            <p style={{ margin:'0 0 18px', fontSize:12, color:NA.text2 }}>{editClase.alumno} · {fmt(editClase.fecha?.toString())}</p>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(8,80,65,.45)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+            padding: 16,
+          }}
+          onClick={() => setEditClase(null)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 420,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxSizing: "border-box",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 700,
+                color: NA.text,
+                margin: "0 0 4px",
+              }}
+            >
+              Editar clase
+            </h2>
 
-            <div style={{ marginBottom:12 }}>
-              <label style={{ fontSize:11, color:NA.text2, display:'block', marginBottom:4, fontWeight:500 }}>Tipo de aula</label>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+            <p
+              style={{
+                margin: "0 0 18px",
+                fontSize: 12,
+                color: NA.text2,
+              }}
+            >
+              {editClase.alumno} · {fmt(editClase.fecha?.toString())}
+            </p>
+
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  color: NA.text2,
+                  display: "block",
+                  marginBottom: 4,
+                  fontWeight: 500,
+                }}
+              >
+                Tipo de aula
+              </label>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 6,
+                }}
+              >
                 {TIPOS_AULA.map(({ v, l }) => (
-                  <button key={v} type="button" onClick={() => setEditForm(p => ({...p, tipoAula:v}))}
-                    style={{ padding:'9px 8px', borderRadius:10, border:`1.5px solid ${editForm.tipoAula===v ? NA.dark : NA.border}`,
-                      background: editForm.tipoAula===v ? NA.dark : '#fff', color: editForm.tipoAula===v ? '#fff' : NA.text,
-                      fontSize:11, fontWeight:600, cursor:'pointer', textAlign:'center' }}>
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() =>
+                      setEditForm((p) => ({
+                        ...p,
+                        tipoAula: v,
+                      }))
+                    }
+                    style={{
+                      padding: "9px 8px",
+                      borderRadius: 10,
+                      border: `1.5px solid ${
+                        editForm.tipoAula === v ? NA.dark : NA.border
+                      }`,
+                      background: editForm.tipoAula === v ? NA.dark : "#fff",
+                      color: editForm.tipoAula === v ? "#fff" : NA.text,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      textAlign: "center",
+                    }}
+                  >
                     {l}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Input label="Hora entrada" type="time" value={editForm.horaSalida ? (editClase.hora?.substring(0,5)||'') : (editClase.hora?.substring(0,5)||'')}
-                style={{ background:'#f9fafb', color:'#9ca3af' }} readOnly/>
-              <Input label="Hora salida" type="time" value={editForm.horaSalida}
-                onChange={e => setEditForm(p => ({...p, horaSalida: e.target.value}))}/>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Input label="Horas" type="number" step="0.5" value={editForm.horas}
-                onChange={e => setEditForm(p => ({...p, horas: e.target.value}))}/>
-              <Input label="Tarifa (R$/h)" type="number" value={editForm.tarifa}
-                onChange={e => setEditForm(p => ({...p, tarifa: e.target.value}))}/>
-            </div>
-            <Input label="Lugar" type="text" value={editForm.lugar}
-              onChange={e => setEditForm(p => ({...p, lugar: e.target.value}))}/>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <Input
+                label="Hora entrada"
+                type="time"
+                value={editClase.hora?.substring(0, 5) || ""}
+                style={{
+                  background: "#f9fafb",
+                  color: "#9ca3af",
+                }}
+                readOnly
+              />
 
-            <div style={{ display:'flex', gap:10, marginTop:18 }}>
-              <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={() => setEditClase(null)}/>
-              <Btn label={guardandoEdit ? 'Guardando...' : 'Guardar cambios'} disabled={guardandoEdit}
-                onClick={guardarEditClase}/>
+              <Input
+                label="Hora salida"
+                type="time"
+                value={editForm.horaSalida}
+                onChange={(e) =>
+                  setEditForm((p) => ({
+                    ...p,
+                    horaSalida: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <Input
+                label="Horas"
+                type="number"
+                step="0.5"
+                value={editForm.horas}
+                onChange={(e) =>
+                  setEditForm((p) => ({
+                    ...p,
+                    horas: e.target.value,
+                  }))
+                }
+              />
+
+              <Input
+                label="Tarifa (R$/h)"
+                type="number"
+                value={editForm.tarifa}
+                onChange={(e) =>
+                  setEditForm((p) => ({
+                    ...p,
+                    tarifa: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <Input
+              label="Lugar"
+              type="text"
+              value={editForm.lugar}
+              onChange={(e) =>
+                setEditForm((p) => ({
+                  ...p,
+                  lugar: e.target.value,
+                }))
+              }
+            />
+
+            {/* ── Vínculo de cobro ── */}
+            <div style={{ marginTop: 16, marginBottom: 4 }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  color: NA.text2,
+                  display: "block",
+                  marginBottom: 6,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: ".06em",
+                }}
+              >
+                Cobro vinculado
+              </label>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setEditForm((p) => ({
+                    ...p,
+                    ingresoIdSelec: "",
+                    cobrada: false,
+                  }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  marginBottom: 6,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  border: `1.5px solid ${
+                    !editForm.ingresoIdSelec ? "#B91C1C" : NA.border
+                  }`,
+                  background: !editForm.ingresoIdSelec ? "#FEF2F2" : "#fff",
+                  color: !editForm.ingresoIdSelec ? "#B91C1C" : NA.text2,
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                ✗ Sin cobro registrado
+              </button>
+
+              {ingresosDisponiblesEdit.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#9ca3af",
+                    padding: "8px 0",
+                  }}
+                >
+                  No hay ingresos de este instructor.
+                </p>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    maxHeight: 280,
+                    overflowY: "auto",
+                  }}
+                >
+                  {ingresosDisponiblesEdit.map((i) => {
+                    const sel =
+                      String(editForm.ingresoIdSelec) === String(i.id);
+
+                    const clasesVinculadas = agenda.filter(
+                      (a) =>
+                        a.ingresoId === i.id &&
+                        a.id !== editClase?.id
+                    );
+
+                    const esMismoDia =
+                      i.fecha === editClase?.fecha?.toString();
+
+                    return (
+                      <button
+                        key={i.id}
+                        type="button"
+                        onClick={() =>
+                          setEditForm((p) => ({
+                            ...p,
+                            ingresoIdSelec: String(i.id),
+                            cobrada: true,
+                          }))
+                        }
+                        style={{
+                          padding: "11px 14px",
+                          borderRadius: 10,
+                          textAlign: "left",
+                          cursor: "pointer",
+                          border: `1.5px solid ${
+                            sel ? NA.dark : NA.border
+                          }`,
+                          background: sel ? NA.light : "#fff",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 6,
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                marginBottom: 2,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: sel ? NA.darker : NA.text,
+                                }}
+                              >
+                                #{i.id} ·{" "}
+                                {parseFloat(i.total || 0).toFixed(2)}{" "}
+                                {i.moneda?.startsWith("R$") ||
+                                i.moneda === "BRL"
+                                  ? "R$"
+                                  : i.moneda?.startsWith("EUR")
+                                  ? "€"
+                                  : "US$"}
+                              </span>
+
+                              {esMismoDia && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    padding: "1px 7px",
+                                    borderRadius: 99,
+                                    background: "#D1FAE5",
+                                    color: "#065F46",
+                                  }}
+                                >
+                                  mismo día
+                                </span>
+                              )}
+
+                              {clasesVinculadas.length > 0 && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    padding: "1px 7px",
+                                    borderRadius: 99,
+                                    background: "#EEF2FF",
+                                    color: "#4338CA",
+                                  }}
+                                >
+                                  {clasesVinculadas.length} clase
+                                  {clasesVinculadas.length > 1
+                                    ? "s"
+                                    : ""}{" "}
+                                  más
+                                </span>
+                              )}
+                            </div>
+
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: NA.text2,
+                              }}
+                            >
+                              {i.fecha} ·{" "}
+                              {i.detalles?.split("|")[0].trim() ||
+                                i.actividad ||
+                                ""}
+                            </span>
+                          </div>
+
+                          {sel && (
+                            <i
+                              className="ti ti-check"
+                              style={{
+                                color: NA.dark,
+                                fontSize: 16,
+                                flexShrink: 0,
+                              }}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Botones */}
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginTop: 20,
+              }}
+            >
+              <Btn
+                label="Cancelar"
+                bg="#fff"
+                color={NA.text2}
+                onClick={() => setEditClase(null)}
+              />
+
+              <Btn
+                label={guardandoEdit ? "Guardando..." : "Guardar cambios"}
+                disabled={guardandoEdit}
+                onClick={guardarEditClase}
+              />
             </div>
           </div>
         </div>
