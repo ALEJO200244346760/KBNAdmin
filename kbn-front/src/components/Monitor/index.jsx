@@ -7,6 +7,18 @@ import MonitorDia        from './MonitorDia';
 import { ModalEditarClase, ModalNuevoIngreso } from './MonitorModales';
 import MonitorResumen    from './MonitorResumen';
 
+export const NA = {
+  primary:'#1ABFA0',
+  dark:'#0F6E56',
+  darker:'#085041',
+  light:'#E1F5EE',
+  mid:'#9FE1CB',
+  bg:'#f0faf7',
+  text:'#0a2e27',
+  text2:'#3a6b5e',
+  border:'#c5e8df',
+};
+
 const Monitor = () => {
   // ── Mes actual ──────────────────────────────────────────────────────────────
   const [mes, setMes] = useState(() => {
@@ -360,17 +372,6 @@ const Monitor = () => {
       setEnviando(false);
     }
   };
-  export const NA = {
-  primary:'#1ABFA0',
-  dark:'#0F6E56',
-  darker:'#085041',
-  light:'#E1F5EE',
-  mid:'#9FE1CB',
-  bg:'#f0faf7',
-  text:'#0a2e27',
-  text2:'#3a6b5e',
-  border:'#c5e8df',
-};
 
     // Loading
   if (loading) return (
