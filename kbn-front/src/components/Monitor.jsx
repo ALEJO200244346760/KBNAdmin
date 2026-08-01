@@ -1,10 +1,11 @@
 import React from 'react';
-import useMonitor from './useMonitor';
-
-import MonitorCalendario from './MonitorCalendario';
-import MonitorDia from './MonitorDia';
-import MonitorResumen from './MonitorResumen';
-import MonitorModales from './MonitorModales';
+import {
+  useMonitor,
+  MonitorCalendario,
+  MonitorDia,
+  MonitorModales,
+  MonitorResumen
+} from './Monitor';
 
 const Monitor = ({
   agendaList,
