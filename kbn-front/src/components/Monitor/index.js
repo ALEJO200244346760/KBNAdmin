@@ -361,7 +361,7 @@ const Monitor = () => {
     }
   };
 
-  // ── Loading ─────────────────────────────────────────────────────────────────
+    // Loading
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
       <div style={{ textAlign:'center' }}>
@@ -372,7 +372,7 @@ const Monitor = () => {
     </div>
   );
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+    // Render
   return (
     <div style={{ maxWidth:940, margin:'0 auto', padding:'0 4px 80px', fontFamily:'system-ui,sans-serif' }}>
       <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
