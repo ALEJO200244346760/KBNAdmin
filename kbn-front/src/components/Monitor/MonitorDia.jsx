@@ -5,7 +5,11 @@ const MonitorDia = ({ diaSelec, evD, agenda, ingresos, tieneCobro, ingresoDeClas
   if (!diaSelec) return null;
 
   const pasado = esPasado(diaSelec);
-  const totalClases   = evD.clases.length;
+  
+  // 1. Filtramos las clases rechazadas para que no invadan la visual
+  const clasesActivas = evD.clases.filter(a => a.estado !== 'RECHAZADA');
+  
+  const totalClases   = clasesActivas.length;
   const totalIngresos = evD.ingresos.length;
   const totalEgresos  = evD.egresos.length;
 
@@ -43,13 +47,13 @@ const MonitorDia = ({ diaSelec, evD, agenda, ingresos, tieneCobro, ingresoDeClas
       {/* ── CLASES ── */}
       {totalClases > 0 && (
         <Section color="#0F6E56" bg={NA.bg} label="Clases agendadas">
-          {evD.clases.map(a => {
+          {clasesActivas.map(a => { // Iteramos sobre clasesActivas en lugar de evD.clases
             const cobrado = tieneCobro(a);
             const ingVinc = ingresoDeClase(a);
             const f       = a.fecha?.toString();
-            const colorEst = a.estado==='CONFIRMADA' ? {c:'#065F46',bg:'#D1FAE5'}
-                           : a.estado==='RECHAZADA'  ? {c:'#991B1B',bg:'#FEE2E2'}
-                                                     : {c:'#92400E',bg:'#FEF3C7'};
+            // Ya no calculamos RECHAZADA en los colores porque no aparecerán
+            const colorEst = a.estado==='CONFIRMADA' ? {c:'#065F46',bg:'#D1FAE5'} : {c:'#92400E',bg:'#FEF3C7'};
+            
             return (
               <div key={a.id} style={{ padding:'13px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
