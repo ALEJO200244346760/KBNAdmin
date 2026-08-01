@@ -18,6 +18,10 @@ export const NA = {
   text2:'#3a6b5e',
   border:'#c5e8df',
 };
+const normalizarTexto = (text) => {
+  if (!text) return '';
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+};
 
 const Monitor = ({setView}) => {
   // ── Mes actual ──────────────────────────────────────────────────────────────
@@ -91,17 +95,46 @@ const Monitor = ({setView}) => {
   // a un ingreso real. El fallback por fecha+instructor fue eliminado porque
   // causaba que todas las clases del mismo instructor en el mismo día
   // aparecieran como cobradas aunque solo una tuviera ingreso.
+  // ── Cobro: Vínculo explícito e Inteligente por Nombre ───────────────────────
   const ingresoDeClase = useCallback((clase) => {
+    if (!clase) return null;
+    
+    const fClase = clase.fecha?.toString();
+    const claseIdStr = String(clase.id);
+    const normAlumno = normalizarTexto(clase.alumno);
+
+    // A. Vinculación directa por ID explícito
     if (clase.cobrada && clase.ingresoId) {
-      return ingresos.find(i => i.id === clase.ingresoId) || null;
+      const ing = ingresos.find(i => String(i.id) === String(clase.ingresoId));
+      if (ing) return ing;
     }
+
+    // B. Vinculación por agendaIds (si el ingreso agrupa varios IDs de clases)
+    const ingPorIds = ingresos.find(i => 
+      i.agendaIds && i.agendaIds.toString().split(',').map(x => x.trim()).includes(claseIdStr)
+    );
+    if (ingPorIds) return ingPorIds;
+
+    // C. Nueva Heurística: Buscar el nombre del alumno en detalles/actividad del mismo día
+    if (fClase && normAlumno) {
+      return ingresos.find(i => {
+        if (i.fecha !== fClase) return false; // Debe ser el mismo día
+
+        // Unimos detalles y actividad para buscar en ambos campos a la vez
+        const textoIngreso = normalizarTexto(`${i.detalles || ''} ${i.actividad || ''}`);
+        
+        // Si el texto del ingreso contiene el nombre del alumno, lo vinculamos
+        return textoIngreso.includes(normAlumno);
+      }) || null;
+    }
+
     return null;
   }, [ingresos]);
 
-  const tieneCobro = useCallback(
-    (clase) => !!(clase.cobrada && clase.ingresoId),
-    []
-  );
+  const tieneCobro = useCallback((clase) => {
+    if (!clase) return false;
+    return Boolean(clase.cobrada || ingresoDeClase(clase));
+  }, [ingresoDeClase]);
 
   // ── Alertas: clases pasadas sin cobro ───────────────────────────────────────
   const alertas = useMemo(() => agenda.filter(a => {
