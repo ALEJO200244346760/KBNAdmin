@@ -5,7 +5,7 @@ import {
   MonitorDia,
   MonitorModales,
   MonitorResumen
-} from './Monitor';
+} from './Monitor/index.js';
 
 const Monitor = ({
   agendaList,
