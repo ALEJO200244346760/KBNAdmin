@@ -1,1 +1,434 @@
-export { default as useMonitor } from './useMonitor';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import api from '../../axiosConfig';
+
+import { toYMD, HOY, esPasado, normName } from './MonitorShared';
+import MonitorCalendario from './MonitorCalendario';
+import MonitorDia        from './MonitorDia';
+import { ModalEditarClase, ModalNuevoIngreso } from './MonitorModales';
+import MonitorResumen    from './MonitorResumen';
+
+const Monitor = () => {
+  // ── Mes actual ──────────────────────────────────────────────────────────────
+  const [mes, setMes] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+
+  // ── Datos del servidor ──────────────────────────────────────────────────────
+  const [agenda,   setAgenda]   = useState([]);
+  const [clases,   setClases]   = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+
+  // ── UI ──────────────────────────────────────────────────────────────────────
+  const [diaSelec,   setDiaSelec]   = useState(null);
+  const [filtroInst, setFiltroInst] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('TODO');
+
+  // ── Modal: editar clase ─────────────────────────────────────────────────────
+  const [editClase,      setEditClase]      = useState(null);
+  const [editForm,       setEditForm]       = useState({});
+  const [guardandoEdit,  setGuardandoEdit]  = useState(false);
+  const guardandoEditRef = useRef(false);
+
+  // ── Modal: nuevo ingreso ────────────────────────────────────────────────────
+  const [showIngreso,   setShowIngreso]   = useState(false);
+  const [ingresoFecha,  setIngresoFecha]  = useState(null);
+  const [ingresoForm,   setIngresoForm]   = useState({});
+  const [clasesSelec,   setClasesSelec]   = useState([]);
+  const [enviando,      setEnviando]      = useState(false);
+  const enviandoRef = useRef(false);
+
+  // ── Fetch ───────────────────────────────────────────────────────────────────
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [rA, rC, rU] = await Promise.all([
+        api.get('/api/agenda/listar'),
+        api.get('/api/clases/listar'),
+        api.get('/usuario'),
+      ]);
+      setAgenda(rA.data);
+      setClases(rC.data);
+      setUsuarios(rU.data);
+    } catch (e) {
+      console.error('Monitor:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  // ── Derivaciones ────────────────────────────────────────────────────────────
+  const ingresos = useMemo(() => clases.filter(c => c.tipoTransaccion === 'INGRESO'), [clases]);
+  const egresos  = useMemo(() => clases.filter(c => c.tipoTransaccion === 'EGRESO'),  [clases]);
+
+  const instructores = useMemo(() => {
+    const set = new Set();
+    agenda.forEach(a => a.nombreInstructor && set.add(a.nombreInstructor));
+    usuarios.forEach(u => {
+      const n = `${u.nombre} ${u.apellido}`.replace(/\s+/g, ' ').trim();
+      if (n) set.add(n);
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [agenda, usuarios]);
+
+  // ── Cobro: vínculo explícito únicamente ─────────────────────────────────────
+  // Solo se considera cobrada una clase cuando cobrada=true + ingresoId apunta
+  // a un ingreso real. El fallback por fecha+instructor fue eliminado porque
+  // causaba que todas las clases del mismo instructor en el mismo día
+  // aparecieran como cobradas aunque solo una tuviera ingreso.
+  const ingresoDeClase = useCallback((clase) => {
+    if (clase.cobrada && clase.ingresoId) {
+      return ingresos.find(i => i.id === clase.ingresoId) || null;
+    }
+    return null;
+  }, [ingresos]);
+
+  const tieneCobro = useCallback(
+    (clase) => !!(clase.cobrada && clase.ingresoId),
+    []
+  );
+
+  // ── Alertas: clases pasadas sin cobro ───────────────────────────────────────
+  const alertas = useMemo(() => agenda.filter(a => {
+    const f = a.fecha?.toString();
+    return f && esPasado(f) && a.estado !== 'RECHAZADA' && !tieneCobro(a);
+  }), [agenda, tieneCobro]);
+
+  // ── Filtros ─────────────────────────────────────────────────────────────────
+  const agendaF = useMemo(() => agenda.filter(a => {
+    if (filtroInst && a.nombreInstructor !== filtroInst) return false;
+    if (filtroTipo === 'INGRESOS' || filtroTipo === 'EGRESOS') return false;
+    if (filtroTipo === 'ALERTAS') {
+      const f = a.fecha?.toString();
+      return f && esPasado(f) && a.estado !== 'RECHAZADA' && !tieneCobro(a);
+    }
+    return true;
+  }), [agenda, filtroInst, filtroTipo, tieneCobro]);
+
+  const ingresosF = useMemo(() => ingresos.filter(i => {
+    if (filtroInst && normName(i.instructor) !== normName(filtroInst)) return false;
+    if (filtroTipo === 'CLASES' || filtroTipo === 'ALERTAS') return false;
+    return true;
+  }), [ingresos, filtroInst, filtroTipo]);
+
+  const egresosF = useMemo(() => egresos.filter(e => {
+    if (filtroTipo === 'CLASES' || filtroTipo === 'ALERTAS') return false;
+    return true;
+  }), [egresos, filtroTipo]);
+
+  // ── Grilla del mes ──────────────────────────────────────────────────────────
+  const grilla = useMemo(() => {
+    const { y, m } = mes;
+    const primer = new Date(y, m, 1).getDay();
+    const ultimo = new Date(y, m + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < primer; i++) cells.push(null);
+    for (let d = 1; d <= ultimo; d++) cells.push(toYMD(new Date(y, m, d)));
+    while (cells.length % 7) cells.push(null);
+    return cells;
+  }, [mes]);
+
+  // ── Dots por día ────────────────────────────────────────────────────────────
+  const dotsD = useMemo(() => {
+    const map = {};
+    const add = (f, tipo) => {
+      if (!f) return;
+      if (!map[f]) map[f] = {};
+      map[f][tipo] = (map[f][tipo] || 0) + 1;
+    };
+    agendaF.forEach(a => {
+      const f = a.fecha?.toString();
+      const esAlerta = f && esPasado(f) && a.estado !== 'RECHAZADA' && !tieneCobro(a);
+      add(f, esAlerta ? 'alerta' : 'clase');
+    });
+    ingresosF.forEach(i => add(i.fecha, 'ingreso'));
+    egresosF.forEach(e  => add(e.fecha,  'egreso'));
+    return map;
+  }, [agendaF, ingresosF, egresosF, tieneCobro]);
+
+  // ── Eventos del día seleccionado ────────────────────────────────────────────
+  const evD = useMemo(() => {
+    if (!diaSelec) return { clases: [], ingresos: [], egresos: [] };
+    return {
+      clases:   agendaF.filter(a  => a.fecha?.toString() === diaSelec),
+      ingresos: ingresosF.filter(i => i.fecha             === diaSelec),
+      egresos:  egresosF.filter(e  => e.fecha              === diaSelec),
+    };
+  }, [diaSelec, agendaF, ingresosF, egresosF]);
+
+  // ── Clases del día para selector de ingreso ─────────────────────────────────
+  const clasesParaIngreso = useMemo(() => {
+    if (!ingresoFecha) return [];
+    return agenda.filter(a =>
+      a.fecha?.toString() === ingresoFecha && a.estado !== 'RECHAZADA'
+    );
+  }, [agenda, ingresoFecha]);
+
+  // ── Ingresos disponibles para vincular con una clase (todos del instructor) ─
+  // No solo los del mismo día: un padre puede pagar N clases futuras de una vez,
+  // o pagar varias clases juntas al final del período.
+  const ingresosDisponiblesEdit = useMemo(() => {
+    if (!editClase) return [];
+    const normInst = normName(editClase.nombreInstructor);
+    return ingresos
+      .filter(i => {
+        const iNorm = normName(i.instructor);
+        return iNorm === normInst
+          || iNorm === ''
+          || iNorm === 'secretaria'
+          || iNorm === 'nautica atins';
+      })
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [editClase, ingresos]);
+
+  // ── Resumen del mes ─────────────────────────────────────────────────────────
+  const resumen = useMemo(() => {
+    const { y, m } = mes;
+    const inMes = (f) => {
+      if (!f) return false;
+      const [fy, fm] = f.split('-');
+      return parseInt(fy) === y && parseInt(fm) - 1 === m;
+    };
+    const clasesMes   = agendaF.filter(a  => inMes(a.fecha?.toString()));
+    const ingresosMes = ingresosF.filter(i => inMes(i.fecha));
+    const egresosMes  = egresosF.filter(e  => inMes(e.fecha));
+    const alertasMes  = alertas.filter(a   => inMes(a.fecha?.toString()));
+
+    const balances = {};
+    ingresosMes.forEach(i => {
+      const mo = i.moneda || 'BRL';
+      balances[mo] = (balances[mo] || 0) + (parseFloat(i.total) || 0);
+    });
+    egresosMes.forEach(e => {
+      const mo = e.moneda || 'BRL';
+      balances[mo] = (balances[mo] || 0) - (parseFloat(e.total) || 0);
+    });
+
+    return { clasesMes, ingresosMes, egresosMes, alertasMes, balances };
+  }, [mes, agendaF, ingresosF, egresosF, alertas]);
+
+  // ── Navegar mes ─────────────────────────────────────────────────────────────
+  const navMes = (dir) => {
+    setMes(p => {
+      let m = p.m + dir, y = p.y;
+      if (m < 0)  { m = 11; y--; }
+      if (m > 11) { m = 0;  y++; }
+      return { y, m };
+    });
+    setDiaSelec(null);
+  };
+
+  // ── Cambiar estado de clase ─────────────────────────────────────────────────
+  const cambiarEstado = async (id, estado) => {
+    try {
+      await api.put(`/api/agenda/${id}/estado`, estado, {
+        headers: { 'Content-Type': 'text/plain' },
+      });
+      setAgenda(p => p.map(a => a.id === id ? { ...a, estado } : a));
+    } catch (e) {
+      alert('No se pudo actualizar el estado.');
+    }
+  };
+
+  // ── Abrir modal editar clase ────────────────────────────────────────────────
+  const abrirEditClase = (clase) => {
+    setEditClase(clase);
+    setEditForm({
+      tipoAula:       clase.tipoAula    || '',
+      horaSalida:     clase.horaSalida  ? clase.horaSalida.substring(0, 5) : '',
+      horas:          clase.horas       || '',
+      lugar:          clase.lugar       || '',
+      tarifa:         clase.tarifa      || '',
+      ingresoIdSelec: clase.ingresoId   || '',
+      cobrada:        clase.cobrada     || false,
+    });
+  };
+
+  // ── Guardar edición de clase ────────────────────────────────────────────────
+  const guardarEditClase = async () => {
+    if (guardandoEditRef.current) return;
+    guardandoEditRef.current = true;
+    setGuardandoEdit(true);
+    try {
+      const ingresoIdNum = editForm.ingresoIdSelec
+        ? parseInt(editForm.ingresoIdSelec)
+        : null;
+      const payload = {
+        tipoAula:   editForm.tipoAula   || null,
+        horaSalida: editForm.horaSalida || null,
+        horas:      editForm.horas      ? parseFloat(editForm.horas)  : null,
+        lugar:      editForm.lugar      || null,
+        tarifa:     editForm.tarifa     ? parseFloat(editForm.tarifa) : null,
+        cobrada:    !!ingresoIdNum,
+        ingresoId:  ingresoIdNum || null,
+      };
+      const res = await api.patch(`/api/agenda/${editClase.id}`, payload);
+      setAgenda(p => p.map(a => a.id === editClase.id ? res.data : a));
+      setEditClase(null);
+    } catch (e) {
+      alert('No se pudo guardar.');
+    } finally {
+      guardandoEditRef.current = false;
+      setGuardandoEdit(false);
+    }
+  };
+
+  // ── Abrir modal nuevo ingreso ───────────────────────────────────────────────
+  const abrirIngreso = (fecha, prefill = {}) => {
+    setIngresoFecha(fecha);
+    setClasesSelec([]);
+    setIngresoForm({
+      fecha,
+      total:      '',
+      moneda:     'R$_STONE_IGNA',
+      formaPago:  'Efectivo',
+      detalles:   '',
+      instructor: prefill.instructor || '',
+      actividad:  'Clase de Kite',
+      asignadoA:  'IGNA',
+    });
+    setShowIngreso(true);
+  };
+
+  const toggleClaseSelec = (id) =>
+    setClasesSelec(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+
+  // Autocompletar total y detalles al seleccionar clases
+  useEffect(() => {
+    if (clasesSelec.length === 0) return;
+    const sel = clasesParaIngreso.filter(c => clasesSelec.includes(c.id));
+    const totalAuto = sel.reduce((sum, c) =>
+      c.tarifa && c.horas ? sum + c.tarifa * c.horas : sum, 0);
+    const instAuto  = sel.length === 1 ? sel[0].nombreInstructor : '';
+    const alumnos   = sel.map(c => c.alumno).filter(Boolean).join(', ');
+    setIngresoForm(p => ({
+      ...p,
+      instructor: instAuto || p.instructor,
+      total:      totalAuto > 0 ? String(totalAuto) : p.total,
+      detalles:   alumnos || p.detalles,
+    }));
+  }, [clasesSelec]);
+
+  // ── Guardar nuevo ingreso ───────────────────────────────────────────────────
+  const guardarIngreso = async () => {
+    if (enviandoRef.current) return;
+    if (!ingresoForm.total || parseFloat(ingresoForm.total) <= 0) {
+      return alert('Ingresá el monto.');
+    }
+    enviandoRef.current = true;
+    setEnviando(true);
+    try {
+      const descuento  = ingresoForm.formaPago === 'Tarjeta Crédito'
+        ? parseFloat(ingresoForm.total) * 0.05 : 0;
+      const totalFinal = parseFloat(ingresoForm.total) - descuento;
+
+      const payload = {
+        tipoTransaccion: 'INGRESO',
+        fecha:      ingresoForm.fecha,
+        actividad:  ingresoForm.actividad || 'Clase',
+        detalles:   ingresoForm.detalles,
+        instructor: ingresoForm.instructor,
+        total:      String(totalFinal),
+        moneda:     ingresoForm.moneda,
+        formaPago:  ingresoForm.formaPago,
+        comision:   String(descuento),
+        asignadoA:  ingresoForm.asignadoA || null,
+        agendaIds:  clasesSelec.length > 0 ? clasesSelec.join(',') : null,
+      };
+
+      const res = await api.post('/api/clases/guardar', payload);
+
+      // Actualizar estado local inmediatamente
+      if (clasesSelec.length > 0) {
+        setAgenda(p => p.map(a =>
+          clasesSelec.includes(a.id)
+            ? { ...a, cobrada: true, ingresoId: res.data.id }
+            : a
+        ));
+      }
+
+      setShowIngreso(false);
+      await cargar(); // refetch completo para datos frescos
+    } catch (e) {
+      console.error(e);
+      alert('Error al guardar el ingreso.');
+    } finally {
+      enviandoRef.current = false;
+      setEnviando(false);
+    }
+  };
+
+  // ── Loading ─────────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ width:36, height:36, border:'3px solid #9FE1CB', borderTopColor:'#0F6E56', borderRadius:'50%', animation:'mspin .7s linear infinite', margin:'0 auto 12px' }}/>
+        <p style={{ color:'#3a6b5e', fontSize:13 }}>Cargando monitor...</p>
+        <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  );
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ maxWidth:940, margin:'0 auto', padding:'0 4px 80px', fontFamily:'system-ui,sans-serif' }}>
+      <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
+
+      <MonitorCalendario
+        mes={mes} navMes={navMes}
+        grilla={grilla} dotsD={dotsD}
+        diaSelec={diaSelec} setDiaSelec={setDiaSelec}
+        filtroTipo={filtroTipo} setFiltroTipo={setFiltroTipo}
+        filtroInst={filtroInst} setFiltroInst={setFiltroInst}
+        instructores={instructores}
+        alertas={alertas}
+        cargar={cargar}
+        abrirIngreso={abrirIngreso}
+      />
+
+      <MonitorDia
+        diaSelec={diaSelec}
+        evD={evD}
+        agenda={agenda}
+        ingresos={ingresos}
+        tieneCobro={tieneCobro}
+        ingresoDeClase={ingresoDeClase}
+        cambiarEstado={cambiarEstado}
+        abrirEditClase={abrirEditClase}
+        abrirIngreso={abrirIngreso}
+      />
+
+      <MonitorResumen mes={mes} resumen={resumen}/>
+
+      <ModalEditarClase
+        editClase={editClase}
+        editForm={editForm} setEditForm={setEditForm}
+        ingresosDisponiblesEdit={ingresosDisponiblesEdit}
+        agenda={agenda}
+        guardandoEdit={guardandoEdit}
+        guardarEditClase={guardarEditClase}
+        onClose={() => setEditClase(null)}
+      />
+
+      {showIngreso && (
+        <ModalNuevoIngreso
+          ingresoFecha={ingresoFecha}
+          ingresoForm={ingresoForm} setIngresoForm={setIngresoForm}
+          clasesParaIngreso={clasesParaIngreso}
+          clasesSelec={clasesSelec} toggleClaseSelec={toggleClaseSelec}
+          agenda={agenda}
+          tieneCobro={tieneCobro}
+          instructores={instructores}
+          enviando={enviando}
+          guardarIngreso={guardarIngreso}
+          onClose={() => setShowIngreso(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Monitor;
