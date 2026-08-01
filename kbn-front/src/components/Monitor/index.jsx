@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import api from '../../axiosConfig';
 
-import { toYMD, HOY, esPasado, normName } from './MonitorShared';
+import { toYMD, HOY, esPasado, normName, NA } from './MonitorShared';
 import MonitorCalendario from './MonitorCalendario';
 import MonitorDia        from './MonitorDia';
 import { ModalEditarClase, ModalNuevoIngreso } from './MonitorModales';
