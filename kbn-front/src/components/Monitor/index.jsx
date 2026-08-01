@@ -360,6 +360,17 @@ const Monitor = () => {
       setEnviando(false);
     }
   };
+  export const NA = {
+  primary:'#1ABFA0',
+  dark:'#0F6E56',
+  darker:'#085041',
+  light:'#E1F5EE',
+  mid:'#9FE1CB',
+  bg:'#f0faf7',
+  text:'#0a2e27',
+  text2:'#3a6b5e',
+  border:'#c5e8df',
+};
 
     // Loading
   if (loading) return (
@@ -376,6 +387,7 @@ const Monitor = () => {
   return (
     <div style={{ maxWidth:940, margin:'0 auto', padding:'0 4px 80px', fontFamily:'system-ui,sans-serif' }}>
       <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
+
       <button
         onClick={() => setView('INICIO')}
         style={{
