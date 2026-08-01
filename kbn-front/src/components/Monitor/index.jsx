@@ -19,7 +19,7 @@ export const NA = {
   border:'#c5e8df',
 };
 
-const Monitor = () => {
+const Monitor = ({setView}) => {
   // ── Mes actual ──────────────────────────────────────────────────────────────
   const [mes, setMes] = useState(() => {
     const d = new Date();
