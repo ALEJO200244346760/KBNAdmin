@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  useMonitor,
-  MonitorCalendario,
-  MonitorDia,
-  MonitorModales,
-  MonitorResumen
-} from './Monitor/index.js';
+import { useMonitor } from './Monitor/index.js';
 
 const Monitor = ({
   agendaList,
