@@ -1,1 +1,1 @@
-export { default } from './Monitor/index.js';
+export { default } from './Monitor/index.jsx';
