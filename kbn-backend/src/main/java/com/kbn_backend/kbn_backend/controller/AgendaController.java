@@ -107,6 +107,10 @@ public class AgendaController {
         private Double tarifa;
         private Double horasPagadas;
         private String estado;
+        
+        // 👉 1. Agregá estos dos campos nuevos con sus getters y setters
+        private Boolean cobrada;
+        private Long ingresoId;
 
         public String getTipoAula() { return tipoAula; }
         public void setTipoAula(String tipoAula) { this.tipoAula = tipoAula; }
@@ -124,6 +128,12 @@ public class AgendaController {
         public void setHorasPagadas(Double horasPagadas) { this.horasPagadas = horasPagadas; }
         public String getEstado() { return estado; }
         public void setEstado(String estado) { this.estado = estado; }
+        
+        // 👉 Getters y Setters de los nuevos campos
+        public Boolean getCobrada() { return cobrada; }
+        public void setCobrada(Boolean cobrada) { this.cobrada = cobrada; }
+        public Long getIngresoId() { return ingresoId; }
+        public void setIngresoId(Long ingresoId) { this.ingresoId = ingresoId; }
     }
 
     @PatchMapping("/{id}")
@@ -144,6 +154,13 @@ public class AgendaController {
             if (req.getTarifa()           != null) agenda.setTarifa(req.getTarifa());
             if (req.getHorasPagadas()     != null) agenda.setHorasPagadas(req.getHorasPagadas());
             if (req.getEstado()           != null) agenda.setEstado(req.getEstado());
+            
+            // 👉 2. Agregar esta validación para guardar el estado del cobro
+            if (req.getCobrada() != null) {
+                agenda.setCobrada(req.getCobrada());
+                agenda.setIngresoId(req.getIngresoId()); // Se setea el ID o null si se desvinculó
+            }
+
             return ResponseEntity.ok(agendaRepository.save(agenda));
         }).orElse(ResponseEntity.notFound().build());
     }
