@@ -107,10 +107,26 @@ const MonitorResumen = ({ mes, resumen }) => {
     const n = i.instructor?.trim() || i.asignadoA?.trim(); // Toma el instructor o a quien se le asignó
     if (!n || n.toUpperCase() === 'NINGUNO' || n.toUpperCase() === 'SIN ESPECIFICAR') return;
 
-    const yaVinculado = clasesActivas.some(c => 
-      String(c.ingresoId) === String(i.id) || 
-      (i.agendaIds && i.agendaIds.toString().split(',').map(x=>x.trim()).includes(String(c.id)))
-    );
+    const { _alumno, _tipoAula } = parsearIngresoManual(i);
+
+    // Detección inteligente para evitar duplicados en la visual
+    const yaVinculado = clasesActivas.some(c => {
+      // 1. Vínculo duro (conectados por base de datos)
+      const vinculoDuro = String(c.ingresoId) === String(i.id) || 
+                          (i.agendaIds && i.agendaIds.toString().split(',').map(x=>x.trim()).includes(String(c.id)));
+      
+      // 2. Vínculo heurístico (coincidencia lógica en pantalla)
+      const mismoDia = String(c.fecha) === String(i.fecha);
+      const mismoInst = normName(c.nombreInstructor) === normName(n);
+      
+      // Chequeamos que alguno de los nombres contenga al otro para evitar problemas de tipeo
+      const nombreParecido = _alumno && c.alumno && (
+        _alumno.toLowerCase().includes(c.alumno.toLowerCase()) || 
+        c.alumno.toLowerCase().includes(_alumno.toLowerCase())
+      );
+
+      return vinculoDuro || (mismoDia && mismoInst && nombreParecido);
+    });
 
     if (!yaVinculado) {
       const texto = `${i.actividad || ''} ${i.detalles || ''}`;
@@ -119,7 +135,6 @@ const MonitorResumen = ({ mes, resumen }) => {
         if (!instCounts[key]) instCounts[key] = { nombre: n, clases: 0, horas: 0, registros: [] };
         
         const hrsCalc = calcularHorasReales(i);
-        const { _alumno, _tipoAula } = parsearIngresoManual(i);
 
         instCounts[key].clases += 1;
         instCounts[key].horas  += hrsCalc;
