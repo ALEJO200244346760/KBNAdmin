@@ -253,4 +253,35 @@ public class PasivoController {
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    // 7. CORREGIR MONEDA de un PagoPasivo existente ──────────────────────────
+    // Útil cuando un pago se guardó sin moneda (legacy) o con moneda incorrecta.
+    // Después de corregir, llamar a /{id}/recalcular para ajustar montoTotal.
+    public static class CorregirMonedaRequest {
+        private String moneda;
+        public String getMoneda() { return moneda; }
+        public void setMoneda(String m) { moneda = m; }
+    }
+
+    @Transactional
+    @PatchMapping("/{pasivoId}/historial/{pagoId}/moneda")
+    public ResponseEntity<?> corregirMonedaMovimiento(
+            @PathVariable Long pasivoId,
+            @PathVariable Long pagoId,
+            @RequestBody CorregirMonedaRequest req) {
+
+        Pasivo pasivo = pasivoRepository.findById(pasivoId).orElse(null);
+        if (pasivo == null) return ResponseEntity.notFound().build();
+
+        PagoPasivo pago = pagoPasivoRepository.findById(pagoId).orElse(null);
+        if (pago == null) return ResponseEntity.notFound().build();
+
+        if (pago.getPasivo() == null || !pago.getPasivo().getId().equals(pasivoId))
+            return ResponseEntity.badRequest().body("Ese movimiento no pertenece a esta tarjeta.");
+
+        pago.setMoneda(req.getMoneda());
+        pagoPasivoRepository.save(pago);
+
+        return ResponseEntity.ok(enriquecerPasivo(pasivo));
+    }
 }

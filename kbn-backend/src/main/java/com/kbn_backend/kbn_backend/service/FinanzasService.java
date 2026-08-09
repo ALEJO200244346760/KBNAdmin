@@ -74,16 +74,30 @@ public class FinanzasService {
             pasivoRepository.findById(registro.getPasivoId()).ifPresent(pasivo -> {
 
                 double monto = Double.parseDouble(registro.getTotal());
-                String tipo = registro.getTipoMovimientoPasivo();
+                String monedaMovimiento = registro.getMoneda();
 
-                pasivo.setMontoTotal(pasivo.getMontoTotal() + monto);
+                // montoTotal solo se actualiza para movimientos en BRL o canales R$_*
+                // Para EUR/USD, el saldo real vive en el historial (PagoPasivo.moneda)
+                // y se calcula en PasivoController.calcularSaldosPorMoneda().
+                boolean esBRL = monedaMovimiento == null
+                        || monedaMovimiento.isBlank()
+                        || monedaMovimiento.equals("BRL")
+                        || monedaMovimiento.startsWith("R$_");
 
+                if (esBRL) {
+                    pasivo.setMontoTotal(pasivo.getMontoTotal() + monto);
+                }
+                // Para EUR/USD: montoTotal no cambia. El saldo se ve en saldosPorMoneda.
+
+                // Guardar en historial con la moneda correcta para que
+                // calcularSaldosPorMoneda() pueda agrupar bien.
                 PagoPasivo pagoHistorial = new PagoPasivo();
                 pagoHistorial.setMontoPagado(monto);
                 pagoHistorial.setFecha(LocalDate.now());
                 pagoHistorial.setNota(
                         registro.getDetalles() != null ? registro.getDetalles() : "Pago registrado"
                 );
+                pagoHistorial.setMoneda(monedaMovimiento); // ← CRÍTICO: guarda EUR/USD/BRL
                 pagoHistorial.setPasivo(pasivo);
 
                 pagoPasivoRepository.save(pagoHistorial);
