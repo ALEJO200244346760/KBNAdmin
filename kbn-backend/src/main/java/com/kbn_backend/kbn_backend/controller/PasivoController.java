@@ -196,23 +196,30 @@ public class PasivoController {
         if (pago.getPasivo() == null || !pago.getPasivo().getId().equals(pasivoId))
             return ResponseEntity.badRequest().body("Ese movimiento no pertenece a esta tarjeta.");
 
-        double monto = pago.getMontoPagado() != null ? pago.getMontoPagado() : 0;
-        String monedaBase = pasivo.getMoneda() != null ? pasivo.getMoneda() : "BRL";
-        String monedaPago = pago.getMoneda();
-
-        // Solo revertimos montoTotal si el pago era en la moneda base
-        boolean esMismaMoneda = monedaPago == null
-                || monedaPago.isBlank()
-                || monedaPago.equals("BRL")
-                || monedaPago.equals(monedaBase)
-                || monedaPago.startsWith("R$_");
-
-        if (esMismaMoneda) {
-            pasivo.setMontoTotal(pasivo.getMontoTotal() - monto);
-        }
-
+        // Borrar el movimiento primero
         pagoPasivoRepository.delete(pago);
-        return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivo)));
+        pagoPasivoRepository.flush(); // asegurar que el delete llegó a BD antes de releer
+
+        // Refrescar el pasivo desde BD para tener el historial actualizado (sin el pago borrado)
+        Pasivo pasivoFresco = pasivoRepository.findById(pasivoId).orElse(pasivo);
+
+        // Recalcular montoTotal desde cero sumando solo movimientos BRL del historial.
+        // Esto garantiza consistencia independientemente del estado previo de montoTotal,
+        // evitando el error de restar un monto en EUR/USD de un total en BRL.
+        double totalBRL = 0;
+        if (pasivoFresco.getHistorialPagos() != null) {
+            for (PagoPasivo p : pasivoFresco.getHistorialPagos()) {
+                String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
+                        ? p.getMoneda()
+                        : detectarMonedaDeLaNota(p.getNota());
+                if (monedaBaseDeCanal(canal).equals("BRL")) {
+                    totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                }
+            }
+        }
+        pasivoFresco.setMontoTotal(totalBRL);
+
+        return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivoFresco)));
     }
 
     // 5. Obtener una tarjeta por ID (con saldos por moneda)
