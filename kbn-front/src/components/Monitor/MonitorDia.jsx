@@ -1,20 +1,70 @@
-import React from 'react';
-import { NA, fmt, esPasado, labelMon, Tag, Btn } from './MonitorShared';
+import React, { useState } from 'react';
+import { NA, fmt, esPasado, HOY, labelMon, Tag, Btn, TIPOS_AULA } from './MonitorShared';
 
-const MonitorDia = ({ diaSelec, evD, agenda, ingresos, tieneCobro, ingresoDeClase, cambiarEstado, abrirEditClase, abrirIngreso }) => {
+// ── Constantes del timeline ───────────────────────────────────────────────────
+const HORA_INICIO  = 8;   // 8:00
+const HORA_FIN     = 19;  // 19:00
+const HORAS_TOTAL  = HORA_FIN - HORA_INICIO;
+const PX_POR_HORA  = 64;  // altura en px de cada franja horaria
+const TIMELINE_H   = HORAS_TOTAL * PX_POR_HORA;
+
+// Colores por tipo de aula
+const COLOR_TIPO = {
+  APK:   { bg: '#DCFCE7', border: '#16A34A', text: '#14532D' },
+  ASPK:  { bg: '#D1FAE5', border: '#059669', text: '#064E3B' },
+  APWF:  { bg: '#DBEAFE', border: '#2563EB', text: '#1E3A8A' },
+  ASPWF: { bg: '#EDE9FE', border: '#7C3AED', text: '#4C1D95' },
+  APWS:  { bg: '#FEF9C3', border: '#CA8A04', text: '#713F12' },
+  ASPWS: { bg: '#FEF3C7', border: '#D97706', text: '#78350F' },
+  RENTAL:{ bg: '#F3F4F6', border: '#6B7280', text: '#1F2937' },
+  OTRO:  { bg: '#FEE2E2', border: '#DC2626', text: '#7F1D1D' },
+  DEFAULT:{ bg: NA.light, border: NA.dark,  text: NA.darker  },
+};
+
+const colorDeTipo = (tipoAula, estado) => {
+  if (estado === 'RECHAZADA') return { bg: '#FEE2E2', border: '#DC2626', text: '#7F1D1D' };
+  if (estado === 'PENDIENTE') return { bg: '#FEF3C7', border: '#D97706', text: '#92400E' };
+  return COLOR_TIPO[tipoAula] || COLOR_TIPO.DEFAULT;
+};
+
+// Convierte "HH:MM:SS" o "HH:MM" a minutos desde medianoche
+const horaAMin = (h) => {
+  if (!h) return null;
+  const str = String(h).substring(0, 5);
+  const [hh, mm] = str.split(':').map(Number);
+  return hh * 60 + (mm || 0);
+};
+
+// Posición y altura en px dentro del timeline
+const posicion = (minutos) => {
+  const minRelativo = minutos - HORA_INICIO * 60;
+  return Math.max(0, (minRelativo / 60) * PX_POR_HORA);
+};
+
+const altura = (minInicio, minFin) => {
+  if (!minFin || minFin <= minInicio) return PX_POR_HORA; // fallback 1h
+  return Math.max(28, ((minFin - minInicio) / 60) * PX_POR_HORA - 2);
+};
+
+// ── Componente principal ──────────────────────────────────────────────────────
+const MonitorDia = ({
+  diaSelec, evD, agenda, ingresos,
+  tieneCobro, ingresoDeClase,
+  cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
+}) => {
+  const [claseExpandida, setClaseExpandida] = useState(null);
+
   if (!diaSelec) return null;
 
-  const pasado = esPasado(diaSelec);
-  
-  // 1. Filtramos las clases rechazadas para que no invadan la visual
+  const pasado  = esPasado(diaSelec);
+  const esFutur = diaSelec > HOY;
   const clasesActivas = evD.clases.filter(a => a.estado !== 'RECHAZADA');
-  
-  const totalClases   = clasesActivas.length;
-  const totalIngresos = evD.ingresos.length;
-  const totalEgresos  = evD.egresos.length;
+  const clasesRechaz  = evD.clases.filter(a => a.estado === 'RECHAZADA');
 
-  // Suma rápida de ingresos del día por moneda base
-  const sumaIngresos = {};
+  // ── Estadísticas del día ──────────────────────────────────────────────────
+  const horasTotales   = clasesActivas.reduce((s, a) => s + (parseFloat(a.horas) || 0), 0);
+  const clasesCobradas = clasesActivas.filter(a => tieneCobro(a)).length;
+  const sumaIngresos   = {};
   evD.ingresos.forEach(i => {
     const m = i.moneda?.startsWith('R$') || i.moneda === 'BRL' ? 'R$'
             : i.moneda?.startsWith('EUR') ? '€'
@@ -22,148 +72,312 @@ const MonitorDia = ({ diaSelec, evD, agenda, ingresos, tieneCobro, ingresoDeClas
     sumaIngresos[m] = (sumaIngresos[m] || 0) + (parseFloat(i.total) || 0);
   });
 
+  // ── Agrupar clases en columnas (para solapamientos) ───────────────────────
+  // Si dos clases se superponen en el tiempo, van a columnas paralelas
+  const columnas = [];
+  const clasesConPos = clasesActivas
+    .filter(a => horaAMin(a.hora) !== null)
+    .sort((a, b) => horaAMin(a.hora) - horaAMin(b.hora));
+  const clasSinHora = clasesActivas.filter(a => horaAMin(a.hora) === null);
+
+  clasesConPos.forEach(clase => {
+    const ini = horaAMin(clase.hora);
+    const fin = clase.horaSalida
+      ? horaAMin(clase.horaSalida)
+      : ini + (parseFloat(clase.horas) || 1) * 60;
+
+    let col = columnas.findIndex(c => {
+      const ultimo = c[c.length - 1];
+      const ultimoFin = ultimo.horaSalida
+        ? horaAMin(ultimo.horaSalida)
+        : horaAMin(ultimo.hora) + (parseFloat(ultimo.horas) || 1) * 60;
+      return ultimoFin <= ini;
+    });
+    if (col === -1) { columnas.push([clase]); }
+    else            { columnas[col].push(clase); }
+  });
+
+  const nCols = Math.max(1, columnas.length);
+
   return (
     <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
 
-      {/* ── Header del día ── */}
-      <div style={{ padding:'14px 18px', borderBottom:`0.5px solid ${NA.border}`, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
-        <div>
-          <p style={{ margin:0, fontWeight:700, fontSize:17, color:NA.text }}>{fmt(diaSelec)}</p>
-          <p style={{ margin:'3px 0 0', fontSize:11, color:NA.text2 }}>
-            {totalClases} clase{totalClases!==1?'s':''} ·{' '}
-            {totalIngresos} ingreso{totalIngresos!==1?'s':''} ·{' '}
-            {totalEgresos} egreso{totalEgresos!==1?'s':''}
-            {Object.entries(sumaIngresos).map(([m,v]) => (
-              <span key={m} style={{ marginLeft:6, color:'#059669', fontWeight:600 }}>+{v.toFixed(2)} {m}</span>
-            ))}
-          </p>
+      {/* ══ HEADER + ESTADÍSTICAS ══ */}
+      <div style={{ padding:'14px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
+          <div>
+            <p style={{ margin:0, fontWeight:700, fontSize:17, color:NA.text }}>{fmt(diaSelec)}</p>
+            <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2 }}>
+              {clasesActivas.length} clase{clasesActivas.length!==1?'s':''} · {horasTotales}h en total
+            </p>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            {abrirAgendar && (
+              <Btn label="+ Clase" icon="ti-calendar-plus" bg={NA.light} color={NA.darker} small
+                onClick={() => abrirAgendar(diaSelec)}/>
+            )}
+            {!esFutur && (
+              <Btn label="+ Ingreso" icon="ti-cash" small
+                onClick={() => abrirIngreso(diaSelec)}/>
+            )}
+          </div>
         </div>
-        {pasado && (
-          <Btn label="+ Ingreso del día" icon="ti-cash"
-            onClick={() => abrirIngreso(diaSelec)}/>
+
+        {/* Chips de estadísticas */}
+        <div style={{ display:'flex', gap:8, marginTop:12, flexWrap:'wrap' }}>
+          <StatChip icon="ti-calendar" val={clasesActivas.length} label="clases" color={NA.dark} bg={NA.light}/>
+          <StatChip icon="ti-clock"    val={horasTotales}          label="horas"  color={NA.dark} bg={NA.light}/>
+          <StatChip icon="ti-check"    val={clasesCobradas}        label="cobradas" color="#065F46" bg="#D1FAE5"/>
+          {clasesActivas.length - clasesCobradas > 0 && pasado && (
+            <StatChip icon="ti-alert-triangle" val={clasesActivas.length - clasesCobradas} label="sin cobro" color="#9A3412" bg="#FFF7ED"/>
+          )}
+          {Object.entries(sumaIngresos).map(([m,v]) => (
+            <StatChip key={m} icon="ti-cash" val={`${v.toFixed(0)} ${m}`} label="cobrado" color="#065F46" bg="#D1FAE5"/>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ TIMELINE 8:00 → 19:00 ══ */}
+      <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}>
+
+        {/* Líneas horizontales por hora */}
+        {Array.from({ length: HORAS_TOTAL + 1 }, (_, i) => {
+          const hora = HORA_INICIO + i;
+          return (
+            <div key={hora} style={{ position:'absolute', left:0, right:0, top: i * PX_POR_HORA, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
+              <span style={{ position:'absolute', left:4, top:-8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
+                {hora}:00
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Área de bloques */}
+        <div style={{ position:'relative', height: TIMELINE_H, marginLeft:4 }}>
+
+          {/* Botones "+" en cada hora */}
+          {Array.from({ length: HORAS_TOTAL }, (_, i) => {
+            const hora = HORA_INICIO + i;
+            return (
+              <button key={hora}
+                onClick={() => abrirAgendar && abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
+                title={`Agregar clase a las ${hora}:00`}
+                style={{
+                  position:'absolute', left:2, top: i * PX_POR_HORA + 2,
+                  width:28, height:28, borderRadius:8,
+                  border:`0.5px dashed ${NA.border}`, background:'transparent',
+                  color: NA.border, cursor:'pointer', zIndex:2, fontSize:14,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  transition:'all .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = NA.light; e.currentTarget.style.color = NA.dark; e.currentTarget.style.borderColor = NA.dark; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = NA.border; e.currentTarget.style.borderColor = NA.border; }}
+              >
+                <i className="ti ti-plus" style={{ fontSize:12 }}/>
+              </button>
+            );
+          })}
+
+          {/* Línea de "ahora" si es hoy */}
+          {diaSelec === HOY && (() => {
+            const now   = new Date();
+            const minNow = now.getHours() * 60 + now.getMinutes();
+            if (minNow < HORA_INICIO*60 || minNow > HORA_FIN*60) return null;
+            return (
+              <div style={{
+                position:'absolute', left:0, right:0, top: posicion(minNow),
+                height:2, background:'#EF4444', zIndex:10,
+              }}>
+                <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF4444', marginTop:-3, marginLeft:-4 }}/>
+              </div>
+            );
+          })()}
+
+          {/* Bloques de clases */}
+          {columnas.map((col, colIdx) =>
+            col.map(clase => {
+              const ini    = horaAMin(clase.hora);
+              const finMin = clase.horaSalida
+                ? horaAMin(clase.horaSalida)
+                : ini + (parseFloat(clase.horas) || 1) * 60;
+              const top    = posicion(ini);
+              const h      = altura(ini, finMin);
+              const color  = colorDeTipo(clase.tipoAula, clase.estado);
+              const cobrado = tieneCobro(clase);
+              const ingVinc = ingresoDeClase(clase);
+              const expandida = claseExpandida === clase.id;
+
+              const colW   = `calc((100% - 36px) / ${nCols})`;
+              const colL   = `calc(36px + ${colIdx} * (100% - 36px) / ${nCols})`;
+
+              return (
+                <div key={clase.id}
+                  onClick={() => setClaseExpandida(expandida ? null : clase.id)}
+                  style={{
+                    position:'absolute', top, left: colL, width: colW,
+                    minHeight: h, zIndex: expandida ? 20 : 5,
+                    background: color.bg,
+                    borderLeft: `3px solid ${color.border}`,
+                    borderRadius:'0 8px 8px 0',
+                    padding:'4px 8px', boxSizing:'border-box',
+                    cursor:'pointer', overflow: expandida ? 'visible' : 'hidden',
+                    boxShadow: expandida ? '0 4px 20px rgba(0,0,0,.15)' : 'none',
+                    transition:'box-shadow .15s',
+                  }}>
+                  {/* Contenido compacto siempre visible */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <p style={{ margin:0, fontSize:11, fontWeight:700, color: color.text, lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace: expandida ? 'normal' : 'nowrap' }}>
+                        {clase.alumno}
+                      </p>
+                      {h > 36 && (
+                        <p style={{ margin:'1px 0 0', fontSize:10, color: color.text, opacity:.75, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {clase.nombreInstructor}
+                          {clase.tipoAula && ` · ${clase.tipoAula}`}
+                        </p>
+                      )}
+                      {h > 52 && (
+                        <p style={{ margin:'1px 0 0', fontSize:10, color: color.text, opacity:.6 }}>
+                          {String(clase.hora||'').substring(0,5)}
+                          {clase.horaSalida && ` → ${String(clase.horaSalida).substring(0,5)}`}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'flex-end', flexShrink:0, marginLeft:3 }}>
+                      {cobrado && <i className="ti ti-check" style={{ fontSize:10, color:'#065F46' }}/>}
+                      {esPasado(diaSelec) && !cobrado && <i className="ti ti-alert-triangle" style={{ fontSize:10, color:'#EA580C' }}/>}
+                    </div>
+                  </div>
+
+                  {/* Panel expandido al tocar */}
+                  {expandida && (
+                    <div style={{ marginTop:8, paddingTop:8, borderTop:`0.5px solid ${color.border}40` }}
+                      onClick={e => e.stopPropagation()}>
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+                        <Tag label={clase.estado} color={color.text} bg={`${color.border}22`} small/>
+                        {clase.tipoAula && <Tag label={clase.tipoAula} color={color.text} bg={`${color.border}22`} small/>}
+                        {esPasado(diaSelec) && !cobrado && <Tag label="⚠ Sin cobro" color="#9A3412" bg="#FFF7ED" small/>}
+                        {cobrado && <Tag label="✓ Cobrado" color="#065F46" bg="#D1FAE5" small/>}
+                      </div>
+                      {clase.tarifa && (
+                        <p style={{ margin:'0 0 4px', fontSize:11, color: color.text }}>
+                          R$ {clase.tarifa}/h · {clase.horas}h
+                          {clase.horasPagadas ? ` · Pagado: R$ ${clase.horasPagadas}` : ''}
+                        </p>
+                      )}
+                      {ingVinc && (
+                        <p style={{ margin:'0 0 6px', fontSize:10, color:'#059669' }}>
+                          💰 Ingreso #{ingVinc.id} · {parseFloat(ingVinc.total).toFixed(2)} {labelMon(ingVinc.moneda)}
+                        </p>
+                      )}
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
+                        {clase.estado === 'PENDIENTE' && (<>
+                          <Btn label="✓" bg="#D1FAE5" color="#065F46" small onClick={() => { cambiarEstado(clase.id,'CONFIRMADA'); setClaseExpandida(null); }}/>
+                          <Btn label="✗" bg="#FEE2E2" color="#DC2626" small onClick={() => { cambiarEstado(clase.id,'RECHAZADA'); setClaseExpandida(null); }}/>
+                        </>)}
+                        {clase.estado === 'CONFIRMADA' && !esPasado(diaSelec) && (
+                          <Btn label="Rechazar" bg="#FEE2E2" color="#DC2626" small onClick={() => cambiarEstado(clase.id,'RECHAZADA')}/>
+                        )}
+                        <Btn label="Editar" bg={NA.light} color={NA.darker} small icon="ti-edit"
+                          onClick={() => { abrirEditClase(clase); setClaseExpandida(null); }}/>
+                        {esPasado(diaSelec) && !cobrado && (
+                          <Btn label="Cobro" small icon="ti-cash"
+                            onClick={() => { abrirIngreso(diaSelec, { instructor: clase.nombreInstructor }); setClaseExpandida(null); }}/>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Clases sin hora al final del timeline */}
+        {clasSinHora.length > 0 && (
+          <div style={{ borderTop:`0.5px solid ${NA.border}`, padding:'8px 8px 8px 4px' }}>
+            <p style={{ fontSize:10, color:NA.text2, margin:'0 0 6px', textTransform:'uppercase', letterSpacing:'.06em' }}>Sin horario asignado</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {clasSinHora.map(clase => {
+                const cobrado = tieneCobro(clase);
+                const color   = colorDeTipo(clase.tipoAula, clase.estado);
+                return (
+                  <div key={clase.id} style={{ background: color.bg, borderLeft:`3px solid ${color.border}`, borderRadius:'0 8px 8px 0', padding:'8px 12px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
+                    <div>
+                      <span style={{ fontWeight:600, fontSize:13, color: color.text }}>{clase.alumno}</span>
+                      <span style={{ fontSize:11, color: color.text, opacity:.75, marginLeft:6 }}>
+                        {clase.nombreInstructor}{clase.tipoAula && ` · ${clase.tipoAula}`}{clase.horas && ` · ${clase.horas}h`}
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', gap:4 }}>
+                      <Btn label="Editar" bg={NA.light} color={NA.darker} small icon="ti-edit" onClick={() => abrirEditClase(clase)}/>
+                      {esPasado(diaSelec) && !cobrado && (
+                        <Btn label="Cobro" small icon="ti-cash" onClick={() => abrirIngreso(diaSelec, { instructor: clase.nombreInstructor })}/>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Clases rechazadas colapsadas al final */}
+        {clasesRechaz.length > 0 && (
+          <div style={{ borderTop:`0.5px solid ${NA.border}`, padding:'8px 8px 8px 4px' }}>
+            <p style={{ fontSize:10, color:'#9ca3af', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'.06em' }}>
+              Rechazadas ({clasesRechaz.length})
+            </p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {clasesRechaz.map(c => (
+                <span key={c.id} style={{ fontSize:11, color:'#9ca3af', background:'#F9FAFB', padding:'3px 10px', borderRadius:99, border:'0.5px solid #E5E7EB' }}>
+                  {c.alumno} · {String(c.hora||'').substring(0,5)}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
-      {/* ── CLASES ── */}
-      {totalClases > 0 && (
-        <Section color="#0F6E56" bg={NA.bg} label="Clases agendadas">
-          {clasesActivas.map(a => { // Iteramos sobre clasesActivas en lugar de evD.clases
-            const cobrado = tieneCobro(a);
-            const ingVinc = ingresoDeClase(a);
-            const f       = a.fecha?.toString();
-            // Ya no calculamos RECHAZADA en los colores porque no aparecerán
-            const colorEst = a.estado==='CONFIRMADA' ? {c:'#065F46',bg:'#D1FAE5'} : {c:'#92400E',bg:'#FEF3C7'};
-            
-            return (
-              <div key={a.id} style={{ padding:'13px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    {/* Nombre + badges */}
-                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:4, alignItems:'center' }}>
-                      <span style={{ fontWeight:700, fontSize:15, color:NA.text }}>{a.alumno}</span>
-                      <Tag label={a.estado} color={colorEst.c} bg={colorEst.bg} small/>
-                      {a.tipoAula && <Tag label={a.tipoAula} color={NA.darker} bg={NA.light} small/>}
-                      {esPasado(f) && !cobrado && <Tag label="⚠ Sin cobro" color="#9A3412" bg="#FFF7ED" small/>}
-                      {cobrado     &&              <Tag label="✓ Cobrado"   color="#065F46" bg="#D1FAE5" small/>}
-                    </div>
-
-                    {/* Detalles */}
-                    <p style={{ margin:0, fontSize:12, color:NA.text2 }}>
-                      {a.nombreInstructor}
-                      {a.hora       && ` · ${String(a.hora).substring(0,5)}`}
-                      {a.horaSalida && ` → ${String(a.horaSalida).substring(0,5)}`}
-                      {a.horas      && ` · ${a.horas}h`}
-                      {a.lugar      && ` · ${a.lugar}`}
-                    </p>
-                    {a.tarifa && (
-                      <p style={{ margin:'2px 0 0', fontSize:11, color:NA.dark }}>
-                        Tarifa: R$ {a.tarifa}
-                        {a.horasPagadas ? ` · Pagado: R$ ${a.horasPagadas}` : ''}
-                      </p>
-                    )}
-
-                    {/* Ingreso vinculado */}
-                    {ingVinc && (
-                      <p style={{ margin:'5px 0 0', fontSize:11, color:'#059669', display:'flex', alignItems:'center', gap:4 }}>
-                        <i className="ti ti-cash" style={{ fontSize:13 }}/>
-                        Ingreso #{ingVinc.id} · {parseFloat(ingVinc.total).toFixed(2)} {labelMon(ingVinc.moneda)}
-                        {ingVinc.detalles && ` · ${ingVinc.detalles.split('|')[0].trim()}`}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Acciones */}
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end', flexShrink:0 }}>
-                    {a.estado === 'PENDIENTE' && (
-                      <div style={{ display:'flex', gap:4 }}>
-                        <Btn label="✓" bg="#D1FAE5" color="#065F46" small onClick={() => cambiarEstado(a.id,'CONFIRMADA')}/>
-                        <Btn label="✗" bg="#FEE2E2" color="#DC2626" small onClick={() => cambiarEstado(a.id,'RECHAZADA')}/>
-                      </div>
-                    )}
-                    {a.estado === 'CONFIRMADA' && !esPasado(f) && (
-                      <Btn label="Rechazar" bg="#FEE2E2" color="#DC2626" small onClick={() => cambiarEstado(a.id,'RECHAZADA')}/>
-                    )}
-                    <Btn label="Editar clase" bg={NA.light} color={NA.darker} small icon="ti-edit"
-                      onClick={() => abrirEditClase(a)}/>
-                    {esPasado(f) && !cobrado && (
-                      <Btn label="Registrar cobro" small icon="ti-cash"
-                        onClick={() => abrirIngreso(f, { instructor: a.nombreInstructor })}/>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </Section>
-      )}
-
-      {/* ── INGRESOS ── */}
-      {totalIngresos > 0 && (
+      {/* ══ INGRESOS (abajo) ══ */}
+      {evD.ingresos.length > 0 && (
         <Section color="#065F46" bg="#F0FDF4" label="Ingresos">
           {evD.ingresos.map(i => {
             const clasesVinc = agenda.filter(a => a.ingresoId === i.id);
             return (
-              <div key={i.id} style={{ padding:'13px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', gap:8, alignItems:'baseline', flexWrap:'wrap', marginBottom:3 }}>
-                      <span style={{ fontWeight:700, fontSize:16, color:'#065F46' }}>
-                        + {parseFloat(i.total||0).toFixed(2)} {labelMon(i.moneda)}
-                      </span>
-                      <span style={{ fontSize:11, color:'#9ca3af' }}>#{i.id}</span>
-                      {i.asignadoA && i.asignadoA !== 'NINGUNO'
-                        ? <Tag label={i.asignadoA} color={NA.darker} bg={NA.light} small/>
-                        : <Tag label="Sin asignar"  color="#92400E"  bg="#FEF3C7"  small/>}
-                    </div>
-                    <p style={{ margin:0, fontSize:12, color:NA.text2 }}>
-                      {i.actividad}{i.instructor && ` · ${i.instructor}`} · {i.formaPago}
-                    </p>
-                    {i.detalles && (
-                      <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2, fontStyle:'italic' }}>
-                        {i.detalles.split('|')[0].trim()}
-                      </p>
-                    )}
-                    {clasesVinc.length > 0 && (
-                      <p style={{ margin:'5px 0 0', fontSize:11, color:'#065F46', display:'flex', alignItems:'center', gap:4 }}>
-                        <i className="ti ti-calendar" style={{ fontSize:12 }}/>
-                        Clases vinculadas: {clasesVinc.map(c => c.alumno).join(', ')}
-                      </p>
-                    )}
-                  </div>
+              <div key={i.id} style={{ padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
+                <div style={{ display:'flex', gap:8, alignItems:'baseline', flexWrap:'wrap', marginBottom:3 }}>
+                  <span style={{ fontWeight:700, fontSize:15, color:'#065F46' }}>
+                    + {parseFloat(i.total||0).toFixed(2)} {labelMon(i.moneda)}
+                  </span>
+                  <span style={{ fontSize:11, color:'#9ca3af' }}>#{i.id}</span>
+                  {i.asignadoA && i.asignadoA !== 'NINGUNO'
+                    ? <Tag label={i.asignadoA} color={NA.darker} bg={NA.light} small/>
+                    : <Tag label="Sin asignar" color="#92400E" bg="#FEF3C7" small/>}
                 </div>
+                <p style={{ margin:0, fontSize:12, color:NA.text2 }}>
+                  {i.actividad}{i.instructor && ` · ${i.instructor}`} · {i.formaPago}
+                </p>
+                {i.detalles && <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2, fontStyle:'italic' }}>{i.detalles.split('|')[0].trim()}</p>}
+                {clasesVinc.length > 0 && (
+                  <p style={{ margin:'4px 0 0', fontSize:11, color:'#065F46' }}>
+                    <i className="ti ti-calendar" style={{ fontSize:11, marginRight:3 }}/>
+                    {clasesVinc.map(c => c.alumno).join(', ')}
+                  </p>
+                )}
               </div>
             );
           })}
         </Section>
       )}
 
-      {/* ── EGRESOS ── */}
-      {totalEgresos > 0 && (
+      {/* ══ EGRESOS (abajo) ══ */}
+      {evD.egresos.length > 0 && (
         <Section color="#991B1B" bg="#FEF2F2" label="Egresos">
           {evD.egresos.map(e => (
-            <div key={e.id} style={{ padding:'13px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
+            <div key={e.id} style={{ padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
               <div style={{ display:'flex', gap:8, alignItems:'baseline', marginBottom:3, flexWrap:'wrap' }}>
-                <span style={{ fontWeight:700, fontSize:16, color:'#DC2626' }}>
+                <span style={{ fontWeight:700, fontSize:15, color:'#DC2626' }}>
                   - {parseFloat(e.total||0).toFixed(2)} {labelMon(e.moneda)}
                 </span>
                 <span style={{ fontSize:11, color:'#9ca3af' }}>#{e.id}</span>
@@ -177,14 +391,30 @@ const MonitorDia = ({ diaSelec, evD, agenda, ingresos, tieneCobro, ingresoDeClas
         </Section>
       )}
 
-      {totalClases === 0 && totalIngresos === 0 && totalEgresos === 0 && (
-        <p style={{ textAlign:'center', color:NA.text2, padding:'28px 0', fontSize:14 }}>
+      {clasesActivas.length === 0 && evD.ingresos.length === 0 && evD.egresos.length === 0 && (
+        <div style={{ padding:'32px 20px', textAlign:'center', color:NA.text2 }}>
+          <i className="ti ti-calendar-off" style={{ fontSize:28, opacity:.3, display:'block', marginBottom:8 }}/>
           Sin eventos para este día.
-        </p>
+          {abrirAgendar && (
+            <div style={{ marginTop:12 }}>
+              <Btn label="Agregar clase" icon="ti-plus" bg={NA.light} color={NA.dark}
+                onClick={() => abrirAgendar(diaSelec)}/>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 };
+
+// ── Chip de estadística ───────────────────────────────────────────────────────
+const StatChip = ({ icon, val, label, color, bg }) => (
+  <div style={{ display:'flex', alignItems:'center', gap:5, background: bg, padding:'5px 10px', borderRadius:99 }}>
+    <i className={`ti ${icon}`} style={{ fontSize:12, color }}/>
+    <span style={{ fontSize:12, fontWeight:600, color }}>{val}</span>
+    <span style={{ fontSize:11, color, opacity:.7 }}>{label}</span>
+  </div>
+);
 
 // ── Sección con header coloreado ──────────────────────────────────────────────
 const Section = ({ color, bg, label, children }) => (
