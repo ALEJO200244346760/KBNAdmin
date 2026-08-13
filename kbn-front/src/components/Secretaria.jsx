@@ -109,11 +109,9 @@ const Secretaria = () => {
   // --- MANEJADORES DE EVENTOS ---
   const handleAgendaSubmit = async (e) => {
     e.preventDefault();
-    if (!agendaData.instructorId) return alert("Por favor selecciona un instructor");
-
     const dataToSubmit = {
       ...agendaData,
-      instructorId:  Number(agendaData.instructorId),
+      instructorId:  agendaData.instructorId ? Number(agendaData.instructorId) : null,
       tarifa:        Number(agendaData.tarifa),
       horas:         Number(agendaData.horas),
       horasPagadas:  Number(agendaData.horasPagadas),
@@ -340,7 +338,7 @@ const Secretaria = () => {
                   style={sx.input} onFocus={focusOn} onBlur={focusOff} required/>
               </div>
               <InstructorSelector
-                label="Instructor *"
+                label="Instructor (opcional — asignar después)"
                 name="instructorId"
                 value={agendaData.instructorId}
                 onChange={e => set('instructorId', e.target.value)}
@@ -460,9 +458,9 @@ const Secretaria = () => {
               style={{ flex:1, padding:'14px', borderRadius:12, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, fontSize:14, fontWeight:500, cursor:'pointer' }}>
               Cancelar
             </button>
-            <button type="submit" disabled={!agendaData.alumno || !agendaData.instructorId}
+            <button type="submit" disabled={!agendaData.alumno}
               style={{ flex:2, padding:'14px', borderRadius:12, border:'none',
-                background: !agendaData.alumno || !agendaData.instructorId ? NA.mid : NA.dark,
+                background: !agendaData.alumno ? NA.mid : NA.dark,
                 color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer',
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
               <i className="ti ti-check" style={{ fontSize:16 }}/>

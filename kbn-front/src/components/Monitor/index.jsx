@@ -344,7 +344,7 @@ const Monitor = () => {
     try {
       const payload = {
         alumno:          form.alumno,
-        instructorId:    Number(form.instructorId),
+        instructorId:    form.instructorId ? Number(form.instructorId) : null,
         tipoAula:        form.tipoAula   || null,
         fecha:           form.fecha,
         hora:            form.hora,

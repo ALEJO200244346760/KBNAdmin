@@ -472,10 +472,10 @@ export const ModalAgendar = ({
             <Inp placeholder="Juan García" value={form.alumno} onChange={e => set('alumno', e.target.value)} required/>
           </div>
           <div>
-            <label style={labelSx}>Instructor *</label>
+            <label style={labelSx}>Instructor <span style={{ color:'rgba(255,255,255,.3)', fontWeight:400 }}>(opcional)</span></label>
             <select value={form.instructorId} onChange={e => set('instructorId', e.target.value)}
               style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid ${NA.border}`, fontSize:14, color:NA.text, background:'#fff', boxSizing:'border-box' }}>
-              <option value="">Seleccionar...</option>
+              <option value="">Sin asignar — asignar después</option>
               {instructores.map(i => <option key={i.id} value={i.id}>{i.nombre} {i.apellido}</option>)}
             </select>
           </div>
@@ -546,7 +546,7 @@ export const ModalAgendar = ({
           <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={onClose}/>
           <Btn
             label={guardando ? 'Agendando...' : 'Agendar clase'}
-            disabled={guardando || !form.alumno || !form.instructorId}
+            disabled={guardando || !form.alumno}
             icon="ti-calendar-plus"
             onClick={() => onSubmit(form)}/>
         </div>
