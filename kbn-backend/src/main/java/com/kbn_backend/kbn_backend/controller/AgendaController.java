@@ -61,30 +61,37 @@ public class AgendaController {
     @PostMapping("/crear")
     public ResponseEntity<?> crearAgenda(@RequestBody Agenda agenda) {
         try {
-            Optional<Usuario> instructorOpt = usuarioRepository.findById(agenda.getInstructorId());
+            // Instructor es opcional — se puede asignar después editando la clase
+            if (agenda.getInstructorId() != null) {
+                Optional<Usuario> instructorOpt = usuarioRepository.findById(agenda.getInstructorId());
+                if (instructorOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body("Instructor no encontrado");
+                }
+                Usuario instructor = instructorOpt.get();
+                agenda.setNombreInstructor(instructor.getNombre() + " " + instructor.getApellido());
 
-            if (instructorOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body("Instructor no encontrado");
+                // Push de nueva clase al instructor
+                Agenda nuevaAgenda = agendaRepository.save(agenda);
+                nuevaAgenda.setEstado("PENDIENTE");
+                agendaRepository.save(nuevaAgenda);
+
+                String titulo = "📅 Nueva clase asignada";
+                String cuerpo = String.format(
+                        "%s — %s a las %s hs en %s",
+                        nuevaAgenda.getAlumno(),
+                        nuevaAgenda.getFecha().toString(),
+                        nuevaAgenda.getHora() != null ? nuevaAgenda.getHora().toString().substring(0, 5) : "??",
+                        nuevaAgenda.getLugar() != null ? nuevaAgenda.getLugar() : "Sin lugar"
+                );
+                pushService.enviarNotificacion(nuevaAgenda.getInstructorId(), titulo, cuerpo, "/#/instructor");
+                return ResponseEntity.ok(nuevaAgenda);
+
+            } else {
+                // Sin instructor: guardar sin push, estado PENDIENTE
+                agenda.setNombreInstructor(null);
+                agenda.setEstado("PENDIENTE");
+                return ResponseEntity.ok(agendaRepository.save(agenda));
             }
-
-            Usuario instructor = instructorOpt.get();
-            agenda.setNombreInstructor(instructor.getNombre() + " " + instructor.getApellido());
-            agenda.setEstado("PENDIENTE");
-
-            Agenda nuevaAgenda = agendaRepository.save(agenda);
-
-            // Push DESPUÉS del save, con los datos completos
-            String titulo = "📅 Nueva clase asignada";
-            String cuerpo = String.format(
-                    "%s — %s a las %s hs en %s",
-                    nuevaAgenda.getAlumno(),
-                    nuevaAgenda.getFecha().toString(),
-                    nuevaAgenda.getHora() != null ? nuevaAgenda.getHora().toString().substring(0, 5) : "??",
-                    nuevaAgenda.getLugar() != null ? nuevaAgenda.getLugar() : "Sin lugar"
-            );
-            pushService.enviarNotificacion(nuevaAgenda.getInstructorId(), titulo, cuerpo, "/#/instructor");
-
-            return ResponseEntity.ok(nuevaAgenda);
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
@@ -187,7 +194,9 @@ public class AgendaController {
                     + (alumno.isBlank() ? "" : " (" + alumno + ")")
                     + " — " + fechaStr;
 
-            pasivo.setMontoTotal(pasivo.getMontoTotal() - deuda);
+            // Defensive: montoTotal puede ser null en tarjetas recién creadas
+            double montoActual = pasivo.getMontoTotal() != null ? pasivo.getMontoTotal() : 0.0;
+            pasivo.setMontoTotal(montoActual - deuda);
 
             PagoPasivo registro = new PagoPasivo();
             registro.setMontoPagado(-deuda);
@@ -228,6 +237,7 @@ public class AgendaController {
         // 👉 1. Agregá estos dos campos nuevos con sus getters y setters
         private Boolean cobrada;
         private Long ingresoId;
+        private Long instructorId; // para asignar/cambiar instructor y mandar push
 
         public String getTipoAula() { return tipoAula; }
         public void setTipoAula(String tipoAula) { this.tipoAula = tipoAula; }
@@ -245,12 +255,13 @@ public class AgendaController {
         public void setHorasPagadas(Double horasPagadas) { this.horasPagadas = horasPagadas; }
         public String getEstado() { return estado; }
         public void setEstado(String estado) { this.estado = estado; }
-        
-        // 👉 Getters y Setters de los nuevos campos
+
         public Boolean getCobrada() { return cobrada; }
         public void setCobrada(Boolean cobrada) { this.cobrada = cobrada; }
         public Long getIngresoId() { return ingresoId; }
         public void setIngresoId(Long ingresoId) { this.ingresoId = ingresoId; }
+        public Long getInstructorId() { return instructorId; }
+        public void setInstructorId(Long id) { this.instructorId = id; }
     }
 
     @PatchMapping("/{id}")
@@ -271,14 +282,52 @@ public class AgendaController {
             if (req.getTarifa()           != null) agenda.setTarifa(req.getTarifa());
             if (req.getHorasPagadas()     != null) agenda.setHorasPagadas(req.getHorasPagadas());
             if (req.getEstado()           != null) agenda.setEstado(req.getEstado());
-            
-            // 👉 2. Agregar esta validación para guardar el estado del cobro
-            if (req.getCobrada() != null) {
+            if (req.getCobrada()          != null) {
                 agenda.setCobrada(req.getCobrada());
-                agenda.setIngresoId(req.getIngresoId()); // Se setea el ID o null si se desvinculó
+                agenda.setIngresoId(req.getIngresoId());
             }
 
-            return ResponseEntity.ok(agendaRepository.save(agenda));
+            // ── Asignar/cambiar instructor y mandar push ─────────────────────
+            Long instructorAnteriorId = agenda.getInstructorId();
+            boolean instructorCambio = req.getInstructorId() != null
+                    && !req.getInstructorId().equals(instructorAnteriorId);
+
+            if (instructorCambio) {
+                Optional<Usuario> instrOpt = usuarioRepository.findById(req.getInstructorId());
+                if (instrOpt.isPresent()) {
+                    Usuario instr = instrOpt.get();
+                    agenda.setInstructorId(req.getInstructorId());
+                    agenda.setNombreInstructor(instr.getNombre() + " " + instr.getApellido());
+                    // Si el estado era PENDIENTE con otro instructor, resetear a PENDIENTE
+                    // para que el nuevo instructor lo vea como asignación nueva.
+                    agenda.setEstado("PENDIENTE");
+                }
+            }
+
+            Agenda saved = agendaRepository.save(agenda);
+
+            // Push al instructor si cambió o si el toggle "notificar" vino activo
+            // (cuando estado=PENDIENTE llega del front con notificar=true)
+            boolean debeNotificar = instructorCambio
+                    || ("PENDIENTE".equals(req.getEstado()) && saved.getInstructorId() != null);
+
+            if (debeNotificar && saved.getInstructorId() != null) {
+                try {
+                    String titulo = instructorCambio ? "📅 Clase asignada" : "📅 Clase actualizada";
+                    String cuerpo = String.format(
+                            "%s — %s a las %s hs%s",
+                            saved.getAlumno() != null ? saved.getAlumno() : "Clase",
+                            saved.getFecha() != null ? saved.getFecha().toString() : "",
+                            saved.getHora() != null ? saved.getHora().toString().substring(0, 5) : "??",
+                            saved.getTipoAula() != null ? " (" + saved.getTipoAula() + ")" : ""
+                    );
+                    pushService.enviarNotificacion(saved.getInstructorId(), titulo, cuerpo, "/#/instructor");
+                } catch (Exception ignored) {
+                    // La push no debe bloquear el guardado
+                }
+            }
+
+            return ResponseEntity.ok(saved);
         }).orElse(ResponseEntity.notFound().build());
     }
 
