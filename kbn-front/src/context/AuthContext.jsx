@@ -6,7 +6,11 @@ const AuthContext = createContext();
 const decodeToken = (token) => {
   try {
     const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
+    // atob solo maneja ASCII — para nombres con tildes (José, María, etc.)
+    // hay que decodificar el base64 como UTF-8 correctamente.
+    const bytes = Uint8Array.from(atob(payload.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const jsonStr = new TextDecoder('utf-8').decode(bytes);
+    return JSON.parse(jsonStr);
   } catch (e) {
     return null;
   }
