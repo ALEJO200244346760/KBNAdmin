@@ -23,7 +23,7 @@ const normalizarTexto = (text) => {
   return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 };
 
-const Monitor = ({setView}) => {
+const Monitor = () => {
   // ── Mes actual ──────────────────────────────────────────────────────────────
   const [mes, setMes] = useState(() => {
     const d = new Date();
@@ -417,32 +417,10 @@ const Monitor = ({setView}) => {
     </div>
   );
 
-    // Render
+  // Render
   return (
-    <div style={{ maxWidth:940, margin:'0 auto', padding:'0 4px 80px', fontFamily:'system-ui,sans-serif' }}>
+    <div style={{ maxWidth:940, margin:'0 auto', padding:'0 14px 80px', fontFamily:'system-ui,sans-serif' }}>
       <style>{`@keyframes mspin{to{transform:rotate(360deg)}}`}</style>
-
-      <button
-        onClick={() => setView('INICIO')}
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          border: `0.5px solid ${NA.border}`,
-          background: '#fff',
-          color: NA.text2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer'
-        }}
-      >
-        <i
-          className="ti ti-arrow-left"
-          style={{ fontSize: 17 }}
-          aria-hidden="true"
-        />
-      </button>
 
       <MonitorCalendario
         mes={mes} navMes={navMes}
@@ -466,6 +444,10 @@ const Monitor = ({setView}) => {
         cambiarEstado={cambiarEstado}
         abrirEditClase={abrirEditClase}
         abrirIngreso={abrirIngreso}
+        abrirAgendar={(fecha, hora) => {
+          // Abre el modal de nuevo ingreso pre-seteado con la fecha y hora
+          abrirIngreso(fecha);
+        }}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>

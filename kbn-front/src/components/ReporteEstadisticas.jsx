@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { usePresencia, OPCIONES_PRESENCIA } from '../hooks/usePresencia';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -12,6 +13,7 @@ import {
 import api from '../axiosConfig';
 import { useAuth } from '../context/AuthContext';
 import ReportesEstadisticasGraficos from './ReportesEstadisticasGraficos';
+import PresenciaWidget from './PresenciaWidget';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
@@ -81,6 +83,9 @@ const labelMoneda = (m) => {
 const ReporteEstadisticas = () => {
   const { token } = useAuth();
 
+  // ── Presencia del día: preocarga asignadoA en pendientes ──────────────────
+  const { asignadoAuto, opcionActual } = usePresencia();
+
   const axiosConfig = useMemo(() => ({
     headers: { Authorization: `Bearer ${token}` }
   }), [token]);
@@ -132,7 +137,9 @@ const ReporteEstadisticas = () => {
           listEgresos.push(item);
         } else if (item.tipoTransaccion === 'INGRESO') {
           if (!item.asignadoA || item.asignadoA.trim() === '' || item.asignadoA.toUpperCase() === 'NINGUNO') {
-            item.asignadoA = 'NINGUNO';
+            // Precarga la presencia del día en vez de dejar NINGUNO
+            // El usuario puede cambiarlo antes de confirmar con OK
+            item.asignadoA = asignadoAuto || 'NINGUNO';
             listPendientes.push(item);
           } else {
             listAsignados.push(item);
@@ -448,6 +455,9 @@ const ReporteEstadisticas = () => {
 
         {/* ── FIX 1: Paneles de totales agrupados por moneda base ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Presencia del día — visible y editable desde Estadísticas */}
+          <PresenciaWidget />
+
           {/* BRL siempre visible — agrupa Stone José + Stone Igna + Efectivo BRL */}
           <div style={{ background: '#7B5E00', color: '#fff', borderRadius: 10, padding: '8px 16px', minWidth: 110, textAlign: 'center' }}>
             <p style={{ fontSize: 10, opacity: .75, margin: 0, letterSpacing: '.08em', textTransform: 'uppercase' }}>R$ (total)</p>
@@ -625,9 +635,14 @@ const ReporteEstadisticas = () => {
                   <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.actividad} · {item.instructor}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Indicador de presencia actual */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: opcionActual.bg, border: `1px solid ${opcionActual.color}30`, flexShrink: 0 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: opcionActual.color }}/>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: opcionActual.color }}>{opcionActual.short}</span>
+                  </div>
                   <select value={item.asignadoA} onChange={(e) => handlePendienteChange(item.id, e.target.value)} disabled={asignandoEsteItem}
                     style={{ padding: '6px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
-                    <option value="NINGUNO">Elegir...</option>
+                    <option value="NINGUNO">— Cambiar —</option>
                     <option value="IGNA">Igna (pres)</option>
                     <option value="JOSE">Jose (pres)</option>
                     <option value="AMBOS">Ambos presentes</option>

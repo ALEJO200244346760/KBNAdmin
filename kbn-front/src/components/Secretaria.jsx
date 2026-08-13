@@ -8,6 +8,8 @@ import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 import Pasivos from './Pasivos';
 import Monitor from './Monitor';
+import PresenciaWidget from './PresenciaWidget';
+import { usePresencia } from '../hooks/usePresencia';
 
 // ── Paleta Náutica Atins ───────────────────────────────────────────────────
 const NA = {
@@ -35,7 +37,8 @@ const focusOn = (e) => { e.target.style.borderColor = NA.primary; e.target.style
 const focusOff = (e) => { e.target.style.borderColor = NA.border; e.target.style.boxShadow = 'none'; };
 
 const Secretaria = () => {
-  const { user, token } = useAuth(); // Extraemos el token para las peticiones
+  const { user, token } = useAuth();
+  const isAdmin = user?.role === 'ADMINISTRADOR';
   const [view, setView] = useState('INICIO');
   const [instructors, setInstructors] = useState([]);
   const [agendaList, setAgendaList] = useState([]);
@@ -50,9 +53,10 @@ const Secretaria = () => {
   const today = new Date().toISOString().split('T')[0];
 
   const initialAgendaData = {
-    alumno: '', fecha: today, hora: '10:00', instructorId: '',
-    lugar: '', tarifa: '', horas: 1, horasPagadas: 0,
-    hotelDerivacion: '', estado: 'PENDIENTE'
+    alumno: '', fecha: today, hora: '10:00', horaSalida: '',
+    instructorId: '', tipoAula: '', lugar: '',
+    tarifa: '', horas: 1, horasPagadas: 0,
+    hotelDerivacion: '', notas: '', estado: 'PENDIENTE'
   };
   const [agendaData, setAgendaData] = useState(initialAgendaData);
 
@@ -109,10 +113,13 @@ const Secretaria = () => {
 
     const dataToSubmit = {
       ...agendaData,
-      instructorId: Number(agendaData.instructorId),
-      tarifa: Number(agendaData.tarifa),
-      horas: Number(agendaData.horas),
-      horasPagadas: Number(agendaData.horasPagadas)
+      instructorId:  Number(agendaData.instructorId),
+      tarifa:        Number(agendaData.tarifa),
+      horas:         Number(agendaData.horas),
+      horasPagadas:  Number(agendaData.horasPagadas),
+      tipoAula:      agendaData.tipoAula   || null,
+      horaSalida:    agendaData.horaSalida || null,
+      notas:         agendaData.notas      || null,
     };
 
     try {
@@ -197,16 +204,22 @@ const Secretaria = () => {
   if (view === 'INICIO') {
     return (
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '20px 4px 60px' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel de Secretaría</h1>
-          <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Gestioná agenda, caja y cuentas corrientes</p>
+        {/* ── Presencia del día ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel de Secretaría</h1>
+            <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Gestioná agenda, caja y cuentas corrientes</p>
+          </div>
+          <PresenciaWidget />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-          <MenuCard icon="ti-device-desktop" title="Monitor" sub="Estados" color={NA.darker} onClick={() => setView('MONITOR')} />
-          <MenuCard icon="ti-calendar-plus" title="Agendar" sub="Nueva clase" color={NA.dark} onClick={() => setView('CALENDARIO')} />
-          <MenuCard icon="ti-receipt-2" title="Pasivos" sub="Deudas" color="#92400E" onClick={() => setView('PASIVOS')} />
-          <MenuCard icon="ti-cash" title="Ingreso" sub="Caja" color={NA.primary} onClick={() => setView('INGRESO')} />
-          <MenuCard icon="ti-minus" title="Egreso" sub="Gastos" color="#c23a3a" onClick={() => setView('EGRESO')} />
+          <MenuCard icon="ti-device-desktop" title="Monitor"    sub="Estados"      color={NA.darker}  onClick={() => setView('MONITOR')} />
+          <MenuCard icon="ti-calendar-plus"  title="Agendar"    sub="Nueva clase"  color={NA.dark}    onClick={() => setView('CALENDARIO')} />
+          {isAdmin && (
+            <MenuCard icon="ti-receipt-2"    title="Pasivos"    sub="Deudas"       color="#92400E"    onClick={() => setView('PASIVOS')} />
+          )}
+          <MenuCard icon="ti-cash"           title="Ingreso"    sub="Caja"         color={NA.primary} onClick={() => setView('INGRESO')} />
+          <MenuCard icon="ti-minus"          title="Egreso"     sub="Gastos"       color="#c23a3a"    onClick={() => setView('EGRESO')} />
         </div>
       </div>
     );
@@ -225,80 +238,235 @@ const Secretaria = () => {
   }
 
   if (view === 'CALENDARIO') {
+
+    // Tipos de aula con precio sugerido (mismo que Ingreso.jsx)
+    const TIPOS = [
+      { v:'APK',   l:'Kite Privada',         emoji:'🪁', tarifa:400  },
+      { v:'ASPK',  l:'Kite Semiprivada',      emoji:'🪁', tarifa:530  },
+      { v:'APWF',  l:'Wingfoil Privada',      emoji:'🦅', tarifa:420  },
+      { v:'ASPWF', l:'Wingfoil Semiprivada',  emoji:'🦅', tarifa:550  },
+      { v:'APWS',  l:'Windsurf Privada',      emoji:'🌊', tarifa:370  },
+      { v:'ASPWS', l:'Windsurf Semiprivada',  emoji:'🌊', tarifa:500  },
+      { v:'RENTAL',l:'Rental',                emoji:'🏄', tarifa:360  },
+      { v:'OTRO',  l:'Otro',                  emoji:'✏️', tarifa:null },
+    ];
+
+    const COLOR_T = {
+      APK:'#16A34A', ASPK:'#059669', APWF:'#2563EB', ASPWF:'#7C3AED',
+      APWS:'#CA8A04', ASPWS:'#D97706', RENTAL:'#6B7280', OTRO:'#DC2626',
+    };
+
+    const set = (k, v) => setAgendaData(p => ({ ...p, [k]: v }));
+
+    // Auto-sugerir tarifa al elegir tipo
+    const elegirTipo = (v) => {
+      const t = TIPOS.find(x => x.v === v);
+      setAgendaData(p => ({
+        ...p,
+        tipoAula: v,
+        tarifa: t?.tarifa ? String(t.tarifa) : p.tarifa,
+      }));
+    };
+
+    // Calcular horas automático si hay hora entrada y salida
+    const calcularHoras = (entrada, salida) => {
+      if (!entrada || !salida) return;
+      const [h1,m1] = entrada.split(':').map(Number);
+      const [h2,m2] = salida.split(':').map(Number);
+      const diff = (h2*60+m2 - h1*60-m1) / 60;
+      if (diff > 0) setAgendaData(p => ({ ...p, horas: Math.round(diff * 100)/100 }));
+    };
+
     return (
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 4px 60px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <button
-            onClick={() => setView('INICIO')}
-            style={{ width: 36, height: 36, borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-          >
-            <i className="ti ti-arrow-left" style={{ fontSize: 17 }} aria-hidden="true" />
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 4px 80px', fontFamily:'system-ui,sans-serif' }}>
+
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+          <button onClick={() => setView('INICIO')}
+            style={{ width:36, height:36, borderRadius:10, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <i className="ti ti-arrow-left" style={{ fontSize:17 }}/>
           </button>
-          <h2 style={{ fontSize: 18, fontWeight: 500, color: NA.text, margin: 0 }}>
-            {agendaData.id ? 'Reasignar instructor' : 'Nueva asignación'}
-          </h2>
+          <div>
+            <h2 style={{ fontSize:18, fontWeight:700, color:NA.text, margin:0 }}>
+              {agendaData.id ? 'Reasignar clase' : 'Agendar clase'}
+            </h2>
+            <p style={{ fontSize:11, color:NA.text2, margin:'2px 0 0' }}>
+              Completá los datos de la clase
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleAgendaSubmit}>
-          <div style={{ background: '#fff', borderRadius: 16, border: `0.5px solid ${NA.border}`, padding: 22, marginBottom: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+
+          {/* ── Tipo de aula ── */}
+          <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, padding:20, marginBottom:14 }}>
+            <p style={{ margin:'0 0 12px', fontSize:11, fontWeight:700, color:NA.text2, textTransform:'uppercase', letterSpacing:'.07em' }}>
+              Tipo de clase
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+              {TIPOS.map(t => {
+                const sel = agendaData.tipoAula === t.v;
+                const col = COLOR_T[t.v] || NA.dark;
+                return (
+                  <button key={t.v} type="button" onClick={() => elegirTipo(t.v)}
+                    style={{
+                      padding:'11px 10px', borderRadius:12, textAlign:'left', cursor:'pointer',
+                      border:`1.5px solid ${sel ? col : NA.border}`,
+                      background: sel ? `${col}15` : '#fff',
+                      display:'flex', alignItems:'center', gap:8,
+                    }}>
+                    <span style={{ fontSize:18 }}>{t.emoji}</span>
+                    <div>
+                      <p style={{ margin:0, fontSize:12, fontWeight:700, color: sel ? col : NA.text }}>{t.l}</p>
+                      {t.tarifa && <p style={{ margin:0, fontSize:10, color: sel ? col : NA.text2, opacity:.8 }}>R$ {t.tarifa}/h</p>}
+                    </div>
+                    {sel && <i className="ti ti-check" style={{ fontSize:14, color:col, marginLeft:'auto' }}/>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Alumno + Instructor ── */}
+          <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, padding:20, marginBottom:14 }}>
+            <p style={{ margin:'0 0 12px', fontSize:11, fontWeight:700, color:NA.text2, textTransform:'uppercase', letterSpacing:'.07em' }}>
+              Alumno e instructor
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               <div>
-                <label style={sx.label}>Nombre alumno</label>
-                <input type="text" placeholder="Juan" value={agendaData.alumno} onChange={e => setAgendaData({ ...agendaData, alumno: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} required />
+                <label style={sx.label}>Nombre alumno *</label>
+                <input type="text" placeholder="Juan García" value={agendaData.alumno}
+                  onChange={e => set('alumno', e.target.value)}
+                  style={sx.input} onFocus={focusOn} onBlur={focusOff} required/>
               </div>
               <InstructorSelector
-                label="Asignar instructor"
+                label="Instructor *"
                 name="instructorId"
                 value={agendaData.instructorId}
-                onChange={e => setAgendaData({ ...agendaData, instructorId: e.target.value })}
+                onChange={e => set('instructorId', e.target.value)}
               />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={sx.label}>Fecha clase</label>
-                <input type="date" value={agendaData.fecha} onChange={e => setAgendaData({ ...agendaData, fecha: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+            <div>
+              <label style={sx.label}>Hotel / Derivación</label>
+              <input type="text" placeholder="Pousada do Sol..." value={agendaData.hotelDerivacion}
+                onChange={e => set('hotelDerivacion', e.target.value)}
+                style={sx.input} onFocus={focusOn} onBlur={focusOff}/>
+            </div>
+          </div>
+
+          {/* ── Fecha y horario ── */}
+          <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, padding:20, marginBottom:14 }}>
+            <p style={{ margin:'0 0 12px', fontSize:11, fontWeight:700, color:NA.text2, textTransform:'uppercase', letterSpacing:'.07em' }}>
+              Fecha y horario
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={sx.label}>Fecha</label>
+                <input type="date" value={agendaData.fecha}
+                  onChange={e => set('fecha', e.target.value)}
+                  style={sx.input} onFocus={focusOn} onBlur={focusOff}/>
               </div>
               <div>
-                <label style={sx.label}>Horario</label>
-                <input type="time" value={agendaData.hora} onChange={e => setAgendaData({ ...agendaData, hora: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+                <label style={sx.label}>Hora entrada</label>
+                <input type="time" value={agendaData.hora}
+                  onChange={e => {
+                    set('hora', e.target.value);
+                    calcularHoras(e.target.value, agendaData.horaSalida);
+                  }}
+                  style={sx.input} onFocus={focusOn} onBlur={focusOff}/>
+              </div>
+              <div>
+                <label style={sx.label}>Hora salida</label>
+                <input type="time" value={agendaData.horaSalida}
+                  onChange={e => {
+                    set('horaSalida', e.target.value);
+                    calcularHoras(agendaData.hora, e.target.value);
+                  }}
+                  style={sx.input} onFocus={focusOn} onBlur={focusOff}/>
+              </div>
+              <div>
+                <label style={sx.label}>Horas</label>
+                <input type="number" step="0.5" value={agendaData.horas}
+                  onChange={e => set('horas', e.target.value)}
+                  style={sx.input} onFocus={focusOn} onBlur={focusOff}/>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ marginTop:12 }}>
+              <label style={sx.label}>Lugar / Spot</label>
+              <input type="text" placeholder="Escola, Caburé, Lagoa..."
+                value={agendaData.lugar}
+                onChange={e => set('lugar', e.target.value)}
+                style={sx.input} onFocus={focusOn} onBlur={focusOff}/>
+            </div>
+          </div>
+
+          {/* ── Condiciones económicas ── */}
+          <div style={{ background:NA.darker, borderRadius:16, padding:20, marginBottom:14 }}>
+            <p style={{ fontSize:11, color:'rgba(255,255,255,.5)', textTransform:'uppercase', letterSpacing:'.08em', margin:'0 0 14px', fontWeight:600 }}>
+              Condiciones económicas
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
               <div>
-                <label style={sx.label}>Lugar / Spot</label>
-                <input type="text" value={agendaData.lugar} onChange={e => setAgendaData({ ...agendaData, lugar: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+                <label style={{ ...sx.label, color:'rgba(255,255,255,.6)' }}>Tarifa (R$/h)</label>
+                <input type="number" value={agendaData.tarifa}
+                  onChange={e => set('tarifa', e.target.value)}
+                  style={{ ...sx.input, background:'rgba(255,255,255,.1)', border:'0.5px solid rgba(255,255,255,.15)', color:'#fff', fontWeight:600 }}/>
               </div>
               <div>
-                <label style={sx.label}>Descripción / Hotel</label>
-                <input type="text" value={agendaData.hotelDerivacion} onChange={e => setAgendaData({ ...agendaData, hotelDerivacion: e.target.value })} style={sx.input} onFocus={focusOn} onBlur={focusOff} />
+                <label style={{ ...sx.label, color:'rgba(255,255,255,.6)' }}>Horas</label>
+                <input type="number" step="0.5" value={agendaData.horas}
+                  onChange={e => set('horas', e.target.value)}
+                  style={{ ...sx.input, background:'rgba(255,255,255,.1)', border:'0.5px solid rgba(255,255,255,.15)', color:'#fff' }}/>
+              </div>
+              <div>
+                <label style={{ ...sx.label, color:'rgba(255,255,255,.6)' }}>Total est.</label>
+                <div style={{ padding:'11px 13px', borderRadius:10, background:NA.primary, color:NA.darker, fontSize:16, fontWeight:700, textAlign:'right' }}>
+                  {agendaData.tarifa && agendaData.horas
+                    ? (Number(agendaData.tarifa) * Number(agendaData.horas)).toFixed(0)
+                    : '—'}
+                </div>
+              </div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12 }}>
+              <div>
+                <label style={{ ...sx.label, color:'rgba(255,255,255,.6)' }}>Seña / Pagado</label>
+                <input type="number" value={agendaData.horasPagadas}
+                  onChange={e => set('horasPagadas', e.target.value)}
+                  style={{ ...sx.input, background:'rgba(255,255,255,.1)', border:'0.5px solid rgba(255,255,255,.15)', color:'#fff' }}/>
+              </div>
+              <div>
+                <label style={{ ...sx.label, color:'rgba(255,255,255,.6)' }}>Resto a cobrar</label>
+                <div style={{ padding:'11px 13px', borderRadius:10, background:'rgba(255,255,255,.08)', border:'0.5px solid rgba(255,255,255,.15)', color:'rgba(255,255,255,.8)', fontSize:14, fontWeight:600, textAlign:'right' }}>
+                  {agendaData.tarifa && agendaData.horas
+                    ? Math.max(0, Number(agendaData.tarifa)*Number(agendaData.horas) - Number(agendaData.horasPagadas||0)).toFixed(0)
+                    : '—'}
+                </div>
               </div>
             </div>
           </div>
 
-          <div style={{ background: NA.darker, borderRadius: 16, padding: 22, marginBottom: 16 }}>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', textTransform: 'uppercase', letterSpacing: '.08em', margin: '0 0 14px' }}>Condiciones acordadas</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-              <div>
-                <label style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Tarifa pactada</label>
-                <input type="number" value={agendaData.tarifa} onChange={e => setAgendaData({ ...agendaData, tarifa: e.target.value })} style={{ ...sx.input, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.15)', color: '#fff' }} />
-              </div>
-              <div>
-                <label style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Horas solicitadas</label>
-                <input type="number" value={agendaData.horas} onChange={e => setAgendaData({ ...agendaData, horas: e.target.value })} style={{ ...sx.input, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.15)', color: '#fff' }} />
-              </div>
-              <div>
-                <label style={{ ...sx.label, color: 'rgba(255,255,255,.6)' }}>Horas pagadas</label>
-                <input type="number" value={agendaData.horasPagadas} onChange={e => setAgendaData({ ...agendaData, horasPagadas: e.target.value })} style={{ ...sx.input, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.15)', color: '#fff' }} />
-              </div>
-            </div>
+          {/* ── Notas ── */}
+          <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, padding:20, marginBottom:18 }}>
+            <label style={sx.label}>Notas adicionales</label>
+            <textarea rows={2} placeholder="Nivel del alumno, preferencias, observaciones..."
+              value={agendaData.notas || ''}
+              onChange={e => set('notas', e.target.value)}
+              style={{ ...sx.input, resize:'vertical', fontFamily:'inherit', lineHeight:1.5 }}/>
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={() => setView('INICIO')} style={{ flex: 1, padding: '14px', borderRadius: 12, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+          {/* Botones */}
+          <div style={{ display:'flex', gap:10 }}>
+            <button type="button" onClick={() => setView('INICIO')}
+              style={{ flex:1, padding:'14px', borderRadius:12, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, fontSize:14, fontWeight:500, cursor:'pointer' }}>
               Cancelar
             </button>
-            <button type="submit" style={{ flex: 2, padding: '14px', borderRadius: 12, border: 'none', background: NA.dark, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-              Confirmar asignación
+            <button type="submit" disabled={!agendaData.alumno || !agendaData.instructorId}
+              style={{ flex:2, padding:'14px', borderRadius:12, border:'none',
+                background: !agendaData.alumno || !agendaData.instructorId ? NA.mid : NA.dark,
+                color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <i className="ti ti-check" style={{ fontSize:16 }}/>
+              {agendaData.id ? 'Confirmar reasignación' : 'Agendar clase'}
             </button>
           </div>
         </form>

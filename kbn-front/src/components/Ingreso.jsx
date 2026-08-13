@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { usePresencia } from '../hooks/usePresencia';
 
 const NA = {
   primary: '#1ABFA0', dark: '#0F6E56', darker: '#085041',
@@ -92,6 +93,9 @@ const Section = ({ title, children }) => (
 // ── Componente principal ─────────────────────────────────────────────────────
 const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, InstructorField, setView, axiosConfig }) => {
 
+  // ── Presencia del día (reemplaza campo manual de instructor) ────────────────
+  const { asignadoAuto, opcionActual } = usePresencia();
+
   // ── Pasos del wizard ──
   // 0 = tipo de clase  |  1 = detalles + pago  |  2 = confirmación
   const [paso, setPaso]           = useState(0);
@@ -99,26 +103,29 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
   const enviandoRef               = useRef(false);
 
   // ── Selecciones del paso 0 ──
-  const [tipoBase, setTipoBase]   = useState(null); // 'AULA' | 'RENTAL' | 'OTRO'
-  const [codigoAula, setCodigoAula] = useState(null); // 'APK' | 'ASPK' | etc.
-  const [rentalTipo, setRentalTipo] = useState(null); // 'KITE' | 'WINGFOIL' | 'WINDSURF'
-  const [rentalPeriodo, setRentalPeriodo] = useState(null); // 'HORA' | 'DIA'
+  const [tipoBase, setTipoBase]   = useState(null);
+  const [codigoAula, setCodigoAula] = useState(null);
+  const [rentalTipo, setRentalTipo] = useState(null);
+  const [rentalPeriodo, setRentalPeriodo] = useState(null);
 
   // ── Datos del paso 1 ──
   const today = new Date().toISOString().split('T')[0];
-  const [fecha,      setFecha]      = useState(formData.fecha || today);
-  const [horas,      setHoras]      = useState('');
-  const [precioUnitario, setPrecioUnitario] = useState(''); // precio/h o precio/día editable
-  const [moneda,     setMoneda]     = useState(formData.moneda || 'R$_STONE_IGNA');
-  const [formaPago,  setFormaPago]  = useState('Efectivo');
-  const [detalles,   setDetalles]   = useState('');
-  const [vendedor,   setVendedor]   = useState('');
-  const [gastos,     setGastos]     = useState('');
-  const [nombreAlumno, setNombreAlumno] = useState('');
-  const [instructor, setInstructor] = useState('');
+  const [fecha,          setFecha]          = useState(formData.fecha || today);
+  const [horas,          setHoras]          = useState('');
+  const [precioUnitario, setPrecioUnitario] = useState('');
+  const [moneda,         setMoneda]         = useState(formData.moneda || 'R$_STONE_IGNA');
+  const [formaPago,      setFormaPago]      = useState('Efectivo');
+  const [detalles,       setDetalles]       = useState('');
+  const [vendedor,       setVendedor]       = useState('');
+  const [gastos,         setGastos]         = useState('');
+  const [nombreAlumno,   setNombreAlumno]   = useState('');
 
   // ── Pasivos para vínculo de cuenta corriente ──
   const [pasivos, setPasivos] = useState([]);
+
+  // ── Clases de agenda del día (para marcar como cobradas) ──────────────────
+  const [clasesDelDia,       setClasesDelDia]       = useState([]);
+  const [clasesSeleccionadas, setClasesSeleccionadas] = useState([]); // ids de agenda
 
   useEffect(() => {
     if (!axiosConfig) return;
@@ -126,6 +133,24 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
       .then(r => setPasivos(r.data))
       .catch(console.error);
   }, [axiosConfig]);
+
+  // Fetch clases de la fecha seleccionada
+  useEffect(() => {
+    if (!axiosConfig || !fecha) return;
+    axios.get('https://kbn-admin-production.up.railway.app/api/agenda/listar', axiosConfig)
+      .then(r => {
+        const delDia = r.data.filter(a =>
+          a.fecha?.toString() === fecha && a.estado !== 'RECHAZADA'
+        );
+        setClasesDelDia(delDia);
+        // Resetear selección si cambia la fecha
+        setClasesSeleccionadas([]);
+      })
+      .catch(console.error);
+  }, [fecha, axiosConfig]);
+
+  const toggleClase = (id) =>
+    setClasesSeleccionadas(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
   // ── Cálculos derivados ──────────────────────────────────────────────────────
   const aula   = codigoAula ? TARIFAS[codigoAula] : null;
@@ -164,11 +189,16 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
   const totalFinal = subtotal - descuentoTarj - gastosNum;
 
   // ── Cuenta corriente vinculada ──────────────────────────────────────────────
+  // Busca el pasivo del instructor que está presente según la presencia del día.
+  // Para AMBOS, intenta encontrar el pasivo del instructor que figure en la agenda.
   const pasivoInstructor = pasivos.find(p => {
     const { esInstructor } = decodeTarifa(p.descripcion);
     if (!esInstructor) return false;
     const norm = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-    return norm(p.titulo) === norm(instructor);
+    // Busca por el label de la presencia (ej: "José presente" → "José Sánchez")
+    const labelPresencia = opcionActual.label.toLowerCase();
+    return labelPresencia.includes(norm(p.titulo).split(' ')[0].toLowerCase())
+      || norm(p.titulo) === norm(opcionActual.label);
   });
 
   // Para semiprivadas el instructor cobra 150 R$/h fijo, no su tarifa de pasivo
@@ -213,7 +243,10 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
         actividad: actividadLabel(),
         detalles: [nombreAlumno, detalles].filter(Boolean).join(' · '),
         vendedor,
-        instructor,
+        // El instructor ya no se pide manualmente — viene de la presencia del día
+        instructor: opcionActual.label,
+        // asignadoA se precarga desde la presencia (JOSE/IGNA/AMBOS/AUSENTES)
+        asignadoA: asignadoAuto,
         cantidadHoras: esRentalDia ? null : String(horasNum),
         tarifaPorHora: String(precioNum),
         total: String(totalFinal),
@@ -222,6 +255,8 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
         moneda,
         formaPago,
         detalleFormaPago: formaPago === 'Tarjeta Credito' ? '-5% banco' : null,
+        // IDs de clases de agenda que cubre este pago → backend las marca cobradas
+        agendaIds: clasesSeleccionadas.length > 0 ? clasesSeleccionadas.join(',') : null,
       };
 
       await axios.post(
@@ -233,7 +268,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
       // Acumular deuda del instructor si corresponde
       if (deudaInstructor > 0 && axiosConfig) {
         const pasivoTarget = esSemiprivada
-          ? pasivos.find(p => { const n = (s) => s.toLowerCase().replace(/\s+/g,' ').trim(); return n(p.titulo) === n(instructor); })
+          ? pasivos.find(p => { const n = (s) => s.toLowerCase().replace(/\s+/g,' ').trim(); return n(p.titulo) === n(opcionActual.label); })
           : pasivoInstructor;
 
         if (pasivoTarget) {
@@ -418,7 +453,83 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
             </div>
           </Section>
 
-          {/* ── Alumno / Instructor ── */}
+          {/* ── Selector de clases del día ── */}
+          {clasesDelDia.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ ...sx.label, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+                Clases de este día — ¿cuáles cubre este pago?
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {clasesDelDia.map(a => {
+                  const sel     = clasesSeleccionadas.includes(a.id);
+                  const cobrada = a.cobrada;
+                  const col = a.tipoAula === 'APK'  ? { border:'#16A34A', bg:'#DCFCE7', text:'#14532D' }
+                            : a.tipoAula === 'ASPK' ? { border:'#059669', bg:'#D1FAE5', text:'#064E3B' }
+                            : a.tipoAula === 'APWF' ? { border:'#2563EB', bg:'#DBEAFE', text:'#1E3A8A' }
+                            : a.tipoAula === 'ASPWF'? { border:'#7C3AED', bg:'#EDE9FE', text:'#4C1D95' }
+                            : a.tipoAula === 'APWS' ? { border:'#CA8A04', bg:'#FEF9C3', text:'#713F12' }
+                            : a.tipoAula === 'ASPWS'? { border:'#D97706', bg:'#FEF3C7', text:'#78350F' }
+                            : { border: NA.dark, bg: NA.light, text: NA.darker };
+                  return (
+                    <button key={a.id} type="button"
+                      onClick={() => !cobrada && toggleClase(a.id)}
+                      style={{
+                        padding: '11px 14px', borderRadius: 12, textAlign: 'left',
+                        cursor: cobrada ? 'default' : 'pointer',
+                        opacity: cobrada ? 0.5 : 1,
+                        border: `1.5px solid ${sel ? col.border : cobrada ? '#D1FAE5' : NA.border}`,
+                        background: sel ? col.bg : cobrada ? '#F0FDF4' : '#fff',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                      }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: sel ? col.text : NA.text }}>
+                            {a.alumno}
+                          </span>
+                          {a.tipoAula && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: col.bg, color: col.text, border: `1px solid ${col.border}30` }}>
+                              {a.tipoAula}
+                            </span>
+                          )}
+                          {cobrada && (
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 99, background: '#D1FAE5', color: '#065F46' }}>
+                              ✓ Ya cobrada
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 11, color: NA.text2 }}>
+                          {a.nombreInstructor}
+                          {a.hora && ` · ${String(a.hora).substring(0,5)}`}
+                          {a.horas && ` · ${a.horas}h`}
+                          {a.tarifa && ` · R$ ${a.tarifa}/h`}
+                        </span>
+                      </div>
+                      {/* Checkbox visual */}
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                        border: `2px solid ${sel ? col.border : NA.border}`,
+                        background: sel ? col.border : '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {sel     && <i className="ti ti-check" style={{ fontSize: 12, color: '#fff' }}/>}
+                        {cobrada && <i className="ti ti-lock"  style={{ fontSize: 11, color: '#9ca3af' }}/>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {clasesSeleccionadas.length > 0 && (
+                <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 10, background: NA.light, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="ti ti-check-circle" style={{ fontSize: 16, color: NA.dark }}/>
+                  <p style={{ margin: 0, fontSize: 12, color: NA.darker, fontWeight: 500 }}>
+                    {clasesSeleccionadas.length} clase{clasesSeleccionadas.length > 1 ? 's' : ''} seleccionada{clasesSeleccionadas.length > 1 ? 's' : ''} — se marcarán como cobradas al guardar
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Alumno + Presencia del día ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
             <div>
               <p style={sx.label}>Nombre alumno</p>
@@ -426,9 +537,20 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
                 style={sx.input} onFocus={focusOn} onBlur={focusOff} />
             </div>
             <div>
-              <p style={sx.label}>Instructor</p>
-              <div onChange={e => { if (e.target.tagName === 'SELECT') setInstructor(e.target.value); }}>
-                <InstructorField />
+              <p style={sx.label}>Asignado a (presencia de hoy)</p>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '11px 13px', borderRadius: 10,
+                border: `0.5px solid ${opcionActual.color}40`,
+                background: opcionActual.bg,
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: opcionActual.color, flexShrink: 0 }}/>
+                <span style={{ fontSize: 14, fontWeight: 600, color: opcionActual.color }}>
+                  {opcionActual.short}
+                </span>
+                <span style={{ fontSize: 11, color: opcionActual.color, opacity: .7 }}>
+                  {opcionActual.label}
+                </span>
               </div>
             </div>
           </div>
@@ -561,20 +683,27 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
 
             {/* Filas de datos */}
             {[
-              { label: 'Fecha',         value: fecha },
-              { label: 'Instructor',    value: instructor || '—' },
-              { label: 'Canal de cobro',value: MONEDAS.find(m => m.value === moneda)?.label || moneda },
-              { label: 'Forma de pago', value: formaPago },
-              !esRentalDia && { label: 'Horas',          value: `${horasNum}h` },
-              { label: 'Precio',        value: `R$ ${precioUnitario}/h${esRentalDia ? 'día' : ''}` },
+              { label: 'Fecha',          value: fecha },
+              { label: 'Asignado a',     value: opcionActual.label },
+              { label: 'Canal de cobro', value: MONEDAS.find(m => m.value === moneda)?.label || moneda },
+              { label: 'Forma de pago',  value: formaPago },
+              !esRentalDia && { label: 'Horas',  value: `${horasNum}h` },
+              { label: 'Precio',         value: `R$ ${precioUnitario}/${esRentalDia ? 'día' : 'h'}` },
               subtotal !== totalFinal && { label: 'Descuento tarjeta', value: `-R$ ${descuentoTarj.toFixed(2)}` },
-              gastosNum > 0 && { label: 'Gastos (aparte)',  value: `R$ ${gastosNum.toFixed(2)}` },
-              vendedor && { label: 'Vendedor', value: vendedor },
-              detalles && { label: 'Detalles', value: detalles },
+              gastosNum > 0 && { label: 'Gastos',   value: `R$ ${gastosNum.toFixed(2)}` },
+              vendedor  &&     { label: 'Vendedor',  value: vendedor },
+              detalles  &&     { label: 'Detalles',  value: detalles },
+              clasesSeleccionadas.length > 0 && {
+                label: `Clases (${clasesSeleccionadas.length})`,
+                value: clasesDelDia
+                  .filter(a => clasesSeleccionadas.includes(a.id))
+                  .map(a => a.alumno)
+                  .join(', '),
+              },
             ].filter(Boolean).map(({ label, value }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 20px', borderBottom: `0.5px solid ${NA.border}` }}>
                 <span style={{ fontSize: 13, color: NA.text2 }}>{label}</span>
-                <span style={{ fontSize: 13, color: NA.text, fontWeight: 500, textAlign: 'right', maxWidth: '55%' }}>{value}</span>
+                <span style={{ fontSize: 13, color: label === 'Asignado a' ? opcionActual.color : NA.text, fontWeight: 500, textAlign: 'right', maxWidth: '55%' }}>{value}</span>
               </div>
             ))}
 
@@ -591,7 +720,7 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
               <i className="ti ti-link" style={{ fontSize: 18, color: NA.dark, marginTop: 1 }} />
               <div>
                 <p style={{ fontSize: 13, fontWeight: 600, color: NA.darker, margin: '0 0 2px' }}>
-                  Cuenta corriente de {instructor}
+                  Cuenta corriente — {opcionActual.label}
                 </p>
                 <p style={{ fontSize: 12, color: NA.text2, margin: 0 }}>
                   Se acumularán <strong>R$ {deudaInstructor.toFixed(2)}</strong> ({horasNum}h × {tarifaInstructorEfectiva} BRL/h
