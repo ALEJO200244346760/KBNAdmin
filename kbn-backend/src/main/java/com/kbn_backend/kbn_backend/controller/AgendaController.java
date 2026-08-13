@@ -1,15 +1,19 @@
 package com.kbn_backend.kbn_backend.controller;
 
 import com.kbn_backend.kbn_backend.model.Agenda;
+import com.kbn_backend.kbn_backend.model.PagoPasivo;
+import com.kbn_backend.kbn_backend.model.Pasivo;
 import com.kbn_backend.kbn_backend.model.Usuario;
 import com.kbn_backend.kbn_backend.repository.AgendaRepository;
+import com.kbn_backend.kbn_backend.repository.PagoPasivoRepository;
+import com.kbn_backend.kbn_backend.repository.PasivoRepository;
 import com.kbn_backend.kbn_backend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.kbn_backend.kbn_backend.service.PushNotificationService;
 
-
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,7 +29,33 @@ public class AgendaController {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private PasivoRepository pasivoRepository;
+
+    @Autowired
+    private PagoPasivoRepository pagoPasivoRepository;
+
+    @Autowired
     private PushNotificationService pushService;
+
+    // ── Helper: tarifa/hora del instructor desde su pasivo ───────────────────
+    // El campo descripcion tiene el formato: "__tarifa__:120||Nombre Instructor"
+    private static final String TARIFA_PREFIX = "__tarifa__:";
+
+    private Double extraerTarifaHora(String descripcion) {
+        if (descripcion == null || !descripcion.startsWith(TARIFA_PREFIX)) return null;
+        try {
+            String sin = descripcion.substring(TARIFA_PREFIX.length());
+            int sep = sin.indexOf("||");
+            String valorStr = sep >= 0 ? sin.substring(0, sep) : sin;
+            return Double.parseDouble(valorStr.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String normalizarNombre(String s) {
+        return s == null ? "" : s.toLowerCase().replaceAll("\\s+", " ").trim();
+    }
 
     // 1. Crear nueva cita (Secretaria)
     @PostMapping("/crear")
@@ -93,6 +123,93 @@ public class AgendaController {
             agendaRepository.save(agenda);
 
             return ResponseEntity.ok("Estado actualizado a " + estadoLimpio);
+
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 4b. LIQUIDAR clase — solo secretaria/admin lo llama después de revisar el día.
+    //     Acumula en el pasivo del instructor las horas correspondientes.
+    //     Marca la clase como FINALIZADA para que no se pueda liquidar dos veces.
+    @PostMapping("/{id}/liquidar")
+    public ResponseEntity<?> liquidarClase(@PathVariable Long id) {
+        return agendaRepository.findById(id).map(agenda -> {
+
+            // Guardia: ya fue liquidada
+            if ("FINALIZADA".equals(agenda.getEstado())) {
+                return ResponseEntity.badRequest().body("Esta clase ya fue liquidada.");
+            }
+
+            // Guardia: necesita instructor y horas
+            if (agenda.getNombreInstructor() == null || agenda.getNombreInstructor().isBlank()) {
+                return ResponseEntity.badRequest().body("La clase no tiene instructor asignado.");
+            }
+            if (agenda.getHoras() == null || agenda.getHoras() <= 0) {
+                return ResponseEntity.badRequest().body("La clase no tiene horas registradas.");
+            }
+
+            // Buscar tarjeta de pasivo del instructor
+            String normInstructor = normalizarNombre(agenda.getNombreInstructor());
+            Optional<Pasivo> pasivoOpt = pasivoRepository.findAll().stream()
+                    .filter(p -> normalizarNombre(p.getTitulo()).equals(normInstructor))
+                    .findFirst();
+
+            if (pasivoOpt.isEmpty()) {
+                // No tiene tarjeta → igual marcar FINALIZADA, solo avisar
+                agenda.setEstado("FINALIZADA");
+                agendaRepository.save(agenda);
+                return ResponseEntity.ok(java.util.Map.of(
+                    "estado", "FINALIZADA",
+                    "aviso", "Clase marcada como finalizada, pero " + agenda.getNombreInstructor() + " no tiene tarjeta de pasivo."
+                ));
+            }
+
+            Pasivo pasivo = pasivoOpt.get();
+            Double tarifaHora = extraerTarifaHora(pasivo.getDescripcion());
+
+            if (tarifaHora == null) {
+                agenda.setEstado("FINALIZADA");
+                agendaRepository.save(agenda);
+                return ResponseEntity.ok(java.util.Map.of(
+                    "estado", "FINALIZADA",
+                    "aviso", "Clase finalizada, pero no se encontró tarifa en la tarjeta de " + agenda.getNombreInstructor() + "."
+                ));
+            }
+
+            // Calcular y acumular deuda
+            double horas    = agenda.getHoras();
+            double deuda    = Math.round(tarifaHora * horas * 100.0) / 100.0;
+            String actividad = agenda.getTipoAula() != null ? agenda.getTipoAula() : "Clase";
+            String alumno    = agenda.getAlumno()   != null ? agenda.getAlumno()   : "";
+            String fechaStr  = agenda.getFecha()    != null ? agenda.getFecha().toString() : "";
+
+            String nota = actividad + " · " + horas + "h × " + tarifaHora
+                    + " BRL/h = " + deuda + " BRL"
+                    + (alumno.isBlank() ? "" : " (" + alumno + ")")
+                    + " — " + fechaStr;
+
+            pasivo.setMontoTotal(pasivo.getMontoTotal() - deuda);
+
+            PagoPasivo registro = new PagoPasivo();
+            registro.setMontoPagado(-deuda);
+            registro.setFecha(agenda.getFecha() != null ? agenda.getFecha() : LocalDate.now());
+            registro.setNota(nota);
+            registro.setMoneda("BRL");
+            registro.setPasivo(pasivo);
+
+            pagoPasivoRepository.save(registro);
+            pasivoRepository.save(pasivo);
+
+            // Marcar clase como FINALIZADA para que no se liquide dos veces
+            agenda.setEstado("FINALIZADA");
+            agendaRepository.save(agenda);
+
+            return ResponseEntity.ok(java.util.Map.of(
+                "estado", "FINALIZADA",
+                "instructorNombre", agenda.getNombreInstructor(),
+                "horasAcumuladas", horas,
+                "montoAcumulado", deuda,
+                "tarifaHora", tarifaHora
+            ));
 
         }).orElse(ResponseEntity.notFound().build());
     }

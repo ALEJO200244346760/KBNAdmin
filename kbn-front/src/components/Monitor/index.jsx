@@ -330,7 +330,35 @@ const Monitor = () => {
     }
   };
 
-  // ── Abrir modal agendar ─────────────────────────────────────────────────────
+  // ── Liquidar clase ──────────────────────────────────────────────────────────
+  // Solo secretaria/admin. Acumula horas en el pasivo del instructor
+  // y marca la clase como FINALIZADA para que no se duplique.
+  const liquidarClase = async (clase) => {
+    const nombre = clase.alumno || 'esta clase';
+    const instructor = clase.nombreInstructor || 'el instructor';
+    const horas = clase.horas || '?';
+
+    if (!window.confirm(
+      `¿Liquidar clase de ${nombre} con ${instructor} (${horas}h)?\n\nSe acumulará el monto correspondiente en la tarjeta del instructor.`
+    )) return;
+
+    try {
+      const res = await api.post(`/api/agenda/${clase.id}/liquidar`);
+      const data = res.data;
+
+      // Actualizar estado local a FINALIZADA
+      setAgenda(p => p.map(a => a.id === clase.id ? { ...a, estado: 'FINALIZADA' } : a));
+
+      if (data.aviso) {
+        alert(`✓ ${data.aviso}`);
+      } else {
+        // Éxito silencioso — el badge "Liquidada" aparece en la clase
+      }
+    } catch (e) {
+      const msg = e.response?.data || 'No se pudo liquidar la clase.';
+      alert(`Error: ${msg}`);
+    }
+  };
   const abrirAgendar = (fecha, hora = '09:00') => {
     setAgendarFecha(fecha);
     setAgendarHora(hora);
@@ -492,6 +520,7 @@ const Monitor = () => {
         abrirEditClase={abrirEditClase}
         abrirIngreso={abrirIngreso}
         abrirAgendar={abrirAgendar}
+        liquidarClase={liquidarClase}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>

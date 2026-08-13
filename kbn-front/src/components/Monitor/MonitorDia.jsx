@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NA, fmt, esPasado, HOY, labelMon, Tag, Btn, TIPOS_AULA } from './MonitorShared';
+import { useAuth } from '../../context/AuthContext';
 
 // ── Constantes del timeline ───────────────────────────────────────────────────
 const HORA_INICIO  = 9;   // 9:00
@@ -51,8 +52,11 @@ const MonitorDia = ({
   diaSelec, evD, agenda, ingresos,
   tieneCobro, ingresoDeClase,
   cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
+  liquidarClase,
 }) => {
   const [claseExpandida, setClaseExpandida] = useState(null);
+  const { user } = useAuth();
+  const puedeAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
 
   if (!diaSelec) return null;
 
@@ -277,6 +281,18 @@ const MonitorDia = ({
                         </>)}
                         {clase.estado === 'CONFIRMADA' && !esPasado(diaSelec) && (
                           <Btn label="Rechazar" bg="#FEE2E2" color="#DC2626" small onClick={() => cambiarEstado(clase.id,'RECHAZADA')}/>
+                        )}
+                        {/* Liquidar: solo admin/secretaria, clase confirmada en día pasado */}
+                        {puedeAdmin && clase.estado === 'CONFIRMADA' && liquidarClase && (
+                          <Btn label="💰 Liquidar" bg='#085041' color='#fff' small
+                            onClick={() => { liquidarClase(clase); setClaseExpandida(null); }}/>
+                        )}
+                        {clase.estado === 'FINALIZADA' && (
+                          <span style={{ fontSize:11, color:'#065F46', fontWeight:600,
+                            padding:'4px 10px', borderRadius:8, background:'#D1FAE5',
+                            display:'flex', alignItems:'center', gap:4 }}>
+                            <i className="ti ti-check" style={{ fontSize:12 }}/> Liquidada
+                          </span>
                         )}
                         <Btn label="Editar" bg={NA.light} color={NA.darker} small icon="ti-edit"
                           onClick={() => { abrirEditClase(clase); setClaseExpandida(null); }}/>
