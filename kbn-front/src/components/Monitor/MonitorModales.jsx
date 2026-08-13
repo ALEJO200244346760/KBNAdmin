@@ -136,8 +136,29 @@ export const ModalEditarClase = ({
           )}
         </div>
 
+        {/* ── Notificar instructor ── */}
+        <div style={{ margin:'16px 0', padding:'12px 14px', borderRadius:12, background:'#FEF9C3', border:'0.5px solid #FDE68A', display:'flex', alignItems:'center', gap:10 }}>
+          <button type="button"
+            onClick={() => setEditForm(p => ({...p, notificar: !p.notificar}))}
+            style={{ width:38, height:22, borderRadius:11, border:'none', cursor:'pointer', flexShrink:0,
+              background: editForm.notificar ? '#F59E0B' : '#D1D5DB', position:'relative', transition:'background .2s' }}>
+            <span style={{ position:'absolute', top:2, left: editForm.notificar ? 18 : 2, width:18, height:18,
+              borderRadius:'50%', background:'#fff', transition:'left .2s' }}/>
+          </button>
+          <div>
+            <p style={{ margin:0, fontSize:12, fontWeight:600, color:'#713F12' }}>
+              {editForm.notificar ? '🔔 Vuelve a PENDIENTE' : 'Notificar al instructor'}
+            </p>
+            <p style={{ margin:0, fontSize:11, color:'#92400E' }}>
+              {editForm.notificar
+                ? 'El instructor verá la clase como nueva en su dashboard'
+                : 'Activar para que el instructor confirme los cambios'}
+            </p>
+          </div>
+        </div>
+
         {/* Botones */}
-        <div style={{ display:'flex', gap:10, marginTop:20 }}>
+        <div style={{ display:'flex', gap:10, marginTop:4 }}>
           <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={onClose}/>
           <Btn
             label={guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
@@ -356,3 +377,180 @@ const Modal = ({ onClick, children, maxWidth = 440 }) => (
 
 const labelSx = { fontSize:11, color:NA.text2, display:'block', marginBottom:5, fontWeight:500 };
 const closeBtnSx = { width:28, height:28, borderRadius:8, border:'none', background:'#f3f4f6', color:'#6b7280', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 };
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODAL: AGENDAR CLASE — desde el Monitor
+// ══════════════════════════════════════════════════════════════════════════════
+export const ModalAgendar = ({
+  fecha, horaInicio, instructores,
+  guardando, onSubmit, onClose,
+}) => {
+  const TIPOS = [
+    { v:'APK',   l:'Kite Privada',          emoji:'🪁', tarifa:400  },
+    { v:'ASPK',  l:'Kite Semiprivada',       emoji:'🪁', tarifa:530  },
+    { v:'APWF',  l:'Wingfoil Privada',       emoji:'🦅', tarifa:420  },
+    { v:'ASPWF', l:'Wingfoil Semiprivada',   emoji:'🦅', tarifa:550  },
+    { v:'APWS',  l:'Windsurf Privada',       emoji:'🌊', tarifa:370  },
+    { v:'ASPWS', l:'Windsurf Semiprivada',   emoji:'🌊', tarifa:500  },
+    { v:'RENTAL',l:'Rental',                 emoji:'🏄', tarifa:360  },
+    { v:'OTRO',  l:'Otro',                   emoji:'✏️', tarifa:null },
+  ];
+  const COLOR_T = {
+    APK:'#16A34A', ASPK:'#059669', APWF:'#2563EB', ASPWF:'#7C3AED',
+    APWS:'#CA8A04', ASPWS:'#D97706', RENTAL:'#6B7280', OTRO:'#DC2626',
+  };
+
+  const today = new Date().toISOString().split('T')[0];
+  const [form, setForm] = React.useState({
+    alumno: '', instructorId: '', tipoAula: '',
+    fecha: fecha || today, hora: horaInicio || '09:00', horaSalida: '',
+    horas: 1, tarifa: '', horasPagadas: 0,
+    lugar: '', hotelDerivacion: '', notas: '',
+  });
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const elegirTipo = (v) => {
+    const t = TIPOS.find(x => x.v === v);
+    setForm(p => ({ ...p, tipoAula: v, tarifa: t?.tarifa ? String(t.tarifa) : p.tarifa }));
+  };
+
+  const calcularHoras = (entrada, salida) => {
+    if (!entrada || !salida) return;
+    const [h1,m1] = entrada.split(':').map(Number);
+    const [h2,m2] = salida.split(':').map(Number);
+    const diff = (h2*60+m2 - h1*60-m1) / 60;
+    if (diff > 0) set('horas', Math.round(diff * 100)/100);
+  };
+
+  const totalEst = form.tarifa && form.horas
+    ? (Number(form.tarifa) * Number(form.horas)).toFixed(0)
+    : null;
+
+  return (
+    <Overlay onClick={onClose}>
+      <Modal onClick={e => e.stopPropagation()} maxWidth={480}>
+        {/* Header */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+          <div>
+            <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:NA.text }}>Agendar clase</h2>
+            <p style={{ margin:'3px 0 0', fontSize:12, color:NA.text2 }}>{fmt(form.fecha)}</p>
+          </div>
+          <button onClick={onClose} style={{ ...closeBtnSx }}>
+            <i className="ti ti-x" style={{ fontSize:15 }}/>
+          </button>
+        </div>
+
+        {/* Tipo de clase */}
+        <p style={{ ...labelSx, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>Tipo de clase</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, marginBottom:16 }}>
+          {TIPOS.map(t => {
+            const sel = form.tipoAula === t.v;
+            const col = COLOR_T[t.v] || NA.dark;
+            return (
+              <button key={t.v} type="button" onClick={() => elegirTipo(t.v)}
+                style={{ padding:'9px 10px', borderRadius:10, textAlign:'left', cursor:'pointer',
+                  border:`1.5px solid ${sel ? col : NA.border}`,
+                  background: sel ? `${col}15` : '#fff',
+                  display:'flex', alignItems:'center', gap:7 }}>
+                <span style={{ fontSize:16 }}>{t.emoji}</span>
+                <div>
+                  <p style={{ margin:0, fontSize:11, fontWeight:700, color: sel ? col : NA.text }}>{t.l}</p>
+                  {t.tarifa && <p style={{ margin:0, fontSize:10, color: sel ? col : NA.text2 }}>R$ {t.tarifa}/h</p>}
+                </div>
+                {sel && <i className="ti ti-check" style={{ fontSize:13, color:col, marginLeft:'auto' }}/>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Alumno e instructor */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+          <div>
+            <label style={labelSx}>Alumno *</label>
+            <Inp placeholder="Juan García" value={form.alumno} onChange={e => set('alumno', e.target.value)} required/>
+          </div>
+          <div>
+            <label style={labelSx}>Instructor *</label>
+            <select value={form.instructorId} onChange={e => set('instructorId', e.target.value)}
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid ${NA.border}`, fontSize:14, color:NA.text, background:'#fff', boxSizing:'border-box' }}>
+              <option value="">Seleccionar...</option>
+              {instructores.map(i => <option key={i.id} value={i.id}>{i.nombre} {i.apellido}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Fecha y horario */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:12 }}>
+          <div style={{ gridColumn:'1/-1' }}>
+            <label style={labelSx}>Fecha</label>
+            <Inp type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)}/>
+          </div>
+          <div>
+            <label style={labelSx}>Entrada</label>
+            <Inp type="time" value={form.hora}
+              onChange={e => { set('hora', e.target.value); calcularHoras(e.target.value, form.horaSalida); }}/>
+          </div>
+          <div>
+            <label style={labelSx}>Salida</label>
+            <Inp type="time" value={form.horaSalida}
+              onChange={e => { set('horaSalida', e.target.value); calcularHoras(form.hora, e.target.value); }}/>
+          </div>
+          <div>
+            <label style={labelSx}>Horas</label>
+            <Inp type="number" step="0.5" value={form.horas} onChange={e => set('horas', e.target.value)}/>
+          </div>
+        </div>
+
+        {/* Lugar */}
+        <div style={{ marginBottom:12 }}>
+          <label style={labelSx}>Lugar / Hotel</label>
+          <Inp placeholder="Escola, Caburé..." value={form.lugar}
+            onChange={e => set('lugar', e.target.value)}/>
+        </div>
+
+        {/* Condiciones económicas */}
+        <div style={{ background:NA.darker, borderRadius:12, padding:14, marginBottom:14 }}>
+          <p style={{ margin:'0 0 10px', fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>Condiciones</p>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            <div>
+              <label style={{ ...labelSx, color:'rgba(255,255,255,.6)' }}>Tarifa R$/h</label>
+              <Inp type="number" value={form.tarifa} onChange={e => set('tarifa', e.target.value)}
+                style={{ background:'rgba(255,255,255,.1)', borderColor:'rgba(255,255,255,.15)', color:'#fff' }}/>
+            </div>
+            <div>
+              <label style={{ ...labelSx, color:'rgba(255,255,255,.6)' }}>Seña</label>
+              <Inp type="number" value={form.horasPagadas} onChange={e => set('horasPagadas', e.target.value)}
+                style={{ background:'rgba(255,255,255,.1)', borderColor:'rgba(255,255,255,.15)', color:'#fff' }}/>
+            </div>
+            <div>
+              <label style={{ ...labelSx, color:'rgba(255,255,255,.6)' }}>Total est.</label>
+              <div style={{ padding:'10px 12px', borderRadius:10, background:NA.primary, color:NA.darker, fontSize:16, fontWeight:700, textAlign:'right' }}>
+                {totalEst || '—'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Notas */}
+        <div style={{ marginBottom:18 }}>
+          <label style={labelSx}>Notas</label>
+          <textarea rows={2} value={form.notas} onChange={e => set('notas', e.target.value)}
+            placeholder="Nivel del alumno, observaciones..."
+            style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid ${NA.border}`, fontSize:13, color:NA.text, background:'#fff', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
+        </div>
+
+        {/* Botones */}
+        <div style={{ display:'flex', gap:10 }}>
+          <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={onClose}/>
+          <Btn
+            label={guardando ? 'Agendando...' : 'Agendar clase'}
+            disabled={guardando || !form.alumno || !form.instructorId}
+            icon="ti-calendar-plus"
+            onClick={() => onSubmit(form)}/>
+        </div>
+      </Modal>
+    </Overlay>
+  );
+};

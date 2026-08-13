@@ -4,7 +4,7 @@ import api from '../../axiosConfig';
 import { toYMD, HOY, esPasado, normName } from './MonitorShared';
 import MonitorCalendario from './MonitorCalendario';
 import MonitorDia        from './MonitorDia';
-import { ModalEditarClase, ModalNuevoIngreso } from './MonitorModales';
+import { ModalEditarClase, ModalNuevoIngreso, ModalAgendar } from './MonitorModales';
 import MonitorResumen    from './MonitorResumen';
 
 export const NA = {
@@ -54,6 +54,12 @@ const Monitor = () => {
   const [clasesSelec,   setClasesSelec]   = useState([]);
   const [enviando,      setEnviando]      = useState(false);
   const enviandoRef = useRef(false);
+
+  // ── Modal: agendar clase ────────────────────────────────────────────────────
+  const [showAgendar,    setShowAgendar]    = useState(false);
+  const [agendarFecha,   setAgendarFecha]   = useState(null);
+  const [agendarHora,    setAgendarHora]    = useState('09:00');
+  const [guardandoAgendar, setGuardandoAgendar] = useState(false);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
@@ -289,6 +295,7 @@ const Monitor = () => {
       tarifa:         clase.tarifa      || '',
       ingresoIdSelec: clase.ingresoId   || '',
       cobrada:        clase.cobrada     || false,
+      notificar:      false, // toggle para resetear a PENDIENTE y avisar al instructor
     });
   };
 
@@ -309,6 +316,8 @@ const Monitor = () => {
         tarifa:     editForm.tarifa     ? parseFloat(editForm.tarifa) : null,
         cobrada:    !!ingresoIdNum,
         ingresoId:  ingresoIdNum || null,
+        // Si notificar=true, resetea a PENDIENTE para que el instructor lo vea como nuevo
+        estado:     editForm.notificar ? 'PENDIENTE' : null,
       };
       const res = await api.patch(`/api/agenda/${editClase.id}`, payload);
       setAgenda(p => p.map(a => a.id === editClase.id ? res.data : a));
@@ -318,6 +327,44 @@ const Monitor = () => {
     } finally {
       guardandoEditRef.current = false;
       setGuardandoEdit(false);
+    }
+  };
+
+  // ── Abrir modal agendar ─────────────────────────────────────────────────────
+  const abrirAgendar = (fecha, hora = '09:00') => {
+    setAgendarFecha(fecha);
+    setAgendarHora(hora);
+    setShowAgendar(true);
+  };
+
+  // ── Guardar clase agendada ──────────────────────────────────────────────────
+  const guardarAgendar = async (form) => {
+    if (guardandoAgendar) return;
+    setGuardandoAgendar(true);
+    try {
+      const payload = {
+        alumno:          form.alumno,
+        instructorId:    Number(form.instructorId),
+        tipoAula:        form.tipoAula   || null,
+        fecha:           form.fecha,
+        hora:            form.hora,
+        horaSalida:      form.horaSalida || null,
+        horas:           Number(form.horas)         || 1,
+        tarifa:          Number(form.tarifa)         || 0,
+        horasPagadas:    Number(form.horasPagadas)   || 0,
+        lugar:           form.lugar            || null,
+        hotelDerivacion: form.hotelDerivacion  || null,
+        notas:           form.notas            || null,
+        estado:          'PENDIENTE',
+      };
+      await api.post('/api/agenda/crear', payload);
+      setShowAgendar(false);
+      await cargar(); // refetch para ver la clase nueva
+    } catch (e) {
+      console.error(e);
+      alert('No se pudo agendar la clase. Revisá los datos.');
+    } finally {
+      setGuardandoAgendar(false);
     }
   };
 
@@ -444,10 +491,7 @@ const Monitor = () => {
         cambiarEstado={cambiarEstado}
         abrirEditClase={abrirEditClase}
         abrirIngreso={abrirIngreso}
-        abrirAgendar={(fecha, hora) => {
-          // Abre el modal de nuevo ingreso pre-seteado con la fecha y hora
-          abrirIngreso(fecha);
-        }}
+        abrirAgendar={abrirAgendar}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>
@@ -461,6 +505,17 @@ const Monitor = () => {
         guardarEditClase={guardarEditClase}
         onClose={() => setEditClase(null)}
       />
+
+      {showAgendar && (
+        <ModalAgendar
+          fecha={agendarFecha}
+          horaInicio={agendarHora}
+          instructores={usuarios}
+          guardando={guardandoAgendar}
+          onSubmit={guardarAgendar}
+          onClose={() => setShowAgendar(false)}
+        />
+      )}
 
       {showIngreso && (
         <ModalNuevoIngreso

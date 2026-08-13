@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { NA, fmt, esPasado, HOY, labelMon, Tag, Btn, TIPOS_AULA } from './MonitorShared';
 
 // ── Constantes del timeline ───────────────────────────────────────────────────
-const HORA_INICIO  = 8;   // 8:00
-const HORA_FIN     = 19;  // 19:00
+const HORA_INICIO  = 9;   // 9:00
+const HORA_FIN     = 18;  // 18:00
 const HORAS_TOTAL  = HORA_FIN - HORA_INICIO;
-const PX_POR_HORA  = 64;  // altura en px de cada franja horaria
+const PX_POR_HORA  = 68;  // altura en px de cada franja horaria
 const TIMELINE_H   = HORAS_TOTAL * PX_POR_HORA;
 
 // Colores por tipo de aula
