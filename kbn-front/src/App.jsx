@@ -4,13 +4,11 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Login from './components/Login';
 import Register from './components/Register';
-import Inicio from './components/Inicio';
 import AdminDashboard from './components/AdminDashboard';
 import InstructorForm from './components/InstructorForm';
 import ReporteEstadisticas from './components/ReporteEstadisticas';
 import UserManagement from './components/UserManagement';
 import Secretaria from './components/Secretaria';
-import Clientes from './components/Clientes';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword  from './components/ResetPassword';
 
@@ -112,7 +110,13 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   if (!user?.role) return <Navigate to="/login" replace />;
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/inicio" replace />;
+    switch (user.role) {
+      case 'ADMINISTRADOR': return <Navigate to="/admin"      replace />;
+      case 'SECRETARIA':    return <Navigate to="/secretaria" replace />;
+      case 'INSTRUCTOR':
+      case 'ALUMNO':        return <Navigate to="/instructor" replace />;
+      default:              return <Navigate to="/login"      replace />;
+    }
   }
 
   return children;
@@ -121,9 +125,17 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 // ── Redirección raíz según rol ─────────────────────────────────────────────
 const HomeRedirect = () => {
   const { user, loading } = useAuth();
+
   if (loading) return <LoadingScreen mensaje="Cargando sesión..." />;
   if (!user?.role) return <Navigate to="/login" replace />;
-  return <Navigate to="/inicio" replace />;
+
+  switch (user.role) {
+    case 'ADMINISTRADOR': return <Navigate to="/admin"      replace />;
+    case 'SECRETARIA':    return <Navigate to="/secretaria" replace />;
+    case 'INSTRUCTOR':
+    case 'ALUMNO':        return <Navigate to="/instructor" replace />;
+    default:              return <Navigate to="/login"      replace />;
+  }
 };
 
 // ── App ────────────────────────────────────────────────────────────────────
@@ -211,13 +223,6 @@ function App() {
             <Route path="/reset-password"  element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
 
-            {/* INICIO — pantalla de menú por rol */}
-            <Route path="/inicio" element={
-              <PrivateRoute allowedRoles={['ADMINISTRADOR','SECRETARIA','INSTRUCTOR','ALUMNO']}>
-                <Inicio />
-              </PrivateRoute>
-            } />
-
             {/* ADMINISTRADOR */}
             <Route
               path="/admin"
@@ -237,32 +242,34 @@ function App() {
             />
 
             {/* SECRETARIA */}
-            <Route path="/secretaria" element={
-              <PrivateRoute allowedRoles={['ADMINISTRADOR','SECRETARIA']}>
-                <Secretaria key="secretaria" />
-              </PrivateRoute>
-            } />
+            <Route
+              path="/secretaria"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR', 'SECRETARIA']}>
+                  <Secretaria key="secretaria" />
+                </PrivateRoute>
+              }
+            />
 
-            {/* INSTRUCTOR */}
-            <Route path="/instructor" element={
-              <PrivateRoute allowedRoles={['ADMINISTRADOR','INSTRUCTOR','SECRETARIA','ALUMNO']}>
-                <InstructorForm />
-              </PrivateRoute>
-            } />
+            {/* INSTRUCTOR / ALUMNO / ADMIN */}
+            <Route
+              path="/instructor"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR', 'INSTRUCTOR', 'ALUMNO']}>
+                  <InstructorForm />
+                </PrivateRoute>
+              }
+            />
 
             {/* GESTIÓN DE USUARIOS */}
-            <Route path="/usuarios" element={
-              <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
-                <UserManagement />
-              </PrivateRoute>
-            } />
-
-            {/* CLIENTES */}
-            <Route path="/clientes" element={
-              <PrivateRoute allowedRoles={['ADMINISTRADOR', 'SECRETARIA']}>
-                <Clientes />
-              </PrivateRoute>
-            } />
+            <Route
+              path="/usuarios"
+              element={
+                <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
+                  <UserManagement />
+                </PrivateRoute>
+              }
+            />
           </Routes>
         </div>
       </HashRouter>

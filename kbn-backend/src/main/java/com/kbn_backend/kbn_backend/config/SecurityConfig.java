@@ -47,8 +47,6 @@ public class SecurityConfig {
                             "/auth/validate-reset-token"
                         ).permitAll()
                         .requestMatchers("/administracion/**").hasRole("ADMINISTRADOR")
-                        // Cuentas corrientes (Pasivos) — solo ADMINISTRADOR
-                        .requestMatchers("/api/pasivos/**").hasRole("ADMINISTRADOR")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

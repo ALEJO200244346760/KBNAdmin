@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import PresenciaWidget from './PresenciaWidget';
 
 const AdminDashboard = () => {
   const { token, loading: authLoading } = useAuth();
@@ -124,11 +123,6 @@ const AdminDashboard = () => {
   return (
     <div className="max-w-7xl mx-auto mt-10 p-6 bg-white shadow-xl rounded-xl pb-20">
       
-      {/* Presencia del día */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <PresenciaWidget />
-      </div>
-
       {/* HEADER Y CREAR ROL */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b pb-6">
         <h1 className="text-3xl font-bold text-gray-800">⚙️ Gestión de Usuarios y Roles</h1>

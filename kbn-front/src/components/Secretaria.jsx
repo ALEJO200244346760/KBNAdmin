@@ -8,8 +8,6 @@ import Ingreso from './Ingreso';
 import Egreso from './Egreso';
 import Pasivos from './Pasivos';
 import Monitor from './Monitor';
-import PresenciaWidget from './PresenciaWidget';
-import { usePresencia } from '../hooks/usePresencia';
 
 // ── Paleta Náutica Atins ───────────────────────────────────────────────────
 const NA = {
@@ -37,8 +35,7 @@ const focusOn = (e) => { e.target.style.borderColor = NA.primary; e.target.style
 const focusOff = (e) => { e.target.style.borderColor = NA.border; e.target.style.boxShadow = 'none'; };
 
 const Secretaria = () => {
-  const { user, token } = useAuth();
-  const isAdmin = user?.role === 'ADMINISTRADOR';
+  const { user, token } = useAuth(); // Extraemos el token para las peticiones
   const [view, setView] = useState('INICIO');
   const [instructors, setInstructors] = useState([]);
   const [agendaList, setAgendaList] = useState([]);
@@ -200,22 +197,16 @@ const Secretaria = () => {
   if (view === 'INICIO') {
     return (
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '20px 4px 60px' }}>
-        {/* ── Presencia del día ── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel de Secretaría</h1>
-            <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Gestioná agenda, caja y cuentas corrientes</p>
-          </div>
-          <PresenciaWidget />
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel de Secretaría</h1>
+          <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Gestioná agenda, caja y cuentas corrientes</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-          <MenuCard icon="ti-device-desktop" title="Monitor"    sub="Estados"      color={NA.darker}  onClick={() => setView('MONITOR')} />
-          <MenuCard icon="ti-calendar-plus"  title="Agendar"    sub="Nueva clase"  color={NA.dark}    onClick={() => setView('CALENDARIO')} />
-          {isAdmin && (
-            <MenuCard icon="ti-receipt-2"    title="Pasivos"    sub="Deudas"       color="#92400E"    onClick={() => setView('PASIVOS')} />
-          )}
-          <MenuCard icon="ti-cash"           title="Ingreso"    sub="Caja"         color={NA.primary} onClick={() => setView('INGRESO')} />
-          <MenuCard icon="ti-minus"          title="Egreso"     sub="Gastos"       color="#c23a3a"    onClick={() => setView('EGRESO')} />
+          <MenuCard icon="ti-device-desktop" title="Monitor" sub="Estados" color={NA.darker} onClick={() => setView('MONITOR')} />
+          <MenuCard icon="ti-calendar-plus" title="Agendar" sub="Nueva clase" color={NA.dark} onClick={() => setView('CALENDARIO')} />
+          <MenuCard icon="ti-receipt-2" title="Pasivos" sub="Deudas" color="#92400E" onClick={() => setView('PASIVOS')} />
+          <MenuCard icon="ti-cash" title="Ingreso" sub="Caja" color={NA.primary} onClick={() => setView('INGRESO')} />
+          <MenuCard icon="ti-minus" title="Egreso" sub="Gastos" color="#c23a3a" onClick={() => setView('EGRESO')} />
         </div>
       </div>
     );
