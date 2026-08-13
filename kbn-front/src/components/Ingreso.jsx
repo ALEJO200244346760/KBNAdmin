@@ -2,6 +2,38 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { usePresencia } from '../hooks/usePresencia';
 
+// ── Reparto de dueños ─────────────────────────────────────────────────────────
+// Porcentajes según quién está presente (mismo que ReporteEstadisticas)
+const HANS_PCT = 5;
+const PASIVO_TITULOS = {
+  JOSE: 'José Sánchez',
+  IGNA: 'Igna Krebs',
+  HANS: 'Hans Leonhard Wurbs',
+};
+
+const calcularReparto = (asignadoA, montoBase) => {
+  let pIgna = 8, pJose = 8;
+  if      (asignadoA === 'IGNA')  { pIgna = 16; pJose = 8;    }
+  else if (asignadoA === 'JOSE')  { pIgna = 8;  pJose = 16;   }
+  else if (asignadoA === 'AMBOS') { pIgna = 12.5; pJose = 12.5; }
+  else                            { pIgna = 10; pJose = 10;   }
+  const pHans = HANS_PCT;
+  return {
+    pIgna, pJose, pHans,
+    mIgna: Math.round((montoBase * pIgna / 100) * 100) / 100,
+    mJose: Math.round((montoBase * pJose / 100) * 100) / 100,
+    mHans: Math.round((montoBase * pHans / 100) * 100) / 100,
+  };
+};
+
+const labelMon = (m) => {
+  if (!m) return 'R$';
+  if (m === 'BRL' || m.startsWith('R$_')) return 'R$';
+  if (m.startsWith('EUR')) return '€';
+  if (m.startsWith('USD')) return 'US$';
+  return m;
+};
+
 const NA = {
   primary: '#1ABFA0', dark: '#0F6E56', darker: '#085041',
   light: '#E1F5EE', mid: '#9FE1CB', bg: '#f0faf7',
@@ -120,12 +152,14 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
   const [gastos,         setGastos]         = useState('');
   const [nombreAlumno,   setNombreAlumno]   = useState('');
 
-  // ── Pasivos para vínculo de cuenta corriente ──
+  // ── Pasivos de los DUEÑOS (para acumular reparto) ────────────────────────
+  // José, Igna y Hans tienen cada uno su tarjeta de pasivo.
+  // Al guardar un ingreso se les acumula su % automáticamente.
   const [pasivos, setPasivos] = useState([]);
 
   // ── Clases de agenda del día (para marcar como cobradas) ──────────────────
-  const [clasesDelDia,       setClasesDelDia]       = useState([]);
-  const [clasesSeleccionadas, setClasesSeleccionadas] = useState([]); // ids de agenda
+  const [clasesDelDia,        setClasesDelDia]        = useState([]);
+  const [clasesSeleccionadas, setClasesSeleccionadas] = useState([]);
 
   useEffect(() => {
     if (!axiosConfig) return;
@@ -143,7 +177,6 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
           a.fecha?.toString() === fecha && a.estado !== 'RECHAZADA'
         );
         setClasesDelDia(delDia);
-        // Resetear selección si cambia la fecha
         setClasesSeleccionadas([]);
       })
       .catch(console.error);
@@ -188,32 +221,16 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
   const descuentoTarj = formaPago === 'Tarjeta Credito' ? subtotal * 0.05 : 0;
   const totalFinal = subtotal - descuentoTarj - gastosNum;
 
-  // ── Cuenta corriente vinculada ──────────────────────────────────────────────
-  // Busca el pasivo del instructor que está presente según la presencia del día.
-  // Para AMBOS, intenta encontrar el pasivo del instructor que figure en la agenda.
-  const pasivoInstructor = pasivos.find(p => {
-    const { esInstructor } = decodeTarifa(p.descripcion);
-    if (!esInstructor) return false;
-    const norm = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-    // Busca por el label de la presencia (ej: "José presente" → "José Sánchez")
-    const labelPresencia = opcionActual.label.toLowerCase();
-    return labelPresencia.includes(norm(p.titulo).split(' ')[0].toLowerCase())
-      || norm(p.titulo) === norm(opcionActual.label);
-  });
-
-  // Para semiprivadas el instructor cobra 150 R$/h fijo, no su tarifa de pasivo
-  const esSemiprivada = aula && aula.instructorFijo !== null;
-  const tarifaInstructorEfectiva = esSemiprivada
-    ? aula.instructorFijo
-    : pasivoInstructor ? decodeTarifa(pasivoInstructor.descripcion).tarifaHora : null;
-
-  const deudaInstructor = tarifaInstructorEfectiva && horasNum > 0
-    ? Math.round(tarifaInstructorEfectiva * horasNum * 100) / 100
-    : 0;
+  // ── Reparto de dueños ──────────────────────────────────────────────────────
+  // Calculado sobre el totalFinal (después de descuentos)
+  // Se acumula en los pasivos de José, Igna y Hans al confirmar.
+  // Los pasivos de dueños se identifican por título exacto.
+  const buscarPasivoDueno = (titulo) =>
+    pasivos.find(p => p.titulo?.trim().toLowerCase() === titulo.trim().toLowerCase());
 
   // ── Etiqueta de actividad para guardar ─────────────────────────────────────
   const actividadLabel = () => {
-    if (tipoBase === 'AULA' && aula)   return aula.label;
+    if (tipoBase === 'AULA'   && aula)   return aula.label;
     if (tipoBase === 'RENTAL' && rental) return rental.label;
     return detalles || 'Otro';
   };
@@ -259,26 +276,37 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
         agendaIds: clasesSeleccionadas.length > 0 ? clasesSeleccionadas.join(',') : null,
       };
 
-      await axios.post(
+      const savedIngreso = await axios.post(
         'https://kbn-admin-production.up.railway.app/api/clases/guardar',
         payload,
         axiosConfig
       );
 
-      // Acumular deuda del instructor si corresponde
-      if (deudaInstructor > 0 && axiosConfig) {
-        const pasivoTarget = esSemiprivada
-          ? pasivos.find(p => { const n = (s) => s.toLowerCase().replace(/\s+/g,' ').trim(); return n(p.titulo) === n(opcionActual.label); })
-          : pasivoInstructor;
+      // ── Acumular reparto en pasivos de dueños ──────────────────────────────
+      // José, Igna y Hans reciben su % sobre el total según quién estuvo presente.
+      if (totalFinal > 0 && axiosConfig && pasivos.length > 0) {
+        const { pIgna, pJose, pHans, mIgna, mJose, mHans } =
+          calcularReparto(asignadoAuto, totalFinal);
 
-        if (pasivoTarget) {
-          const nota = `${actividadLabel()} · ${horasNum}h × ${tarifaInstructorEfectiva} BRL/h = ${deudaInstructor.toFixed(2)} BRL${nombreAlumno ? ` (${nombreAlumno})` : ''} — ${fecha}`;
+        const notaSufijo = `${actividadLabel()}${nombreAlumno ? ` (${nombreAlumno})` : ''} — ${fecha}`;
+        const notaPct = ` | Reparto: IGNA ${pIgna}% ($${mIgna.toFixed(2)}) - JOSE ${pJose}% ($${mJose.toFixed(2)}) - HANS ${pHans}% ($${mHans.toFixed(2)})`;
+
+        const acumular = async (titulo, monto) => {
+          const pasivo = buscarPasivoDueno(titulo);
+          if (!pasivo || monto <= 0) return;
+          const nota = `${pIgna === pJose ? '12,5' : titulo === PASIVO_TITULOS.JOSE ? pJose : titulo === PASIVO_TITULOS.IGNA ? pIgna : pHans}% de ${notaSufijo}${notaPct}`;
           await axios.put(
-            `https://kbn-admin-production.up.railway.app/api/pasivos/${pasivoTarget.id}/acumular`,
-            { monto: -deudaInstructor, nota, fecha },
+            `https://kbn-admin-production.up.railway.app/api/pasivos/${pasivo.id}/acumular`,
+            { monto: -monto, nota, fecha, moneda },
             axiosConfig
           );
-        }
+        };
+
+        await Promise.allSettled([
+          acumular(PASIVO_TITULOS.JOSE, mJose),
+          acumular(PASIVO_TITULOS.IGNA, mIgna),
+          acumular(PASIVO_TITULOS.HANS, mHans),
+        ]);
       }
 
       setView();
@@ -714,21 +742,34 @@ const Ingreso = ({ formData, handleChange, handleSubmit: originalHandleSubmit, I
             </div>
           </div>
 
-          {/* ── Vínculo con cuenta corriente del instructor ── */}
-          {deudaInstructor > 0 && (
-            <div style={{ background: NA.light, borderRadius: 14, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <i className="ti ti-link" style={{ fontSize: 18, color: NA.dark, marginTop: 1 }} />
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: NA.darker, margin: '0 0 2px' }}>
-                  Cuenta corriente — {opcionActual.label}
+          {/* ── Reparto de dueños ── */}
+          {totalFinal > 0 && (() => {
+            const { pIgna, pJose, pHans, mIgna, mJose, mHans } =
+              calcularReparto(asignadoAuto, totalFinal);
+            return (
+              <div style={{ background: NA.light, borderRadius: 14, padding: '14px 16px', marginBottom: 16 }}>
+                <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: NA.darker, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  Reparto automático
                 </p>
-                <p style={{ fontSize: 12, color: NA.text2, margin: 0 }}>
-                  Se acumularán <strong>R$ {deudaInstructor.toFixed(2)}</strong> ({horasNum}h × {tarifaInstructorEfectiva} BRL/h
-                  {esSemiprivada ? ' — tarifa semiprivada fija' : ''})
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    { nombre: 'Igna',  pct: pIgna, monto: mIgna },
+                    { nombre: 'José',  pct: pJose, monto: mJose },
+                    { nombre: 'Hans',  pct: pHans, monto: mHans },
+                  ].map(({ nombre, pct, monto }) => (
+                    <div key={nombre} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, color: NA.text2 }}>
+                        {nombre} <span style={{ fontSize: 11, opacity: .7 }}>({pct}%)</span>
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: NA.darker }}>
+                        {labelMon(moneda)} {monto.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Botones ── */}
           <button type="submit" disabled={guardando}
