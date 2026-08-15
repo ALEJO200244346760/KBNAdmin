@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { NA, fmt, esPasado, HOY, labelMon, Tag, Btn, TIPOS_AULA } from './MonitorShared';
 import { useAuth } from '../../context/AuthContext';
 
@@ -52,11 +52,52 @@ const MonitorDia = ({
   diaSelec, evD, agenda, ingresos,
   tieneCobro, ingresoDeClase,
   cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
-  liquidarClase, duplicarClase,
+  liquidarClase, duplicarClase, navDia, onDragHora,
 }) => {
   const [claseExpandida, setClaseExpandida] = useState(null);
+  const [dragging,       setDragging]       = useState(null); // { id, startY, startMin }
+  const [dragY,          setDragY]          = useState(null); // posición Y actual
+  const timelineRef = useRef(null);
   const { user } = useAuth();
   const puedeAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
+
+  // ── Drag handlers ─────────────────────────────────────────────────────────
+  const MIN_POR_PX = 60 / PX_POR_HORA; // minutos por pixel
+
+  const startDrag = useCallback((e, clase) => {
+    e.stopPropagation();
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    setDragging({ id: clase.id, startY: clientY, horaOriginal: clase.hora });
+    setDragY(clientY);
+  }, []);
+
+  const onDrag = useCallback((e) => {
+    if (!dragging) return;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    setDragY(clientY);
+  }, [dragging]);
+
+  const endDrag = useCallback((e) => {
+    if (!dragging || !timelineRef.current) { setDragging(null); setDragY(null); return; }
+
+    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const rect    = timelineRef.current.getBoundingClientRect();
+    const yRel    = clientY - rect.top;
+    const minutos = HORA_INICIO * 60 + yRel * MIN_POR_PX;
+
+    // Snap a intervalos de 15 minutos
+    const snapped   = Math.round(minutos / 15) * 15;
+    const hh        = Math.floor(snapped / 60);
+    const mm        = snapped % 60;
+    const nuevaHora = `${String(Math.max(HORA_INICIO, Math.min(HORA_FIN - 1, hh))).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+
+    if (onDragHora && nuevaHora !== dragging.horaOriginal?.substring(0, 5)) {
+      onDragHora(dragging.id, nuevaHora);
+    }
+    setDragging(null);
+    setDragY(null);
+  }, [dragging, onDragHora]);
+
 
   if (!diaSelec) return null;
 
@@ -109,11 +150,26 @@ const MonitorDia = ({
       {/* ══ HEADER + ESTADÍSTICAS ══ */}
       <div style={{ padding:'14px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
-          <div>
-            <p style={{ margin:0, fontWeight:700, fontSize:17, color:NA.text }}>{fmt(diaSelec)}</p>
-            <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2 }}>
-              {clasesActivas.length} clase{clasesActivas.length!==1?'s':''} · {horasTotales}h en total
-            </p>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {/* Flechas de navegación entre días */}
+            {navDia && (
+              <button onClick={() => navDia(-1)}
+                style={{ width:30, height:30, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+                <i className="ti ti-chevron-left" style={{ fontSize:14 }}/>
+              </button>
+            )}
+            <div>
+              <p style={{ margin:0, fontWeight:700, fontSize:17, color:NA.text }}>{fmt(diaSelec)}</p>
+              <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2 }}>
+                {clasesActivas.length} clase{clasesActivas.length!==1?'s':''} · {horasTotales}h en total
+              </p>
+            </div>
+            {navDia && (
+              <button onClick={() => navDia(1)}
+                style={{ width:30, height:30, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+                <i className="ti ti-chevron-right" style={{ fontSize:14 }}/>
+              </button>
+            )}
           </div>
           <div style={{ display:'flex', gap:8 }}>
             {abrirAgendar && (
@@ -141,8 +197,10 @@ const MonitorDia = ({
         </div>
       </div>
 
-      {/* ══ TIMELINE 8:00 → 19:00 ══ */}
-      <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}>
+      {/* ══ TIMELINE ══ */}
+      <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}
+        onMouseMove={onDrag}  onMouseUp={endDrag}  onMouseLeave={endDrag}
+        onTouchMove={onDrag}  onTouchEnd={endDrag}>
 
         {/* Líneas horizontales por hora */}
         {Array.from({ length: HORAS_TOTAL + 1 }, (_, i) => {
@@ -157,7 +215,7 @@ const MonitorDia = ({
         })}
 
         {/* Área de bloques */}
-        <div style={{ position:'relative', height: TIMELINE_H, marginLeft:4 }}>
+        <div ref={timelineRef} style={{ position:'relative', height: TIMELINE_H, marginLeft:4 }}>
 
           {/* Botones "+" en cada hora */}
           {Array.from({ length: HORAS_TOTAL }, (_, i) => {
@@ -214,22 +272,51 @@ const MonitorDia = ({
               const colW   = `calc((100% - 36px) / ${nCols})`;
               const colL   = `calc(36px + ${colIdx} * (100% - 36px) / ${nCols})`;
 
+              const isDragging = dragging?.id === clase.id;
+              const dragOffset = isDragging && dragY !== null
+                ? (dragY - dragging.startY)
+                : 0;
+
               return (
                 <div key={clase.id}
-                  onClick={() => setClaseExpandida(expandida ? null : clase.id)}
+                  onClick={() => !isDragging && setClaseExpandida(expandida ? null : clase.id)}
                   style={{
-                    position:'absolute', top, left: colL, width: colW,
-                    minHeight: h, zIndex: expandida ? 20 : 5,
+                    position:'absolute',
+                    top: top + dragOffset,
+                    left: colL, width: colW,
+                    minHeight: h, zIndex: isDragging ? 50 : expandida ? 20 : 5,
                     background: color.bg,
                     borderLeft: `3px solid ${color.border}`,
                     borderRadius:'0 8px 8px 0',
                     padding:'4px 8px', boxSizing:'border-box',
-                    cursor:'pointer', overflow: expandida ? 'visible' : 'hidden',
-                    boxShadow: expandida ? '0 4px 20px rgba(0,0,0,.15)' : 'none',
-                    transition:'box-shadow .15s',
+                    cursor: isDragging ? 'grabbing' : 'pointer',
+                    overflow: expandida ? 'visible' : 'hidden',
+                    boxShadow: isDragging
+                      ? '0 8px 24px rgba(0,0,0,.25)'
+                      : expandida ? '0 4px 20px rgba(0,0,0,.15)' : 'none',
+                    opacity: isDragging ? 0.85 : 1,
+                    transition: isDragging ? 'none' : 'box-shadow .15s',
+                    userSelect: 'none',
                   }}>
                   {/* Contenido compacto siempre visible */}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    {/* Handle de drag — solo visible en admin/secretaria */}
+                    {puedeAdmin && (
+                      <div
+                        onMouseDown={e => startDrag(e, clase)}
+                        onTouchStart={e => startDrag(e, clase)}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          cursor:'grab', padding:'2px 3px 2px 0', flexShrink:0,
+                          display:'flex', flexDirection:'column', gap:2, marginTop:2,
+                          opacity: .4,
+                        }}
+                        title="Arrastrar para cambiar hora">
+                        {[0,1,2].map(i => (
+                          <span key={i} style={{ display:'block', width:10, height:1.5, borderRadius:1, background:color.border }}/>
+                        ))}
+                      </div>
+                    )}
                     <div style={{ minWidth:0, flex:1 }}>
                       <p style={{ margin:0, fontSize:11, fontWeight:700, color: color.text, lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace: expandida ? 'normal' : 'nowrap' }}>
                         {clase.alumno}

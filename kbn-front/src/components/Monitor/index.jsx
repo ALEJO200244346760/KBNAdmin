@@ -372,7 +372,26 @@ const Monitor = () => {
     }
   };
 
-  // ── Liquidar clase ──────────────────────────────────────────────────────────
+  // ── Navegar al día anterior/siguiente desde el panel del día ───────────────
+  const navDia = (dir) => {
+    if (!diaSelec) return;
+    const d = new Date(diaSelec);
+    d.setDate(d.getDate() + dir);
+    setDiaSelec(toYMD(d));
+    // Si el día destino está fuera del mes actual, cambiar el mes
+    const y = d.getFullYear(), m = d.getMonth();
+    if (y !== mes.y || m !== mes.m) setMes({ y, m });
+  };
+
+  // ── Drag & drop de hora en el timeline ─────────────────────────────────────
+  const onDragHora = async (agendaId, nuevaHora) => {
+    try {
+      await api.patch(`/api/agenda/${agendaId}`, { hora: nuevaHora });
+      setAgenda(p => p.map(a => a.id === agendaId ? { ...a, hora: nuevaHora } : a));
+    } catch (e) {
+      console.error('Error al mover clase:', e);
+    }
+  };
   // Solo secretaria/admin. Acumula horas en el pasivo del instructor
   // y marca la clase como FINALIZADA para que no se duplique.
   const liquidarClase = async (clase) => {
@@ -581,6 +600,8 @@ const Monitor = () => {
         abrirAgendar={abrirAgendar}
         liquidarClase={liquidarClase}
         duplicarClase={duplicarClase}
+        navDia={navDia}
+        onDragHora={onDragHora}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>

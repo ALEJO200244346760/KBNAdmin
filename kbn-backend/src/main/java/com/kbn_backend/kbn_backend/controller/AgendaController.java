@@ -226,6 +226,7 @@ public class AgendaController {
     // 5. Actualizar campos de la clase (tipoAula, horaSalida, horas, lugar, etc.)
     public static class ActualizarClaseRequest {
         private String tipoAula;
+        private String hora;        // hora de inicio (HH:mm) — para drag & drop
         private String horaSalida;
         private Double horas;
         private String lugar;
@@ -241,6 +242,8 @@ public class AgendaController {
 
         public String getTipoAula() { return tipoAula; }
         public void setTipoAula(String tipoAula) { this.tipoAula = tipoAula; }
+        public String getHora() { return hora; }
+        public void setHora(String hora) { this.hora = hora; }
         public String getHoraSalida() { return horaSalida; }
         public void setHoraSalida(String horaSalida) { this.horaSalida = horaSalida; }
         public Double getHoras() { return horas; }
@@ -271,6 +274,9 @@ public class AgendaController {
     ) {
         return agendaRepository.findById(id).map(agenda -> {
             if (req.getTipoAula()         != null) agenda.setTipoAula(req.getTipoAula());
+            if (req.getHora()             != null) {
+                try { agenda.setHora(java.time.LocalTime.parse(req.getHora())); } catch (Exception ignored) {}
+            }
             if (req.getHoraSalida()       != null) {
                 try {
                     agenda.setHoraSalida(java.time.LocalTime.parse(req.getHoraSalida()));
