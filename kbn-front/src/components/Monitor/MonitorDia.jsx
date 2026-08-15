@@ -206,17 +206,16 @@ const MonitorDia = ({
       </div>
 
       {/* ══ TIMELINE ══ */}
-      <div style={{ position:'relative', padding:'16px 0 0 48px', overflowX:'hidden' }}
+      <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}
         onMouseMove={onDrag}  onMouseUp={endDrag}  onMouseLeave={endDrag}
         onTouchMove={onDrag}  onTouchEnd={endDrag}>
 
         {/* Líneas horizontales por hora */}
         {Array.from({ length: HORAS_TOTAL + 1 }, (_, i) => {
           const hora = HORA_INICIO + i;
-          const esFirst = i === 0;
           return (
-            <div key={hora} style={{ position:'absolute', left:0, right:0, top: i * PX_POR_HORA, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
-              <span style={{ position:'absolute', left:4, top: esFirst ? 2 : -8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
+            <div key={hora} style={{ position:'absolute', left:0, right:0, top: i * PX_POR_HORA + 12, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
+              <span style={{ position:'absolute', left:4, top:-8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
                 {hora}:00
               </span>
             </div>
@@ -224,7 +223,7 @@ const MonitorDia = ({
         })}
 
         {/* Área de bloques */}
-        <div ref={timelineRef} style={{ position:'relative', height: TIMELINE_H, marginLeft:4 }}>
+        <div ref={timelineRef} style={{ position:'relative', height: TIMELINE_H, marginLeft:4, marginTop:12 }}>
 
           {/* Botones "+" en cada hora */}
           {Array.from({ length: HORAS_TOTAL }, (_, i) => {
