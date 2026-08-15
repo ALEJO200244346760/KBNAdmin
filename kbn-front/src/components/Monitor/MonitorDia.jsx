@@ -206,7 +206,7 @@ const MonitorDia = ({
       </div>
 
       {/* ══ TIMELINE ══ */}
-      <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}
+      <div style={{ position:'relative', padding:'16px 0 0 48px', overflowX:'hidden' }}
         onMouseMove={onDrag}  onMouseUp={endDrag}  onMouseLeave={endDrag}
         onTouchMove={onDrag}  onTouchEnd={endDrag}>
 
