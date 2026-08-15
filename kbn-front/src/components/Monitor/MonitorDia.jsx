@@ -213,9 +213,10 @@ const MonitorDia = ({
         {/* Líneas horizontales por hora */}
         {Array.from({ length: HORAS_TOTAL + 1 }, (_, i) => {
           const hora = HORA_INICIO + i;
+          const esFirst = i === 0;
           return (
             <div key={hora} style={{ position:'absolute', left:0, right:0, top: i * PX_POR_HORA, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
-              <span style={{ position:'absolute', left:4, top:-8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
+              <span style={{ position:'absolute', left:4, top: esFirst ? 2 : -8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
                 {hora}:00
               </span>
             </div>
