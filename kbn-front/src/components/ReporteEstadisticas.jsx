@@ -100,6 +100,9 @@ const ReporteEstadisticas = () => {
   const [mostrarFiltros,       setMostrarFiltros]       = useState(false);
   const [showOtherCurrencies,  setShowOtherCurrencies]  = useState(false);
   const [expandedId,           setExpandedId]           = useState(null);
+  const [showPendientes, setShowPendientes] = useState(true);
+  const [showEgresos,    setShowEgresos]    = useState(false);
+  const [showIngresos,   setShowIngresos]   = useState(true);
 
   const [editItem, setEditItem] = useState(null);
   const [editForm, setEditForm] = useState(null);
@@ -613,14 +616,16 @@ const ReporteEstadisticas = () => {
       )}
 
       <div style={styles.sectionCard('#F59E0B')}>
-        <div style={styles.sectionHeader('#FFFBEB')}>
+        <div style={{ ...styles.sectionHeader('#FFFBEB'), cursor:'pointer', userSelect:'none' }}
+          onClick={() => setShowPendientes(p => !p)}>
           <h2 style={styles.sectionTitle('#92400E')}>
             <i className="ti ti-bell" aria-hidden="true" style={{ fontSize: 17 }} />
             Pendientes de asignación
             <span style={styles.countBadge('#FDE68A', '#92400E')}>{pendientesFiltrados.length}</span>
           </h2>
+          <i className={`ti ti-chevron-${showPendientes ? 'up' : 'down'}`} style={{ fontSize:16, color:'#92400E' }}/>
         </div>
-        {pendientesFiltrados.length === 0
+        {showPendientes && (pendientesFiltrados.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No hay ingresos pendientes.</div>
           : pendientesFiltrados.map(item => {
             const asignandoEsteItem = asignandoIds.has(item.id);
@@ -669,18 +674,20 @@ const ReporteEstadisticas = () => {
               {expandedId === item.id && <RenderDetails item={item} />}
             </div>
           );})
-        }
+        )}
       </div>
 
       <div style={styles.sectionCard('#EF4444')}>
-        <div style={styles.sectionHeader('#FEF2F2')}>
+        <div style={{ ...styles.sectionHeader('#FEF2F2'), cursor:'pointer', userSelect:'none' }}
+          onClick={() => setShowEgresos(p => !p)}>
           <h2 style={styles.sectionTitle('#991B1B')}>
             <i className="ti ti-trending-down" aria-hidden="true" style={{ fontSize: 17 }} />
             Egresos
             <span style={styles.countBadge('#FECACA', '#991B1B')}>{egresosFiltrados.length}</span>
           </h2>
+          <i className={`ti ti-chevron-${showEgresos ? 'up' : 'down'}`} style={{ fontSize:16, color:'#991B1B' }}/>
         </div>
-        {egresosFiltrados.length === 0
+        {showEgresos && (egresosFiltrados.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No se registraron egresos con estos filtros.</div>
           : egresosFiltrados.map(item => {
             const monto = parseFloat(item.total) || parseFloat(item.gastosAsociados) || 0;
@@ -713,18 +720,20 @@ const ReporteEstadisticas = () => {
               </div>
             );
           })
-        }
+        )}
       </div>
 
       <div style={styles.sectionCard(NA.primary)}>
-        <div style={styles.sectionHeader(NA.light)}>
+        <div style={{ ...styles.sectionHeader(NA.light), cursor:'pointer', userSelect:'none' }}
+          onClick={() => setShowIngresos(p => !p)}>
           <h2 style={styles.sectionTitle(NA.darker)}>
             <i className="ti ti-circle-check" aria-hidden="true" style={{ fontSize: 17 }} />
             Ingresos asignados
             <span style={styles.countBadge(NA.mid, NA.darker)}>{asignadosFiltrados.length}</span>
           </h2>
+          <i className={`ti ti-chevron-${showIngresos ? 'up' : 'down'}`} style={{ fontSize:16, color:NA.darker }}/>
         </div>
-        {asignadosFiltrados.length === 0
+        {showIngresos && (asignadosFiltrados.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No hay ingresos asignados con estos filtros.</div>
           : asignadosFiltrados.map(item => (
             <div key={item.id}>
@@ -755,7 +764,7 @@ const ReporteEstadisticas = () => {
               {expandedId === item.id && <RenderDetails item={item} />}
             </div>
           ))
-        }
+        )}
       </div>
 
       <ReportesEstadisticasGraficos asignados={asignadosFiltrados} egresos={egresosFiltrados} />
