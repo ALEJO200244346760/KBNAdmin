@@ -227,9 +227,17 @@ const Monitor = () => {
     if (!editClase) return [];
     const fechaClase = editClase.fecha?.toString();
     const normInst   = normName(editClase.nombreInstructor || '');
+
+    // Rango de ±7 días alrededor de la clase para capturar pagos adelantados/atrasados
+    const fechaObj = new Date(fechaClase);
+    const desde = new Date(fechaObj); desde.setDate(desde.getDate() - 7);
+    const hasta = new Date(fechaObj); hasta.setDate(hasta.getDate() + 7);
+    const enRango = (f) => { const d = new Date(f); return d >= desde && d <= hasta; };
+
     return ingresos
       .filter(i => {
-        if (i.fecha === fechaClase) return true; // mismo día siempre
+        if (i.fecha === fechaClase)               return true; // mismo día siempre
+        if (enRango(i.fecha))                     return true; // ±7 días
         if (normInst && normName(i.instructor) === normInst) return true; // mismo instructor
         if (!i.instructor || normName(i.instructor) === '') return true; // sin instructor
         return false;

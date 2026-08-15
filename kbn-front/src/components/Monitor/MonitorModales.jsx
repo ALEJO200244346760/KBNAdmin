@@ -137,7 +137,7 @@ export const ModalEditarClase = ({
         </div>
 
         {/* ── Notificar instructor ── */}
-        <div style={{ margin:'16px 0', padding:'12px 14px', borderRadius:12, background:'#FEF9C3', border:'0.5px solid #FDE68A', display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ margin:'16px 0 0', padding:'12px 14px', borderRadius:12, background:'#FEF9C3', border:'0.5px solid #FDE68A', display:'flex', alignItems:'center', gap:10 }}>
           <button type="button"
             onClick={() => setEditForm(p => ({...p, notificar: !p.notificar}))}
             style={{ width:38, height:22, borderRadius:11, border:'none', cursor:'pointer', flexShrink:0,
@@ -157,8 +157,9 @@ export const ModalEditarClase = ({
           </div>
         </div>
 
-        {/* Botones */}
-        <div style={{ display:'flex', gap:10, marginTop:4 }}>
+        {/* Botones — sticky al fondo del modal */}
+        <div style={{ position:'sticky', bottom:0, background:'#fff', paddingTop:14,
+          borderTop:`0.5px solid ${NA.border}`, marginTop:16, display:'flex', gap:10 }}>
           <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={onClose}/>
           <Btn
             label={guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
@@ -344,7 +345,9 @@ export const ModalNuevoIngreso = ({
         </div>
 
         {/* Botones */}
-        <div style={{ display:'flex', gap:10 }}>
+        {/* Botones — sticky al fondo */}
+        <div style={{ position:'sticky', bottom:0, background:'#fff', paddingTop:14,
+          borderTop:`0.5px solid ${NA.border}`, marginTop:4, display:'flex', gap:10 }}>
           <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={onClose}/>
           <Btn
             label={enviando
@@ -370,7 +373,9 @@ const Overlay = ({ onClick, children }) => (
 
 const Modal = ({ onClick, children, maxWidth = 440 }) => (
   <div onClick={onClick}
-    style={{ background:'#fff', borderRadius:20, padding:24, width:'100%', maxWidth, maxHeight:'92vh', overflowY:'auto', boxSizing:'border-box' }}>
+    style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth,
+      maxHeight:'92vh', overflowY:'auto', boxSizing:'border-box',
+      display:'flex', flexDirection:'column' }}>
     {children}
   </div>
 );
@@ -554,15 +559,16 @@ export const ModalAgendar = ({
         </div>
 
         {/* Notas */}
-        <div style={{ marginBottom:18 }}>
+        <div style={{ marginBottom:4 }}>
           <label style={labelSx}>Notas</label>
           <textarea rows={2} value={form.notas} onChange={e => set('notas', e.target.value)}
             placeholder="Nivel del alumno, observaciones..."
             style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid ${NA.border}`, fontSize:13, color:NA.text, background:'#fff', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
         </div>
 
-        {/* Botones */}
-        <div style={{ display:'flex', gap:10 }}>
+        {/* Botones — sticky al fondo */}
+        <div style={{ position:'sticky', bottom:0, background:'#fff', paddingTop:14,
+          borderTop:`0.5px solid ${NA.border}`, marginTop:4, display:'flex', gap:10 }}>
           <Btn label="Cancelar" bg='#fff' color={NA.text2} onClick={onClose}/>
           <Btn
             label={guardando ? 'Agendando...' : 'Agendar clase'}
