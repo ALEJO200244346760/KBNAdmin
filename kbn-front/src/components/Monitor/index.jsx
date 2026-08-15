@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import api from '../../axiosConfig';
+import { useAuth } from '../../context/AuthContext';
 
 import { toYMD, HOY, esPasado, normName } from './MonitorShared';
 import MonitorCalendario from './MonitorCalendario';
@@ -56,9 +57,10 @@ const Monitor = () => {
   const enviandoRef = useRef(false);
 
   // ── Modal: agendar clase ────────────────────────────────────────────────────
-  const [showAgendar,    setShowAgendar]    = useState(false);
-  const [agendarFecha,   setAgendarFecha]   = useState(null);
-  const [agendarHora,    setAgendarHora]    = useState('09:00');
+  const [showAgendar,      setShowAgendar]      = useState(false);
+  const [agendarFecha,     setAgendarFecha]     = useState(null);
+  const [agendarHora,      setAgendarHora]      = useState('09:00');
+  const [duplicarPrefill,  setDuplicarPrefill]  = useState(null); // datos pre-llenados al duplicar
   const [guardandoAgendar, setGuardandoAgendar] = useState(false);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -223,16 +225,21 @@ const Monitor = () => {
   // o pagar varias clases juntas al final del período.
   const ingresosDisponiblesEdit = useMemo(() => {
     if (!editClase) return [];
-    const normInst = normName(editClase.nombreInstructor);
+    const fechaClase = editClase.fecha?.toString();
+    const normInst   = normName(editClase.nombreInstructor || '');
     return ingresos
       .filter(i => {
-        const iNorm = normName(i.instructor);
-        return iNorm === normInst
-          || iNorm === ''
-          || iNorm === 'secretaria'
-          || iNorm === 'nautica atins';
+        if (i.fecha === fechaClase) return true; // mismo día siempre
+        if (normInst && normName(i.instructor) === normInst) return true; // mismo instructor
+        if (!i.instructor || normName(i.instructor) === '') return true; // sin instructor
+        return false;
       })
-      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+      .sort((a, b) => {
+        const aSame = a.fecha === fechaClase ? 0 : 1;
+        const bSame = b.fecha === fechaClase ? 0 : 1;
+        if (aSame !== bSame) return aSame - bSame;
+        return b.fecha.localeCompare(a.fecha);
+      });
   }, [editClase, ingresos]);
 
   // ── Resumen del mes ─────────────────────────────────────────────────────────
@@ -273,7 +280,34 @@ const Monitor = () => {
   };
 
   // ── Cambiar estado de clase ─────────────────────────────────────────────────
+  const { user } = useAuth();
+  const puedeAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
+
+  // cambiarEstado — para instructor solo cambia a CONFIRMADA.
+  // Para admin/secretaria que confirman → liquida automáticamente.
   const cambiarEstado = async (id, estado) => {
+    const clase = agenda.find(a => a.id === id);
+
+    // Si admin/secretaria confirman una clase con instructor → liquidar directo
+    if (estado === 'CONFIRMADA' && puedeAdmin && clase?.nombreInstructor) {
+      try {
+        await api.put(`/api/agenda/${id}/estado`, estado, {
+          headers: { 'Content-Type': 'text/plain' },
+        });
+        const res = await api.post(`/api/agenda/${id}/liquidar`);
+        const data = res.data;
+        setAgenda(p => p.map(a => a.id === id ? { ...a, estado: data.estado || 'FINALIZADA' } : a));
+        if (data.aviso) alert(`✓ ${data.aviso}`);
+      } catch (e) {
+        // Si liquidar falla (ej: no tiene tarjeta), igual confirmar
+        setAgenda(p => p.map(a => a.id === id ? { ...a, estado: 'CONFIRMADA' } : a));
+        const msg = e.response?.data;
+        if (msg && !msg.includes('liquidada')) alert(`Clase confirmada. ${msg}`);
+      }
+      return;
+    }
+
+    // Caso normal: cambio de estado sin liquidar
     try {
       await api.put(`/api/agenda/${id}/estado`, estado, {
         headers: { 'Content-Type': 'text/plain' },
@@ -362,6 +396,23 @@ const Monitor = () => {
   const abrirAgendar = (fecha, hora = '09:00') => {
     setAgendarFecha(fecha);
     setAgendarHora(hora);
+    setDuplicarPrefill(null); // limpia prefill para agenda normal
+    setShowAgendar(true);
+  };
+
+  // ── Duplicar clase ──────────────────────────────────────────────────────────
+  const duplicarClase = (clase) => {
+    setAgendarFecha(clase.fecha?.toString() || HOY);
+    setAgendarHora(clase.hora ? String(clase.hora).substring(0, 5) : '09:00');
+    setDuplicarPrefill({
+      alumno:          clase.alumno          || '',
+      instructorId:    clase.instructorId    || '',
+      tipoAula:        clase.tipoAula        || '',
+      horas:           clase.horas           || 1,
+      tarifa:          clase.tarifa          || '',
+      lugar:           clase.lugar           || '',
+      hotelDerivacion: clase.hotelDerivacion || '',
+    });
     setShowAgendar(true);
   };
 
@@ -521,6 +572,7 @@ const Monitor = () => {
         abrirIngreso={abrirIngreso}
         abrirAgendar={abrirAgendar}
         liquidarClase={liquidarClase}
+        duplicarClase={duplicarClase}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>
@@ -539,10 +591,11 @@ const Monitor = () => {
         <ModalAgendar
           fecha={agendarFecha}
           horaInicio={agendarHora}
+          prefill={duplicarPrefill}
           instructores={usuarios}
           guardando={guardandoAgendar}
           onSubmit={guardarAgendar}
-          onClose={() => setShowAgendar(false)}
+          onClose={() => { setShowAgendar(false); setDuplicarPrefill(null); }}
         />
       )}
 

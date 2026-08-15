@@ -52,7 +52,7 @@ const MonitorDia = ({
   diaSelec, evD, agenda, ingresos,
   tieneCobro, ingresoDeClase,
   cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
-  liquidarClase,
+  liquidarClase, duplicarClase,
 }) => {
   const [claseExpandida, setClaseExpandida] = useState(null);
   const { user } = useAuth();
@@ -296,6 +296,10 @@ const MonitorDia = ({
                         )}
                         <Btn label="Editar" bg={NA.light} color={NA.darker} small icon="ti-edit"
                           onClick={() => { abrirEditClase(clase); setClaseExpandida(null); }}/>
+                        {duplicarClase && (
+                          <Btn label="Duplicar" bg='#EDE9FE' color='#6D28D9' small icon="ti-copy"
+                            onClick={() => { duplicarClase(clase); setClaseExpandida(null); }}/>
+                        )}
                         {esPasado(diaSelec) && !cobrado && (
                           <Btn label="Cobro" small icon="ti-cash"
                             onClick={() => { abrirIngreso(diaSelec, { instructor: clase.nombreInstructor }); setClaseExpandida(null); }}/>

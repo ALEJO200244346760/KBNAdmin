@@ -383,7 +383,8 @@ const closeBtnSx = { width:28, height:28, borderRadius:8, border:'none', backgro
 // MODAL: AGENDAR CLASE — desde el Monitor
 // ══════════════════════════════════════════════════════════════════════════════
 export const ModalAgendar = ({
-  fecha, horaInicio, instructores,
+  fecha, horaInicio, prefill,
+  instructores,
   guardando, onSubmit, onClose,
 }) => {
   const TIPOS = [
@@ -402,11 +403,21 @@ export const ModalAgendar = ({
   };
 
   const today = new Date().toISOString().split('T')[0];
+  const esDuplicado = !!prefill;
+
   const [form, setForm] = React.useState({
-    alumno: '', instructorId: '', tipoAula: '',
-    fecha: fecha || today, hora: horaInicio || '09:00', horaSalida: '',
-    horas: 1, tarifa: '', horasPagadas: 0,
-    lugar: '', hotelDerivacion: '', notas: '',
+    alumno:          prefill?.alumno          || '',
+    instructorId:    prefill?.instructorId    || '',
+    tipoAula:        prefill?.tipoAula        || '',
+    fecha:           fecha || today,
+    hora:            horaInicio || '09:00',
+    horaSalida:      '',
+    horas:           prefill?.horas           || 1,
+    tarifa:          prefill?.tarifa          || '',
+    horasPagadas:    0,
+    lugar:           prefill?.lugar           || '',
+    hotelDerivacion: prefill?.hotelDerivacion || '',
+    notas:           '',
   });
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -434,7 +445,16 @@ export const ModalAgendar = ({
         {/* Header */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
           <div>
-            <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:NA.text }}>Agendar clase</h2>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:NA.text }}>
+                {esDuplicado ? 'Duplicar clase' : 'Agendar clase'}
+              </h2>
+              {esDuplicado && (
+                <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, background:'#EDE9FE', color:'#6D28D9' }}>
+                  COPIA
+                </span>
+              )}
+            </div>
             <p style={{ margin:'3px 0 0', fontSize:12, color:NA.text2 }}>{fmt(form.fecha)}</p>
           </div>
           <button onClick={onClose} style={{ ...closeBtnSx }}>
