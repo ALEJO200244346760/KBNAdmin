@@ -118,11 +118,19 @@ const MonitorDia = ({
   });
 
   // ── Agrupar clases en columnas (para solapamientos) ───────────────────────
-  // Si dos clases se superponen en el tiempo, van a columnas paralelas
+  // Prioridad de tipo: clases privadas/semiprivadas primero, rental/otro al final
+  const PRIORIDAD_TIPO = { APK:0, ASPK:1, APWF:2, ASPWF:3, APWS:4, ASPWS:5, RENTAL:8, OTRO:9 };
+  const prioTipo = (t) => PRIORIDAD_TIPO[t] ?? 6;
+
   const columnas = [];
   const clasesConPos = clasesActivas
     .filter(a => horaAMin(a.hora) !== null)
-    .sort((a, b) => horaAMin(a.hora) - horaAMin(b.hora));
+    .sort((a, b) => {
+      const horaDiff = horaAMin(a.hora) - horaAMin(b.hora);
+      if (horaDiff !== 0) return horaDiff;
+      // Misma hora → prioridad por tipo (APK antes que RENTAL)
+      return prioTipo(a.tipoAula) - prioTipo(b.tipoAula);
+    });
   const clasSinHora = clasesActivas.filter(a => horaAMin(a.hora) === null);
 
   clasesConPos.forEach(clase => {
