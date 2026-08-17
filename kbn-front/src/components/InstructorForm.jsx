@@ -58,11 +58,22 @@ const Stat = ({ icon, value, label, color = NA.dark, bg = NA.light }) => (
 // ── InstructorForm (Dashboard) ────────────────────────────────────────────────
 const InstructorForm = () => {
   const { user, token } = useAuth();
-  const [seccion, setSeccion] = useState('HOY'); // HOY | CALENDARIO | RESUMEN
+  const isAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
+  const [seccion, setSeccion] = useState('HOY');
+
+  // Selector de instructor (solo admin)
+  const [instructores,     setInstructores]     = useState([]);
+  const [instructorSelec,  setInstructorSelec]  = useState(null); // { id, nombre, apellido }
+
+  // El instructor "activo" es el seleccionado (si admin) o el propio usuario
+  const instructorActivo = instructorSelec || {
+    id:      user?.id,
+    nombre:  user?.nombre,
+    apellido: user?.apellido,
+  };
 
   // Datos
   const [agenda,  setAgenda]  = useState([]);
-  const [pasivo,  setPasivo]  = useState(null);  // tarjeta de pasivo del instructor
   const [loading, setLoading] = useState(true);
 
   // Calendario
@@ -73,37 +84,50 @@ const InstructorForm = () => {
   const [diaSelec, setDiaSelec] = useState(HOY);
 
   const nombreCompleto = useMemo(() =>
-    `${user?.nombre || ''} ${user?.apellido || ''}`.replace(/\s+/g, ' ').trim()
-  , [user]);
+    `${instructorActivo.nombre || ''} ${instructorActivo.apellido || ''}`.replace(/\s+/g, ' ').trim()
+  , [instructorActivo]);
 
-  // ── Fetch ─────────────────────────────────────────────────────────────────
+  // Cargar lista de instructores (solo admin)
+  useEffect(() => {
+    if (!isAdmin || !token) return;
+    api.get('/api/agenda/listar')
+      .then(r => {
+        // Extraer instructores únicos de la agenda
+        const mapa = {};
+        r.data.forEach(a => {
+          if (a.instructorId && a.nombreInstructor) {
+            mapa[a.instructorId] = a.nombreInstructor;
+          }
+        });
+        const lista = Object.entries(mapa).map(([id, nombre]) => ({
+          id: Number(id),
+          nombre: nombre.split(' ')[0],
+          apellido: nombre.split(' ').slice(1).join(' '),
+          nombreCompleto: nombre,
+        }));
+        setInstructores(lista);
+      })
+      .catch(console.error);
+  }, [isAdmin, token]);
+
+  // ── Fetch agenda ──────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
-    if (!token || !user?.id) return;
+    if (!token || !instructorActivo.id) return;
     setLoading(true);
     try {
-      // Agenda: filtra por instructorId en el backend no existe, lo hacemos client-side
-      // Pasivos: instructor NO tiene acceso → usamos endpoint público de su propio pasivo si existe
-      // Por ahora solo cargamos agenda (sin pasivos para no generar 403)
       const rAgenda = await api.get('/api/agenda/listar');
-
       const misClases = rAgenda.data.filter(a => {
-        // Coincidencia por ID (más confiable)
-        if (a.instructorId && user.id && String(a.instructorId) === String(user.id)) return true;
-        // Fallback: coincidencia por nombre
         const norm = (s) => (s||'').toLowerCase().replace(/\s+/g,' ').trim();
-        return norm(a.nombreInstructor) === norm(nombreCompleto);
+        return String(a.instructorId) === String(instructorActivo.id)
+          || norm(a.nombreInstructor) === norm(nombreCompleto);
       });
       setAgenda(misClases);
-
-      // Pasivos: solo admin puede listarlos → el instructor no puede verlos acá
-      // El saldo se lo tiene que decir secretaría/admin
-      setPasivo(null);
     } catch (e) {
       console.error('InstructorForm:', e);
     } finally {
       setLoading(false);
     }
-  }, [token, user, nombreCompleto]);
+  }, [token, instructorActivo.id, nombreCompleto]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -172,8 +196,6 @@ const InstructorForm = () => {
   }, [mes]);
 
   // Saldo de cuenta corriente
-  const saldos = pasivo?.saldosPorMoneda || {};
-  const tarifaHora = pasivo ? decodeTarifa(pasivo.descripcion).tarifaHora : null;
 
   // ── Nav por sección ───────────────────────────────────────────────────────
   const navItems = [
@@ -198,14 +220,37 @@ const InstructorForm = () => {
 
       {/* ── Header personal ── */}
       <div style={{ padding: '20px 0 16px' }}>
-        <p style={{ margin: 0, fontSize: 12, color: NA.text2 }}>Hola,</p>
-        <h1 style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 800, color: NA.text }}>
-          {user?.nombre?.split(' ')[0]} 👋
-        </h1>
-        {tarifaHora && (
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: NA.text2 }}>
-            Tarifa: <strong style={{ color: NA.dark }}>R$ {tarifaHora}/h</strong>
-          </p>
+        <p style={{ margin: 0, fontSize: 12, color: NA.text2 }}>
+          {isAdmin && instructorSelec ? 'Viendo clases de' : 'Hola,'}
+        </p>
+
+        {/* Selector de instructor para admin */}
+        {isAdmin ? (
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:4, flexWrap:'wrap' }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: NA.text }}>
+              {instructorSelec ? instructorSelec.nombreCompleto : `${user?.nombre?.split(' ')[0]} (yo)`}
+            </h1>
+            <select
+              value={instructorSelec?.id || ''}
+              onChange={e => {
+                const id = Number(e.target.value);
+                if (!id) { setInstructorSelec(null); return; }
+                const inst = instructores.find(i => i.id === id);
+                setInstructorSelec(inst || null);
+              }}
+              style={{ padding:'6px 12px', borderRadius:10, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text, fontSize:13, cursor:'pointer' }}>
+              <option value="">👤 Mis clases</option>
+              {instructores
+                .filter(i => i.id !== user?.id)
+                .map(i => (
+                  <option key={i.id} value={i.id}>{i.nombreCompleto}</option>
+                ))}
+            </select>
+          </div>
+        ) : (
+          <h1 style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 800, color: NA.text }}>
+            {user?.nombre?.split(' ')[0]} 👋
+          </h1>
         )}
       </div>
 
@@ -390,11 +435,6 @@ const InstructorForm = () => {
             <p style={{ color:'rgba(255,255,255,.5)', fontSize:13, margin:0 }}>
               Tu saldo lo podés consultar con la administración.
             </p>
-            {tarifaHora && (
-              <p style={{ color:'rgba(255,255,255,.7)', fontSize:13, margin:'8px 0 0' }}>
-                Tu tarifa: <strong style={{ color: NA.primary }}>R$ {tarifaHora}/h</strong>
-              </p>
-            )}
           </div>
         </div>
       )}
