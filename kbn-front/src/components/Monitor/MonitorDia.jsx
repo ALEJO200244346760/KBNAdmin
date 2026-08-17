@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 const HORA_INICIO = 9;
 const HORA_FIN    = 18;
 const HORAS_TOTAL = HORA_FIN - HORA_INICIO;
-const PX_POR_HORA = 68;
+const PX_POR_HORA = 80;
 const TIMELINE_H  = HORAS_TOTAL * PX_POR_HORA;
 
 const COLOR_TIPO = {
@@ -306,16 +306,15 @@ const MonitorDia = ({
       </div>
 
       {/* ── TIMELINE ── */}
-      <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}
+      <div style={{ position:'relative', padding:'0 0 0 44px', overflowX:'hidden' }}
         onMouseUp={endDrag} onMouseLeave={endDrag}
         onTouchEnd={endDrag}>
 
-        {/* Líneas de hora */}
         {Array.from({ length: HORAS_TOTAL+1 }, (_,i) => {
           const hora = HORA_INICIO + i;
           return (
             <div key={hora} style={{ position:'absolute', left:0, right:0, top:i*PX_POR_HORA+12, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
-              <span style={{ position:'absolute', left:4, top:-8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
+              <span style={{ position:'absolute', left:2, top:-8, fontSize:9, color:NA.text2, fontWeight:500, width:34, textAlign:'right' }}>
                 {hora}:00
               </span>
             </div>
@@ -328,8 +327,8 @@ const MonitorDia = ({
           return (
             <button key={hora}
               onClick={() => abrirAgendar && abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
-              style={{ position:'absolute', left:10, top:i*PX_POR_HORA+18, width:24, height:24, borderRadius:6, border:`0.5px dashed ${NA.border}`, background:'transparent', color:NA.border, cursor:'pointer', zIndex:2, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <i className="ti ti-plus" style={{ fontSize:11 }}/>
+              style={{ position:'absolute', left:8, top:i*PX_POR_HORA+22, width:20, height:20, borderRadius:5, border:`0.5px dashed ${NA.border}`, background:'transparent', color:NA.border, cursor:'pointer', zIndex:2, fontSize:11, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <i className="ti ti-plus" style={{ fontSize:10 }}/>
             </button>
           );
         })}
@@ -361,7 +360,9 @@ const MonitorDia = ({
               return (
                 <div key={clase.id}
                   onClick={() => setClaseSelec(clase)}
-                  onTouchEnd={e => { if (!dragRef.current) setClaseSelec(clase); }}
+                  onMouseDown={puedeAdmin ? e => startDrag(e, clase) : undefined}
+                  onTouchStart={puedeAdmin ? e => startDrag(e, clase) : undefined}
+                  onTouchEnd={e => { if (!dragRef.current?.moved) setClaseSelec(clase); }}
                   style={{
                     position:'absolute', top, left:colL, width:colW,
                     minHeight:h, zIndex:5,
@@ -372,36 +373,26 @@ const MonitorDia = ({
                     cursor:'pointer', overflow:'hidden',
                     userSelect:'none',
                   }}>
-                  {/* Drag handle */}
-                  {puedeAdmin && (
-                    <div
-                      onMouseDown={e => startDrag(e, clase)}
-                      onTouchStart={e => startDrag(e, clase)}
-                      onClick={e => e.stopPropagation()}
-                      style={{ position:'absolute', top:3, right:3, cursor:'grab', opacity:.4, display:'flex', flexDirection:'column', gap:2 }}>
-                      {[0,1,2].map(i => <span key={i} style={{ display:'block', width:10, height:1.5, borderRadius:1, background:color.border }}/>)}
-                    </div>
-                  )}
-                  {/* Contenido */}
-                  <p style={{ margin:0, fontSize:11, fontWeight:700, color:color.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:14 }}>
+                  {/* Indicadores top-right */}
+                  <div style={{ position:'absolute', top:3, right:4, display:'flex', gap:2 }}>
+                    {cobrado && <span style={{ fontSize:9, color:'#059669' }}>✓</span>}
+                    {pasado && !cobrado && clase.estado!=='RECHAZADA' && <span style={{ fontSize:9, color:'#EA580C' }}>⚠</span>}
+                  </div>
+                  {/* Nombre */}
+                  <p style={{ margin:0, fontSize:12, fontWeight:700, color:color.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:14 }}>
                     {clase.alumno}
                   </p>
-                  {h > 36 && (
-                    <p style={{ margin:'1px 0 0', fontSize:10, color:color.text, opacity:.75, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {clase.tipoAula || clase.nombreInstructor}
+                  {h > 32 && (
+                    <p style={{ margin:'1px 0 0', fontSize:10, color:color.text, opacity:.8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {clase.tipoAula || ''}
                     </p>
                   )}
-                  {h > 52 && (
+                  {h > 48 && (
                     <p style={{ margin:'1px 0 0', fontSize:10, color:color.text, opacity:.6 }}>
                       {String(clase.hora||'').substring(0,5)}
                       {clase.horaSalida && ` → ${String(clase.horaSalida).substring(0,5)}`}
                     </p>
                   )}
-                  {/* Indicadores */}
-                  <div style={{ position:'absolute', top:3, left:4, display:'flex', gap:2 }}>
-                    {cobrado && <span style={{ fontSize:9, color:'#059669' }}>✓</span>}
-                    {pasado && !cobrado && clase.estado!=='RECHAZADA' && <span style={{ fontSize:9, color:'#EA580C' }}>⚠</span>}
-                  </div>
                 </div>
               );
             })
