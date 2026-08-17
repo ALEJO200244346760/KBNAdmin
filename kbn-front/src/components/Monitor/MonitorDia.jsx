@@ -209,7 +209,6 @@ const MonitorDia = ({
   const { user }     = useAuth();
   const puedeAdmin   = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
 
-  if (!diaSelec) return null;
 
   // ── Datos ─────────────────────────────────────────────────────────────────
   const pasado        = esPasado(diaSelec);
@@ -274,6 +273,9 @@ const MonitorDia = ({
     if (onDragHora && nueva !== hhMM(dragRef.current.hora)) onDragHora(dragRef.current.id, nueva);
     dragRef.current = null;
   }, [onDragHora]);
+
+  // Early return DESPUÉS de todos los hooks
+  if (!diaSelec) return null;
 
   return (
     <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
