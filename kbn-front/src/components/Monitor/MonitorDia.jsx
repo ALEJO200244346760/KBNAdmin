@@ -380,16 +380,19 @@ const MonitorDia = ({
                 borderTop: i===0 ? `1px solid ${NA.border}` : `0.5px solid ${NA.border}40`, zIndex:1 }}/>
             ))}
 
-            {/* Botones + por hora (solo si NO modo mover) */}
-            {!modoMover && abrirAgendar && Array.from({ length:HORAS_TOTAL }, (_,i) => {
+            {/* Botones + por hora */}
+            {abrirAgendar && Array.from({ length:HORAS_TOTAL }, (_,i) => {
               const hora = HORA_INICIO+i;
               return (
                 <button key={hora}
                   onClick={() => abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
-                  style={{ position:'absolute', right:4, top:i*PX_H+14, width:18, height:18, borderRadius:5,
+                  style={{ position:'absolute', right:4, top:i*PX_H+14, width:20, height:20, borderRadius:6,
                     border:`0.5px dashed ${NA.border}`, background:'transparent', color:NA.border,
-                    cursor:'pointer', zIndex:2, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="ti ti-plus" style={{ fontSize:10 }}/>
+                    cursor:'pointer', zIndex:2, display:'flex', alignItems:'center', justifyContent:'center',
+                    transition:'all .15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background=NA.light; e.currentTarget.style.color=NA.dark; e.currentTarget.style.borderColor=NA.dark; }}
+                  onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=NA.border; e.currentTarget.style.borderColor=NA.border; }}>
+                  <i className="ti ti-plus" style={{ fontSize:11 }}/>
                 </button>
               );
             })}
