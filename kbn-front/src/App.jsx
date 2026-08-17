@@ -8,7 +8,6 @@ import Inicio from './components/Inicio';
 import AdminDashboard from './components/AdminDashboard';
 import InstructorForm from './components/InstructorForm';
 import ReporteEstadisticas from './components/ReporteEstadisticas';
-import UserManagement from './components/UserManagement';
 import Secretaria from './components/Secretaria';
 import Clientes from './components/Clientes';
 import Monitor from './components/Monitor';
@@ -254,7 +253,7 @@ function App() {
             {/* GESTIÓN DE USUARIOS */}
             <Route path="/usuarios" element={
               <PrivateRoute allowedRoles={['ADMINISTRADOR']}>
-                <UserManagement />
+                <AdminDashboard />
               </PrivateRoute>
             } />
 
