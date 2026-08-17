@@ -39,10 +39,20 @@ const prio = (t) => PRIORIDAD[t] ?? 6;
 
 // ── Drawer de detalle de clase (aparece desde abajo) ──────────────────────────
 const ClaseDrawer = ({ clase, ingresoVinc, cobrado, puedeAdmin, onClose,
-  cambiarEstado, abrirEditClase, abrirIngreso, liquidarClase, duplicarClase }) => {
+  cambiarEstado, abrirEditClase, abrirIngreso, liquidarClase, duplicarClase,
+  eliminarClase, onSaveHoraSalida }) => {
   if (!clase) return null;
-  const col = colorTipo(clase.tipoAula, clase.estado);
+  const col    = colorTipo(clase.tipoAula, clase.estado);
   const pasada = esPasado(clase.fecha?.toString());
+  const [horaSalida, setHoraSalida] = useState(clase.horaSalida ? String(clase.horaSalida).substring(0,5) : '');
+  const [savingHS,   setSavingHS]   = useState(false);
+
+  const guardarHoraSalida = async () => {
+    if (!horaSalida || !onSaveHoraSalida) return;
+    setSavingHS(true);
+    await onSaveHoraSalida(clase.id, horaSalida);
+    setSavingHS(false);
+  };
 
   return (
     <>
@@ -159,6 +169,27 @@ const ClaseDrawer = ({ clase, ingresoVinc, cobrado, puedeAdmin, onClose,
               </button>
             )}
           </div>
+
+          {/* Hora salida rápida */}
+          <div style={{ background:NA.bg, borderRadius:12, padding:'12px 14px', display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ flex:1 }}>
+              <p style={{ margin:'0 0 4px', fontSize:11, color:NA.text2, fontWeight:500 }}>Hora de salida</p>
+              <input type="time" value={horaSalida} onChange={e => setHoraSalida(e.target.value)}
+                style={{ padding:'8px 12px', borderRadius:8, border:`0.5px solid ${NA.border}`, fontSize:14, color:NA.text, background:'#fff', width:'100%', boxSizing:'border-box' }}/>
+            </div>
+            <button onClick={guardarHoraSalida} disabled={!horaSalida || savingHS}
+              style={{ padding:'10px 16px', borderRadius:9, border:'none', background: horaSalida ? NA.dark : NA.border, color:'#fff', fontSize:13, fontWeight:600, cursor: horaSalida ? 'pointer' : 'default', flexShrink:0 }}>
+              {savingHS ? '...' : 'Guardar'}
+            </button>
+          </div>
+
+          {/* Eliminar */}
+          {puedeAdmin && eliminarClase && (
+            <button onClick={() => { if (window.confirm(`¿Eliminar clase de ${clase.alumno}?`)) { eliminarClase(clase.id); onClose(); } }}
+              style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid #FECACA', background:'#FEF2F2', color:'#DC2626', fontSize:14, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <i className="ti ti-trash" style={{ fontSize:16 }}/> Eliminar clase
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -171,6 +202,7 @@ const MonitorDia = ({
   tieneCobro, ingresoDeClase,
   cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
   liquidarClase, duplicarClase, navDia, onDragHora,
+  eliminarClase, onSaveHoraSalida,
 }) => {
   const [claseSelec, setClaseSelec] = useState(null); // clase abierta en drawer
   const timelineRef = useRef(null);
@@ -178,27 +210,36 @@ const MonitorDia = ({
   const { user }    = useAuth();
   const puedeAdmin  = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
 
-  // ── Drag ──────────────────────────────────────────────────────────────────
+  // ── Drag con umbral mínimo de movimiento ──────────────────────────────────
   const MIN_POR_PX = 60 / PX_POR_HORA;
+  const DRAG_THRESHOLD = 12; // px mínimos para considerar drag real
 
   const startDrag = useCallback((e, clase) => {
-    e.stopPropagation();
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    dragRef.current = { id: clase.id, startY: clientY, horaOriginal: clase.hora };
+    dragRef.current = { id: clase.id, startY: clientY, horaOriginal: clase.hora, moved: false };
+  }, []);
+
+  const onMove = useCallback((e) => {
+    if (!dragRef.current) return;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const delta = Math.abs(clientY - dragRef.current.startY);
+    if (delta > DRAG_THRESHOLD) dragRef.current.moved = true;
   }, []);
 
   const endDrag = useCallback((e) => {
-    if (!dragRef.current || !timelineRef.current) { dragRef.current = null; return; }
-    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-    const rect    = timelineRef.current.getBoundingClientRect();
-    const yRel    = clientY - rect.top;
-    const min     = HORA_INICIO*60 + yRel * MIN_POR_PX;
-    const snapped = Math.round(min / 15) * 15;
-    const hh      = Math.max(HORA_INICIO, Math.min(HORA_FIN-1, Math.floor(snapped/60)));
-    const mm      = snapped % 60;
-    const nueva   = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
-    if (onDragHora && nueva !== String(dragRef.current.horaOriginal).substring(0,5)) {
-      onDragHora(dragRef.current.id, nueva);
+    if (!dragRef.current) return;
+    if (dragRef.current.moved && timelineRef.current && onDragHora) {
+      const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+      const rect    = timelineRef.current.getBoundingClientRect();
+      const yRel    = clientY - rect.top;
+      const min     = HORA_INICIO*60 + yRel * MIN_POR_PX;
+      const snapped = Math.round(min / 15) * 15;
+      const hh      = Math.max(HORA_INICIO, Math.min(HORA_FIN-1, Math.floor(snapped/60)));
+      const mm      = snapped % 60;
+      const nueva   = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+      if (nueva !== String(dragRef.current.horaOriginal).substring(0,5)) {
+        onDragHora(dragRef.current.id, nueva);
+      }
     }
     dragRef.current = null;
   }, [onDragHora]);
@@ -307,8 +348,8 @@ const MonitorDia = ({
 
       {/* ── TIMELINE ── */}
       <div style={{ position:'relative', padding:'0 0 0 44px', overflowX:'hidden' }}
-        onMouseUp={endDrag} onMouseLeave={endDrag}
-        onTouchEnd={endDrag}>
+        onMouseMove={onMove}  onMouseUp={endDrag}  onMouseLeave={endDrag}
+        onTouchMove={onMove}  onTouchEnd={endDrag}>
 
         {Array.from({ length: HORAS_TOTAL+1 }, (_,i) => {
           const hora = HORA_INICIO + i;
@@ -349,9 +390,11 @@ const MonitorDia = ({
           {colsVis.map((col, colIdx) =>
             col.map(clase => {
               const ini    = horaAMin(clase.hora);
-              const finMin = clase.horaSalida ? horaAMin(clase.horaSalida) : ini+(parseFloat(clase.horas)||1)*60;
+              const finMin = clase.horaSalida
+                ? horaAMin(clase.horaSalida)
+                : ini + Math.min(parseFloat(clase.horas)||1, 8)*60; // máx 8h
               const top    = posicion(ini);
-              const h      = altura(ini, finMin);
+              const h      = altura(ini, Math.min(finMin, (HORA_FIN)*60)); // no pasar de 18:00
               const color  = colorTipo(clase.tipoAula, clase.estado);
               const cobrado = tieneCobro(clase);
               const colW   = `calc((100% - 2px) / ${nCols})`;
@@ -359,10 +402,9 @@ const MonitorDia = ({
 
               return (
                 <div key={clase.id}
-                  onClick={() => setClaseSelec(clase)}
+                  onClick={e => { if (!dragRef.current?.moved) setClaseSelec(clase); }}
                   onMouseDown={puedeAdmin ? e => startDrag(e, clase) : undefined}
                   onTouchStart={puedeAdmin ? e => startDrag(e, clase) : undefined}
-                  onTouchEnd={e => { if (!dragRef.current?.moved) setClaseSelec(clase); }}
                   style={{
                     position:'absolute', top, left:colL, width:colW,
                     minHeight:h, zIndex:5,
@@ -535,6 +577,8 @@ const MonitorDia = ({
           abrirIngreso={abrirIngreso}
           liquidarClase={liquidarClase}
           duplicarClase={duplicarClase}
+          eliminarClase={eliminarClase}
+          onSaveHoraSalida={onSaveHoraSalida}
         />
       )}
     </div>

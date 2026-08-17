@@ -392,6 +392,22 @@ const Monitor = () => {
       console.error('Error al mover clase:', e);
     }
   };
+  // ── Eliminar clase ──────────────────────────────────────────────────────────
+  const eliminarClase = async (id) => {
+    try {
+      await api.delete(`/api/agenda/${id}`);
+      setAgenda(p => p.filter(a => a.id !== id));
+    } catch (e) { alert('No se pudo eliminar.'); }
+  };
+
+  // ── Guardar hora salida rápida ──────────────────────────────────────────────
+  const onSaveHoraSalida = async (id, horaSalida) => {
+    try {
+      const res = await api.patch(`/api/agenda/${id}`, { horaSalida });
+      setAgenda(p => p.map(a => a.id === id ? res.data : a));
+    } catch (e) { alert('No se pudo guardar.'); }
+  };
+
   // Solo secretaria/admin. Acumula horas en el pasivo del instructor
   // y marca la clase como FINALIZADA para que no se duplique.
   const liquidarClase = async (clase) => {
@@ -602,6 +618,8 @@ const Monitor = () => {
         duplicarClase={duplicarClase}
         navDia={navDia}
         onDragHora={onDragHora}
+        eliminarClase={eliminarClase}
+        onSaveHoraSalida={onSaveHoraSalida}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>

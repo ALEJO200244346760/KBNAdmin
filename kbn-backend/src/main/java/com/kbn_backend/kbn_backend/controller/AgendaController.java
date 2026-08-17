@@ -362,4 +362,12 @@ public class AgendaController {
         return ResponseEntity.ok("Clases marcadas como cobradas");
     }
 
+    // 8. Eliminar clase
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminarClase(@PathVariable Long id) {
+        return agendaRepository.findById(id)
+                .map(a -> { agendaRepository.delete(a); return ResponseEntity.ok().build(); })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
 }
