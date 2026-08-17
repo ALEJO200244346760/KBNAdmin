@@ -1,50 +1,168 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { NA, fmt, esPasado, HOY, labelMon, Tag, Btn, TIPOS_AULA } from './MonitorShared';
+import { NA, fmt, esPasado, HOY, labelMon, Tag, Btn } from './MonitorShared';
 import { useAuth } from '../../context/AuthContext';
 
-// ── Constantes del timeline ───────────────────────────────────────────────────
-const HORA_INICIO  = 9;   // 9:00
-const HORA_FIN     = 18;  // 18:00
-const HORAS_TOTAL  = HORA_FIN - HORA_INICIO;
-const PX_POR_HORA  = 68;  // altura en px de cada franja horaria
-const TIMELINE_H   = HORAS_TOTAL * PX_POR_HORA;
+const HORA_INICIO = 9;
+const HORA_FIN    = 18;
+const HORAS_TOTAL = HORA_FIN - HORA_INICIO;
+const PX_POR_HORA = 68;
+const TIMELINE_H  = HORAS_TOTAL * PX_POR_HORA;
 
-// Colores por tipo de aula
 const COLOR_TIPO = {
-  APK:   { bg: '#DCFCE7', border: '#16A34A', text: '#14532D' },
-  ASPK:  { bg: '#D1FAE5', border: '#059669', text: '#064E3B' },
-  APWF:  { bg: '#DBEAFE', border: '#2563EB', text: '#1E3A8A' },
-  ASPWF: { bg: '#EDE9FE', border: '#7C3AED', text: '#4C1D95' },
-  APWS:  { bg: '#FEF9C3', border: '#CA8A04', text: '#713F12' },
-  ASPWS: { bg: '#FEF3C7', border: '#D97706', text: '#78350F' },
-  RENTAL:{ bg: '#F3F4F6', border: '#6B7280', text: '#1F2937' },
-  OTRO:  { bg: '#FEE2E2', border: '#DC2626', text: '#7F1D1D' },
-  DEFAULT:{ bg: NA.light, border: NA.dark,  text: NA.darker  },
+  APK:   { bg:'#DCFCE7', border:'#16A34A', text:'#14532D' },
+  ASPK:  { bg:'#D1FAE5', border:'#059669', text:'#064E3B' },
+  APWF:  { bg:'#DBEAFE', border:'#2563EB', text:'#1E3A8A' },
+  ASPWF: { bg:'#EDE9FE', border:'#7C3AED', text:'#4C1D95' },
+  APWS:  { bg:'#FEF9C3', border:'#CA8A04', text:'#713F12' },
+  ASPWS: { bg:'#FEF3C7', border:'#D97706', text:'#78350F' },
+  RENTAL:{ bg:'#F3F4F6', border:'#6B7280', text:'#1F2937' },
+  OTRO:  { bg:'#FEE2E2', border:'#DC2626', text:'#7F1D1D' },
+  DEFAULT:{ bg:NA.light,  border:NA.dark,  text:NA.darker },
+};
+const colorTipo = (tipo, estado) => {
+  if (estado === 'RECHAZADA') return { bg:'#FEE2E2', border:'#DC2626', text:'#7F1D1D' };
+  if (estado === 'PENDIENTE') return { bg:'#FEF3C7', border:'#D97706', text:'#92400E' };
+  if (estado === 'FINALIZADA')return { bg:'#F0FDF4', border:'#059669', text:'#065F46' };
+  return COLOR_TIPO[tipo] || COLOR_TIPO.DEFAULT;
 };
 
-const colorDeTipo = (tipoAula, estado) => {
-  if (estado === 'RECHAZADA') return { bg: '#FEE2E2', border: '#DC2626', text: '#7F1D1D' };
-  if (estado === 'PENDIENTE') return { bg: '#FEF3C7', border: '#D97706', text: '#92400E' };
-  return COLOR_TIPO[tipoAula] || COLOR_TIPO.DEFAULT;
-};
-
-// Convierte "HH:MM:SS" o "HH:MM" a minutos desde medianoche
 const horaAMin = (h) => {
   if (!h) return null;
-  const str = String(h).substring(0, 5);
-  const [hh, mm] = str.split(':').map(Number);
+  const [hh, mm] = String(h).substring(0,5).split(':').map(Number);
   return hh * 60 + (mm || 0);
 };
+const posicion = (min) => Math.max(0, ((min - HORA_INICIO*60) / 60) * PX_POR_HORA);
+const altura   = (ini, fin) => Math.max(28, ((fin - ini) / 60) * PX_POR_HORA - 2);
 
-// Posición y altura en px dentro del timeline
-const posicion = (minutos) => {
-  const minRelativo = minutos - HORA_INICIO * 60;
-  return Math.max(0, (minRelativo / 60) * PX_POR_HORA);
-};
+const PRIORIDAD = { APK:0, ASPK:1, APWF:2, ASPWF:3, APWS:4, ASPWS:5, RENTAL:8, OTRO:9 };
+const prio = (t) => PRIORIDAD[t] ?? 6;
 
-const altura = (minInicio, minFin) => {
-  if (!minFin || minFin <= minInicio) return PX_POR_HORA; // fallback 1h
-  return Math.max(28, ((minFin - minInicio) / 60) * PX_POR_HORA - 2);
+// ── Drawer de detalle de clase (aparece desde abajo) ──────────────────────────
+const ClaseDrawer = ({ clase, ingresoVinc, cobrado, puedeAdmin, onClose,
+  cambiarEstado, abrirEditClase, abrirIngreso, liquidarClase, duplicarClase }) => {
+  if (!clase) return null;
+  const col = colorTipo(clase.tipoAula, clase.estado);
+  const pasada = esPasado(clase.fecha?.toString());
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.3)', zIndex:300 }}/>
+      {/* Drawer */}
+      <div style={{
+        position:'fixed', bottom:0, left:0, right:0, zIndex:301,
+        background:'#fff', borderRadius:'20px 20px 0 0',
+        padding:'0 0 env(safe-area-inset-bottom,16px)',
+        boxShadow:'0 -4px 32px rgba(0,0,0,.18)',
+        maxHeight:'85vh', overflowY:'auto',
+      }}>
+        {/* Handle */}
+        <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 0' }}>
+          <div style={{ width:36, height:4, borderRadius:99, background:'#e5e7eb' }}/>
+        </div>
+
+        {/* Header de la clase */}
+        <div style={{ padding:'14px 20px 12px', borderBottom:`0.5px solid ${NA.border}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div>
+              <div style={{ display:'flex', gap:7, alignItems:'center', flexWrap:'wrap', marginBottom:4 }}>
+                <span style={{ fontWeight:800, fontSize:18, color:NA.text }}>{clase.alumno}</span>
+                {clase.tipoAula && (
+                  <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:99,
+                    background:col.bg, color:col.text, border:`1px solid ${col.border}30` }}>
+                    {clase.tipoAula}
+                  </span>
+                )}
+                <span style={{ fontSize:11, fontWeight:600, padding:'2px 10px', borderRadius:99,
+                  background: clase.estado==='CONFIRMADA'?'#D1FAE5':clase.estado==='FINALIZADA'?'#D1FAE5':'#FEF3C7',
+                  color: clase.estado==='CONFIRMADA'||clase.estado==='FINALIZADA'?'#065F46':'#92400E' }}>
+                  {clase.estado}
+                </span>
+                {pasada && !cobrado && <Tag label="⚠ Sin cobro" color="#9A3412" bg="#FFF7ED" small/>}
+                {cobrado && <Tag label="✓ Cobrado" color="#065F46" bg="#D1FAE5" small/>}
+              </div>
+              <p style={{ margin:0, fontSize:13, color:NA.text2 }}>
+                {clase.nombreInstructor || 'Sin instructor'}
+                {clase.hora && ` · ${String(clase.hora).substring(0,5)}`}
+                {clase.horaSalida && ` → ${String(clase.horaSalida).substring(0,5)}`}
+                {clase.horas && ` · ${clase.horas}h`}
+                {clase.lugar && ` · ${clase.lugar}`}
+              </p>
+              {clase.tarifa && (
+                <p style={{ margin:'4px 0 0', fontSize:12, color:NA.dark, fontWeight:500 }}>
+                  R$ {clase.tarifa}/h{clase.horas ? ` · Total estimado: R$ ${(clase.tarifa * parseFloat(clase.horas)).toFixed(0)}` : ''}
+                </p>
+              )}
+              {ingresoVinc && (
+                <p style={{ margin:'4px 0 0', fontSize:12, color:'#059669' }}>
+                  💰 Ingreso #{ingresoVinc.id} · {parseFloat(ingresoVinc.total).toFixed(2)} {labelMon(ingresoVinc.moneda)}
+                </p>
+              )}
+            </div>
+            <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, border:'none', background:'#f3f4f6', color:'#6b7280', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <i className="ti ti-x" style={{ fontSize:16 }}/>
+            </button>
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:10 }}>
+          {/* Confirmar/Rechazar */}
+          {clase.estado === 'PENDIENTE' && (
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => { cambiarEstado(clase.id,'CONFIRMADA'); onClose(); }}
+                style={{ flex:1, padding:'13px', borderRadius:12, border:'none', background:'#D1FAE5', color:'#065F46', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                ✓ Confirmar
+              </button>
+              <button onClick={() => { cambiarEstado(clase.id,'RECHAZADA'); onClose(); }}
+                style={{ flex:1, padding:'13px', borderRadius:12, border:'none', background:'#FEE2E2', color:'#DC2626', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                ✗ Rechazar
+              </button>
+            </div>
+          )}
+          {clase.estado === 'CONFIRMADA' && !pasada && (
+            <button onClick={() => { cambiarEstado(clase.id,'RECHAZADA'); onClose(); }}
+              style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', background:'#FEE2E2', color:'#DC2626', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+              ✗ Rechazar
+            </button>
+          )}
+
+          {/* Liquidar */}
+          {puedeAdmin && clase.estado === 'CONFIRMADA' && (
+            <button onClick={() => { liquidarClase(clase); onClose(); }}
+              style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', background:NA.darker, color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <i className="ti ti-cash" style={{ fontSize:16 }}/> Liquidar clase
+            </button>
+          )}
+          {clase.estado === 'FINALIZADA' && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'#D1FAE5', color:'#065F46', fontSize:14, fontWeight:600, textAlign:'center' }}>
+              ✓ Clase liquidada
+            </div>
+          )}
+
+          {/* Cobro, Editar, Duplicar */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            {pasada && !cobrado && (
+              <button onClick={() => { abrirIngreso(clase.fecha?.toString(), { instructor: clase.nombreInstructor }); onClose(); }}
+                style={{ padding:'12px 8px', borderRadius:12, border:`1px solid ${NA.border}`, background:'#fff', color:NA.dark, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <i className="ti ti-cash" style={{ fontSize:18 }}/>Cobro
+              </button>
+            )}
+            <button onClick={() => { abrirEditClase(clase); onClose(); }}
+              style={{ padding:'12px 8px', borderRadius:12, border:`1px solid ${NA.border}`, background:'#fff', color:NA.text, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+              <i className="ti ti-edit" style={{ fontSize:18 }}/>Editar
+            </button>
+            {duplicarClase && (
+              <button onClick={() => { duplicarClase(clase); onClose(); }}
+                style={{ padding:'12px 8px', borderRadius:12, border:`1px solid #EDE9FE`, background:'#EDE9FE', color:'#6D28D9', fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <i className="ti ti-copy" style={{ fontSize:18 }}/>Duplicar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
 };
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -54,82 +172,60 @@ const MonitorDia = ({
   cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
   liquidarClase, duplicarClase, navDia, onDragHora,
 }) => {
-  const [claseExpandida, setClaseExpandida] = useState(null);
-  const [dragging,       setDragging]       = useState(null); // { id, startY, startMin }
-  const [dragY,          setDragY]          = useState(null); // posición Y actual
+  const [claseSelec, setClaseSelec] = useState(null); // clase abierta en drawer
   const timelineRef = useRef(null);
-  const { user } = useAuth();
-  const puedeAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
+  const dragRef     = useRef(null);
+  const { user }    = useAuth();
+  const puedeAdmin  = user?.role === 'ADMINISTRADOR' || user?.role === 'SECRETARIA';
 
-  // ── Drag handlers ─────────────────────────────────────────────────────────
-  const MIN_POR_PX = 60 / PX_POR_HORA; // minutos por pixel
+  // ── Drag ──────────────────────────────────────────────────────────────────
+  const MIN_POR_PX = 60 / PX_POR_HORA;
 
   const startDrag = useCallback((e, clase) => {
     e.stopPropagation();
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    setDragging({ id: clase.id, startY: clientY, horaOriginal: clase.hora });
-    setDragY(clientY);
+    dragRef.current = { id: clase.id, startY: clientY, horaOriginal: clase.hora };
   }, []);
 
-  const onDrag = useCallback((e) => {
-    if (!dragging) return;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    setDragY(clientY);
-  }, [dragging]);
-
   const endDrag = useCallback((e) => {
-    if (!dragging || !timelineRef.current) { setDragging(null); setDragY(null); return; }
-
+    if (!dragRef.current || !timelineRef.current) { dragRef.current = null; return; }
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
     const rect    = timelineRef.current.getBoundingClientRect();
     const yRel    = clientY - rect.top;
-    const minutos = HORA_INICIO * 60 + yRel * MIN_POR_PX;
-
-    // Snap a intervalos de 15 minutos
-    const snapped   = Math.round(minutos / 15) * 15;
-    const hh        = Math.floor(snapped / 60);
-    const mm        = snapped % 60;
-    const nuevaHora = `${String(Math.max(HORA_INICIO, Math.min(HORA_FIN - 1, hh))).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
-
-    if (onDragHora && nuevaHora !== dragging.horaOriginal?.substring(0, 5)) {
-      onDragHora(dragging.id, nuevaHora);
+    const min     = HORA_INICIO*60 + yRel * MIN_POR_PX;
+    const snapped = Math.round(min / 15) * 15;
+    const hh      = Math.max(HORA_INICIO, Math.min(HORA_FIN-1, Math.floor(snapped/60)));
+    const mm      = snapped % 60;
+    const nueva   = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    if (onDragHora && nueva !== String(dragRef.current.horaOriginal).substring(0,5)) {
+      onDragHora(dragRef.current.id, nueva);
     }
-    setDragging(null);
-    setDragY(null);
-  }, [dragging, onDragHora]);
-
+    dragRef.current = null;
+  }, [onDragHora]);
 
   if (!diaSelec) return null;
 
-  const pasado  = esPasado(diaSelec);
-  const esFutur = diaSelec > HOY;
+  const pasado        = esPasado(diaSelec);
   const clasesActivas = evD.clases.filter(a => a.estado !== 'RECHAZADA');
   const clasesRechaz  = evD.clases.filter(a => a.estado === 'RECHAZADA');
-
-  // ── Estadísticas del día ──────────────────────────────────────────────────
-  const horasTotales   = clasesActivas.reduce((s, a) => s + (parseFloat(a.horas) || 0), 0);
+  const horasTotales  = clasesActivas.reduce((s,a) => s + (parseFloat(a.horas)||0), 0);
   const clasesCobradas = clasesActivas.filter(a => tieneCobro(a)).length;
-  const sumaIngresos   = {};
+
+  // Suma ingresos del día
+  const sumaIngresos = {};
   evD.ingresos.forEach(i => {
-    const m = i.moneda?.startsWith('R$') || i.moneda === 'BRL' ? 'R$'
-            : i.moneda?.startsWith('EUR') ? '€'
-            : i.moneda?.startsWith('USD') ? 'US$' : (i.moneda || 'R$');
-    sumaIngresos[m] = (sumaIngresos[m] || 0) + (parseFloat(i.total) || 0);
+    const m = i.moneda?.startsWith('R$')||i.moneda==='BRL' ? 'R$'
+            : i.moneda?.startsWith('EUR') ? '€' : 'US$';
+    sumaIngresos[m] = (sumaIngresos[m]||0) + (parseFloat(i.total)||0);
   });
 
-  // ── Agrupar clases en columnas (para solapamientos) ───────────────────────
-  // Prioridad de tipo: clases privadas/semiprivadas primero, rental/otro al final
-  const PRIORIDAD_TIPO = { APK:0, ASPK:1, APWF:2, ASPWF:3, APWS:4, ASPWS:5, RENTAL:8, OTRO:9 };
-  const prioTipo = (t) => PRIORIDAD_TIPO[t] ?? 6;
-
+  // ── Columnas con prioridad por tipo ───────────────────────────────────────
   const columnas = [];
   const clasesConPos = clasesActivas
     .filter(a => horaAMin(a.hora) !== null)
-    .sort((a, b) => {
-      const horaDiff = horaAMin(a.hora) - horaAMin(b.hora);
-      if (horaDiff !== 0) return horaDiff;
-      // Misma hora → prioridad por tipo (APK antes que RENTAL)
-      return prioTipo(a.tipoAula) - prioTipo(b.tipoAula);
+    .sort((a,b) => {
+      const d = horaAMin(a.hora) - horaAMin(b.hora);
+      return d !== 0 ? d : prio(a.tipoAula) - prio(b.tipoAula);
     });
   const clasSinHora = clasesActivas.filter(a => horaAMin(a.hora) === null);
 
@@ -137,32 +233,32 @@ const MonitorDia = ({
     const ini = horaAMin(clase.hora);
     const fin = clase.horaSalida
       ? horaAMin(clase.horaSalida)
-      : ini + (parseFloat(clase.horas) || 1) * 60;
-
+      : ini + (parseFloat(clase.horas)||1)*60;
     let col = columnas.findIndex(c => {
-      const ultimo = c[c.length - 1];
-      const ultimoFin = ultimo.horaSalida
-        ? horaAMin(ultimo.horaSalida)
-        : horaAMin(ultimo.hora) + (parseFloat(ultimo.horas) || 1) * 60;
-      return ultimoFin <= ini;
+      const u = c[c.length-1];
+      const uFin = u.horaSalida ? horaAMin(u.horaSalida) : horaAMin(u.hora)+(parseFloat(u.horas)||1)*60;
+      return uFin <= ini;
     });
-    if (col === -1) { columnas.push([clase]); }
-    else            { columnas[col].push(clase); }
+    if (col === -1) columnas.push([clase]);
+    else            columnas[col].push(clase);
   });
 
-  const nCols = Math.max(1, columnas.length);
+  // Máximo 4 columnas en mobile — el resto van a "sin horario"
+  const MAX_COLS  = 4;
+  const colsVis   = columnas.slice(0, MAX_COLS);
+  const clasesOvf = columnas.slice(MAX_COLS).flat();
+  const nCols     = Math.max(1, colsVis.length);
 
   return (
     <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
 
-      {/* ══ HEADER + ESTADÍSTICAS ══ */}
+      {/* ── HEADER ── */}
       <div style={{ padding:'14px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            {/* Flechas de navegación entre días */}
             {navDia && (
               <button onClick={() => navDia(-1)}
-                style={{ width:30, height:30, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+                style={{ width:30, height:30, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
                 <i className="ti ti-chevron-left" style={{ fontSize:14 }}/>
               </button>
             )}
@@ -174,47 +270,51 @@ const MonitorDia = ({
             </div>
             {navDia && (
               <button onClick={() => navDia(1)}
-                style={{ width:30, height:30, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+                style={{ width:30, height:30, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
                 <i className="ti ti-chevron-right" style={{ fontSize:14 }}/>
               </button>
             )}
           </div>
           <div style={{ display:'flex', gap:8 }}>
             {abrirAgendar && (
-              <Btn label="+ Clase" icon="ti-calendar-plus" bg={NA.light} color={NA.darker} small
-                onClick={() => abrirAgendar(diaSelec)}/>
+              <button onClick={() => abrirAgendar(diaSelec)}
+                style={{ padding:'8px 14px', borderRadius:10, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.dark, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+                <i className="ti ti-calendar-plus" style={{ fontSize:15 }}/> + Clase
+              </button>
             )}
-            {!esFutur && (
-              <Btn label="+ Ingreso" icon="ti-cash" small
-                onClick={() => abrirIngreso(diaSelec)}/>
+            {!diaSelec > HOY && (
+              <button onClick={() => abrirIngreso(diaSelec)}
+                style={{ padding:'8px 14px', borderRadius:10, border:'none', background:NA.dark, color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+                <i className="ti ti-cash" style={{ fontSize:15 }}/> + Ingreso
+              </button>
             )}
           </div>
         </div>
 
-        {/* Chips de estadísticas */}
-        <div style={{ display:'flex', gap:8, marginTop:12, flexWrap:'wrap' }}>
-          <StatChip icon="ti-calendar" val={clasesActivas.length} label="clases" color={NA.dark} bg={NA.light}/>
-          <StatChip icon="ti-clock"    val={horasTotales}          label="horas"  color={NA.dark} bg={NA.light}/>
-          <StatChip icon="ti-check"    val={clasesCobradas}        label="cobradas" color="#065F46" bg="#D1FAE5"/>
+        {/* Stats chips */}
+        <div style={{ display:'flex', gap:7, marginTop:12, flexWrap:'wrap' }}>
+          <Chip icon="ti-calendar"         val={clasesActivas.length}  label="clases"   c={NA.dark}   bg={NA.light}/>
+          <Chip icon="ti-clock"            val={`${horasTotales}h`}    label="horas"    c={NA.dark}   bg={NA.light}/>
+          <Chip icon="ti-check"            val={clasesCobradas}        label="cobradas" c="#065F46"   bg="#D1FAE5"/>
           {clasesActivas.length - clasesCobradas > 0 && pasado && (
-            <StatChip icon="ti-alert-triangle" val={clasesActivas.length - clasesCobradas} label="sin cobro" color="#9A3412" bg="#FFF7ED"/>
+            <Chip icon="ti-alert-triangle" val={clasesActivas.length-clasesCobradas} label="sin cobro" c="#9A3412" bg="#FFF7ED"/>
           )}
           {Object.entries(sumaIngresos).map(([m,v]) => (
-            <StatChip key={m} icon="ti-cash" val={`${v.toFixed(0)} ${m}`} label="cobrado" color="#065F46" bg="#D1FAE5"/>
+            <Chip key={m} icon="ti-cash" val={`${v.toFixed(0)} ${m}`} label="cobrado" c="#065F46" bg="#D1FAE5"/>
           ))}
         </div>
       </div>
 
-      {/* ══ TIMELINE ══ */}
+      {/* ── TIMELINE ── */}
       <div style={{ position:'relative', padding:'0 0 0 48px', overflowX:'hidden' }}
-        onMouseMove={onDrag}  onMouseUp={endDrag}  onMouseLeave={endDrag}
-        onTouchMove={onDrag}  onTouchEnd={endDrag}>
+        onMouseUp={endDrag} onMouseLeave={endDrag}
+        onTouchEnd={endDrag}>
 
-        {/* Líneas horizontales por hora */}
-        {Array.from({ length: HORAS_TOTAL + 1 }, (_, i) => {
+        {/* Líneas de hora */}
+        {Array.from({ length: HORAS_TOTAL+1 }, (_,i) => {
           const hora = HORA_INICIO + i;
           return (
-            <div key={hora} style={{ position:'absolute', left:0, right:0, top: i * PX_POR_HORA + 12, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
+            <div key={hora} style={{ position:'absolute', left:0, right:0, top:i*PX_POR_HORA+12, borderTop:`0.5px solid ${NA.border}`, zIndex:1 }}>
               <span style={{ position:'absolute', left:4, top:-8, fontSize:10, color:NA.text2, fontWeight:500, width:38, textAlign:'right' }}>
                 {hora}:00
               </span>
@@ -222,213 +322,128 @@ const MonitorDia = ({
           );
         })}
 
-        {/* Área de bloques */}
-        <div ref={timelineRef} style={{ position:'relative', height: TIMELINE_H, marginLeft:4, marginTop:12 }}>
+        {/* Botones + por hora */}
+        {Array.from({ length: HORAS_TOTAL }, (_,i) => {
+          const hora = HORA_INICIO + i;
+          return (
+            <button key={hora}
+              onClick={() => abrirAgendar && abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
+              style={{ position:'absolute', left:10, top:i*PX_POR_HORA+18, width:24, height:24, borderRadius:6, border:`0.5px dashed ${NA.border}`, background:'transparent', color:NA.border, cursor:'pointer', zIndex:2, fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <i className="ti ti-plus" style={{ fontSize:11 }}/>
+            </button>
+          );
+        })}
 
-          {/* Botones "+" en cada hora */}
-          {Array.from({ length: HORAS_TOTAL }, (_, i) => {
-            const hora = HORA_INICIO + i;
-            return (
-              <button key={hora}
-                onClick={() => abrirAgendar && abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
-                title={`Agregar clase a las ${hora}:00`}
-                style={{
-                  position:'absolute', left:2, top: i * PX_POR_HORA + 2,
-                  width:28, height:28, borderRadius:8,
-                  border:`0.5px dashed ${NA.border}`, background:'transparent',
-                  color: NA.border, cursor:'pointer', zIndex:2, fontSize:14,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  transition:'all .15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = NA.light; e.currentTarget.style.color = NA.dark; e.currentTarget.style.borderColor = NA.dark; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = NA.border; e.currentTarget.style.borderColor = NA.border; }}
-              >
-                <i className="ti ti-plus" style={{ fontSize:12 }}/>
-              </button>
-            );
-          })}
+        {/* Línea de "ahora" */}
+        {diaSelec === HOY && (() => {
+          const n = new Date(); const min = n.getHours()*60+n.getMinutes();
+          if (min < HORA_INICIO*60 || min > HORA_FIN*60) return null;
+          return (
+            <div style={{ position:'absolute', left:0, right:0, top:posicion(min)+12, height:2, background:'#EF4444', zIndex:10 }}>
+              <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF4444', marginTop:-3, marginLeft:-2 }}/>
+            </div>
+          );
+        })()}
 
-          {/* Línea de "ahora" si es hoy */}
-          {diaSelec === HOY && (() => {
-            const now   = new Date();
-            const minNow = now.getHours() * 60 + now.getMinutes();
-            if (minNow < HORA_INICIO*60 || minNow > HORA_FIN*60) return null;
-            return (
-              <div style={{
-                position:'absolute', left:0, right:0, top: posicion(minNow),
-                height:2, background:'#EF4444', zIndex:10,
-              }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF4444', marginTop:-3, marginLeft:-4 }}/>
-              </div>
-            );
-          })()}
-
-          {/* Bloques de clases */}
-          {columnas.map((col, colIdx) =>
+        {/* Bloques de clases */}
+        <div ref={timelineRef} style={{ position:'relative', height:TIMELINE_H, marginLeft:4, marginTop:12 }}>
+          {colsVis.map((col, colIdx) =>
             col.map(clase => {
               const ini    = horaAMin(clase.hora);
-              const finMin = clase.horaSalida
-                ? horaAMin(clase.horaSalida)
-                : ini + (parseFloat(clase.horas) || 1) * 60;
+              const finMin = clase.horaSalida ? horaAMin(clase.horaSalida) : ini+(parseFloat(clase.horas)||1)*60;
               const top    = posicion(ini);
               const h      = altura(ini, finMin);
-              const color  = colorDeTipo(clase.tipoAula, clase.estado);
+              const color  = colorTipo(clase.tipoAula, clase.estado);
               const cobrado = tieneCobro(clase);
-              const ingVinc = ingresoDeClase(clase);
-              const expandida = claseExpandida === clase.id;
-
-              const colW   = `calc((100% - 36px) / ${nCols})`;
-              const colL   = `calc(36px + ${colIdx} * (100% - 36px) / ${nCols})`;
-
-              const isDragging = dragging?.id === clase.id;
-              const dragOffset = isDragging && dragY !== null
-                ? (dragY - dragging.startY)
-                : 0;
+              const colW   = `calc((100% - 2px) / ${nCols})`;
+              const colL   = `calc(${colIdx} * (100% - 2px) / ${nCols})`;
 
               return (
                 <div key={clase.id}
-                  onClick={() => !isDragging && setClaseExpandida(expandida ? null : clase.id)}
+                  onClick={() => setClaseSelec(clase)}
+                  onTouchEnd={e => { if (!dragRef.current) setClaseSelec(clase); }}
                   style={{
-                    position:'absolute',
-                    top: top + dragOffset,
-                    left: colL, width: colW,
-                    minHeight: h, zIndex: isDragging ? 50 : expandida ? 20 : 5,
+                    position:'absolute', top, left:colL, width:colW,
+                    minHeight:h, zIndex:5,
                     background: color.bg,
                     borderLeft: `3px solid ${color.border}`,
-                    borderRadius:'0 8px 8px 0',
-                    padding:'4px 8px', boxSizing:'border-box',
-                    cursor: isDragging ? 'grabbing' : 'pointer',
-                    overflow: expandida ? 'visible' : 'hidden',
-                    boxShadow: isDragging
-                      ? '0 8px 24px rgba(0,0,0,.25)'
-                      : expandida ? '0 4px 20px rgba(0,0,0,.15)' : 'none',
-                    opacity: isDragging ? 0.85 : 1,
-                    transition: isDragging ? 'none' : 'box-shadow .15s',
-                    userSelect: 'none',
+                    borderRadius:'0 6px 6px 0',
+                    padding:'4px 6px', boxSizing:'border-box',
+                    cursor:'pointer', overflow:'hidden',
+                    userSelect:'none',
                   }}>
-                  {/* Contenido compacto siempre visible */}
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                    {/* Handle de drag — solo visible en admin/secretaria */}
-                    {puedeAdmin && (
-                      <div
-                        onMouseDown={e => startDrag(e, clase)}
-                        onTouchStart={e => startDrag(e, clase)}
-                        onClick={e => e.stopPropagation()}
-                        style={{
-                          cursor:'grab', padding:'2px 3px 2px 0', flexShrink:0,
-                          display:'flex', flexDirection:'column', gap:2, marginTop:2,
-                          opacity: .4,
-                        }}
-                        title="Arrastrar para cambiar hora">
-                        {[0,1,2].map(i => (
-                          <span key={i} style={{ display:'block', width:10, height:1.5, borderRadius:1, background:color.border }}/>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ minWidth:0, flex:1 }}>
-                      <p style={{ margin:0, fontSize:11, fontWeight:700, color: color.text, lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace: expandida ? 'normal' : 'nowrap' }}>
-                        {clase.alumno}
-                      </p>
-                      {h > 36 && (
-                        <p style={{ margin:'1px 0 0', fontSize:10, color: color.text, opacity:.75, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {clase.nombreInstructor}
-                          {clase.tipoAula && ` · ${clase.tipoAula}`}
-                        </p>
-                      )}
-                      {h > 52 && (
-                        <p style={{ margin:'1px 0 0', fontSize:10, color: color.text, opacity:.6 }}>
-                          {String(clase.hora||'').substring(0,5)}
-                          {clase.horaSalida && ` → ${String(clase.horaSalida).substring(0,5)}`}
-                        </p>
-                      )}
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'flex-end', flexShrink:0, marginLeft:3 }}>
-                      {cobrado && <i className="ti ti-check" style={{ fontSize:10, color:'#065F46' }}/>}
-                      {esPasado(diaSelec) && !cobrado && <i className="ti ti-alert-triangle" style={{ fontSize:10, color:'#EA580C' }}/>}
-                    </div>
-                  </div>
-
-                  {/* Panel expandido al tocar */}
-                  {expandida && (
-                    <div style={{ marginTop:8, paddingTop:8, borderTop:`0.5px solid ${color.border}40` }}
-                      onClick={e => e.stopPropagation()}>
-                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
-                        <Tag label={clase.estado} color={color.text} bg={`${color.border}22`} small/>
-                        {clase.tipoAula && <Tag label={clase.tipoAula} color={color.text} bg={`${color.border}22`} small/>}
-                        {esPasado(diaSelec) && !cobrado && <Tag label="⚠ Sin cobro" color="#9A3412" bg="#FFF7ED" small/>}
-                        {cobrado && <Tag label="✓ Cobrado" color="#065F46" bg="#D1FAE5" small/>}
-                      </div>
-                      {clase.tarifa && (
-                        <p style={{ margin:'0 0 4px', fontSize:11, color: color.text }}>
-                          R$ {clase.tarifa}/h · {clase.horas}h
-                          {clase.horasPagadas ? ` · Pagado: R$ ${clase.horasPagadas}` : ''}
-                        </p>
-                      )}
-                      {ingVinc && (
-                        <p style={{ margin:'0 0 6px', fontSize:10, color:'#059669' }}>
-                          💰 Ingreso #{ingVinc.id} · {parseFloat(ingVinc.total).toFixed(2)} {labelMon(ingVinc.moneda)}
-                        </p>
-                      )}
-                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
-                        {clase.estado === 'PENDIENTE' && (<>
-                          <Btn label="✓" bg="#D1FAE5" color="#065F46" small onClick={() => { cambiarEstado(clase.id,'CONFIRMADA'); setClaseExpandida(null); }}/>
-                          <Btn label="✗" bg="#FEE2E2" color="#DC2626" small onClick={() => { cambiarEstado(clase.id,'RECHAZADA'); setClaseExpandida(null); }}/>
-                        </>)}
-                        {clase.estado === 'CONFIRMADA' && !esPasado(diaSelec) && (
-                          <Btn label="Rechazar" bg="#FEE2E2" color="#DC2626" small onClick={() => cambiarEstado(clase.id,'RECHAZADA')}/>
-                        )}
-                        {/* Liquidar: solo admin/secretaria, clase confirmada en día pasado */}
-                        {puedeAdmin && clase.estado === 'CONFIRMADA' && liquidarClase && (
-                          <Btn label="💰 Liquidar" bg='#085041' color='#fff' small
-                            onClick={() => { liquidarClase(clase); setClaseExpandida(null); }}/>
-                        )}
-                        {clase.estado === 'FINALIZADA' && (
-                          <span style={{ fontSize:11, color:'#065F46', fontWeight:600,
-                            padding:'4px 10px', borderRadius:8, background:'#D1FAE5',
-                            display:'flex', alignItems:'center', gap:4 }}>
-                            <i className="ti ti-check" style={{ fontSize:12 }}/> Liquidada
-                          </span>
-                        )}
-                        <Btn label="Editar" bg={NA.light} color={NA.darker} small icon="ti-edit"
-                          onClick={() => { abrirEditClase(clase); setClaseExpandida(null); }}/>
-                        {duplicarClase && (
-                          <Btn label="Duplicar" bg='#EDE9FE' color='#6D28D9' small icon="ti-copy"
-                            onClick={() => { duplicarClase(clase); setClaseExpandida(null); }}/>
-                        )}
-                        {esPasado(diaSelec) && !cobrado && (
-                          <Btn label="Cobro" small icon="ti-cash"
-                            onClick={() => { abrirIngreso(diaSelec, { instructor: clase.nombreInstructor }); setClaseExpandida(null); }}/>
-                        )}
-                      </div>
+                  {/* Drag handle */}
+                  {puedeAdmin && (
+                    <div
+                      onMouseDown={e => startDrag(e, clase)}
+                      onTouchStart={e => startDrag(e, clase)}
+                      onClick={e => e.stopPropagation()}
+                      style={{ position:'absolute', top:3, right:3, cursor:'grab', opacity:.4, display:'flex', flexDirection:'column', gap:2 }}>
+                      {[0,1,2].map(i => <span key={i} style={{ display:'block', width:10, height:1.5, borderRadius:1, background:color.border }}/>)}
                     </div>
                   )}
+                  {/* Contenido */}
+                  <p style={{ margin:0, fontSize:11, fontWeight:700, color:color.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:14 }}>
+                    {clase.alumno}
+                  </p>
+                  {h > 36 && (
+                    <p style={{ margin:'1px 0 0', fontSize:10, color:color.text, opacity:.75, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {clase.tipoAula || clase.nombreInstructor}
+                    </p>
+                  )}
+                  {h > 52 && (
+                    <p style={{ margin:'1px 0 0', fontSize:10, color:color.text, opacity:.6 }}>
+                      {String(clase.hora||'').substring(0,5)}
+                      {clase.horaSalida && ` → ${String(clase.horaSalida).substring(0,5)}`}
+                    </p>
+                  )}
+                  {/* Indicadores */}
+                  <div style={{ position:'absolute', top:3, left:4, display:'flex', gap:2 }}>
+                    {cobrado && <span style={{ fontSize:9, color:'#059669' }}>✓</span>}
+                    {pasado && !cobrado && clase.estado!=='RECHAZADA' && <span style={{ fontSize:9, color:'#EA580C' }}>⚠</span>}
+                  </div>
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Clases sin hora al final del timeline */}
+        {/* Overflow de columnas → sin horario */}
+        {clasesOvf.length > 0 && (
+          <div style={{ borderTop:`0.5px solid ${NA.border}`, padding:'8px 8px 8px 4px' }}>
+            <p style={{ fontSize:10, color:NA.text2, margin:'0 0 6px', textTransform:'uppercase', letterSpacing:'.06em' }}>
+              Más clases ({clasesOvf.length})
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {clasesOvf.map(clase => {
+                const col = colorTipo(clase.tipoAula, clase.estado);
+                return (
+                  <div key={clase.id} onClick={() => setClaseSelec(clase)}
+                    style={{ background:col.bg, borderLeft:`3px solid ${col.border}`, borderRadius:'0 8px 8px 0', padding:'8px 12px', cursor:'pointer' }}>
+                    <span style={{ fontWeight:600, fontSize:13, color:col.text }}>{clase.alumno}</span>
+                    <span style={{ fontSize:11, color:col.text, opacity:.75, marginLeft:8 }}>
+                      {clase.tipoAula && `${clase.tipoAula} · `}{String(clase.hora||'').substring(0,5)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Sin horario */}
         {clasSinHora.length > 0 && (
           <div style={{ borderTop:`0.5px solid ${NA.border}`, padding:'8px 8px 8px 4px' }}>
-            <p style={{ fontSize:10, color:NA.text2, margin:'0 0 6px', textTransform:'uppercase', letterSpacing:'.06em' }}>Sin horario asignado</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <p style={{ fontSize:10, color:NA.text2, margin:'0 0 6px', textTransform:'uppercase', letterSpacing:'.06em' }}>Sin horario</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
               {clasSinHora.map(clase => {
-                const cobrado = tieneCobro(clase);
-                const color   = colorDeTipo(clase.tipoAula, clase.estado);
+                const col = colorTipo(clase.tipoAula, clase.estado);
                 return (
-                  <div key={clase.id} style={{ background: color.bg, borderLeft:`3px solid ${color.border}`, borderRadius:'0 8px 8px 0', padding:'8px 12px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
+                  <div key={clase.id} onClick={() => setClaseSelec(clase)}
+                    style={{ background:col.bg, borderLeft:`3px solid ${col.border}`, borderRadius:'0 8px 8px 0', padding:'8px 12px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div>
-                      <span style={{ fontWeight:600, fontSize:13, color: color.text }}>{clase.alumno}</span>
-                      <span style={{ fontSize:11, color: color.text, opacity:.75, marginLeft:6 }}>
-                        {clase.nombreInstructor}{clase.tipoAula && ` · ${clase.tipoAula}`}{clase.horas && ` · ${clase.horas}h`}
-                      </span>
-                    </div>
-                    <div style={{ display:'flex', gap:4 }}>
-                      <Btn label="Editar" bg={NA.light} color={NA.darker} small icon="ti-edit" onClick={() => abrirEditClase(clase)}/>
-                      {esPasado(diaSelec) && !cobrado && (
-                        <Btn label="Cobro" small icon="ti-cash" onClick={() => abrirIngreso(diaSelec, { instructor: clase.nombreInstructor })}/>
-                      )}
+                      <span style={{ fontWeight:600, fontSize:13, color:col.text }}>{clase.alumno}</span>
+                      {clase.tipoAula && <span style={{ fontSize:11, color:col.text, opacity:.75, marginLeft:8 }}>{clase.tipoAula}</span>}
                     </div>
                   </div>
                 );
@@ -437,12 +452,10 @@ const MonitorDia = ({
           </div>
         )}
 
-        {/* Clases rechazadas colapsadas al final */}
+        {/* Rechazadas */}
         {clasesRechaz.length > 0 && (
           <div style={{ borderTop:`0.5px solid ${NA.border}`, padding:'8px 8px 8px 4px' }}>
-            <p style={{ fontSize:10, color:'#9ca3af', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'.06em' }}>
-              Rechazadas ({clasesRechaz.length})
-            </p>
+            <p style={{ fontSize:10, color:'#9ca3af', margin:'0 0 4px', textTransform:'uppercase' }}>Rechazadas ({clasesRechaz.length})</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {clasesRechaz.map(c => (
                 <span key={c.id} style={{ fontSize:11, color:'#9ca3af', background:'#F9FAFB', padding:'3px 10px', borderRadius:99, border:'0.5px solid #E5E7EB' }}>
@@ -454,7 +467,7 @@ const MonitorDia = ({
         )}
       </div>
 
-      {/* ══ INGRESOS (abajo) ══ */}
+      {/* ── INGRESOS ── */}
       {evD.ingresos.length > 0 && (
         <Section color="#065F46" bg="#F0FDF4" label="Ingresos">
           {evD.ingresos.map(i => {
@@ -466,7 +479,7 @@ const MonitorDia = ({
                     + {parseFloat(i.total||0).toFixed(2)} {labelMon(i.moneda)}
                   </span>
                   <span style={{ fontSize:11, color:'#9ca3af' }}>#{i.id}</span>
-                  {i.asignadoA && i.asignadoA !== 'NINGUNO'
+                  {i.asignadoA && i.asignadoA!=='NINGUNO'
                     ? <Tag label={i.asignadoA} color={NA.darker} bg={NA.light} small/>
                     : <Tag label="Sin asignar" color="#92400E" bg="#FEF3C7" small/>}
                 </div>
@@ -476,8 +489,7 @@ const MonitorDia = ({
                 {i.detalles && <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2, fontStyle:'italic' }}>{i.detalles.split('|')[0].trim()}</p>}
                 {clasesVinc.length > 0 && (
                   <p style={{ margin:'4px 0 0', fontSize:11, color:'#065F46' }}>
-                    <i className="ti ti-calendar" style={{ fontSize:11, marginRight:3 }}/>
-                    {clasesVinc.map(c => c.alumno).join(', ')}
+                    <i className="ti ti-calendar" style={{ fontSize:11, marginRight:3 }}/>{clasesVinc.map(c=>c.alumno).join(', ')}
                   </p>
                 )}
               </div>
@@ -486,7 +498,7 @@ const MonitorDia = ({
         </Section>
       )}
 
-      {/* ══ EGRESOS (abajo) ══ */}
+      {/* ── EGRESOS ── */}
       {evD.egresos.length > 0 && (
         <Section color="#991B1B" bg="#FEF2F2" label="Egresos">
           {evD.egresos.map(e => (
@@ -498,43 +510,58 @@ const MonitorDia = ({
                 <span style={{ fontSize:11, color:'#9ca3af' }}>#{e.id}</span>
                 {e.tipoMovimientoPasivo && <Tag label={e.tipoMovimientoPasivo} color="#991B1B" bg="#FEE2E2" small/>}
               </div>
-              <p style={{ margin:0, fontSize:12, color:NA.text2 }}>
-                {e.detalles || e.actividad} · {e.formaPago}
-              </p>
+              <p style={{ margin:0, fontSize:12, color:NA.text2 }}>{e.detalles||e.actividad} · {e.formaPago}</p>
             </div>
           ))}
         </Section>
       )}
 
-      {clasesActivas.length === 0 && evD.ingresos.length === 0 && evD.egresos.length === 0 && (
+      {clasesActivas.length===0 && evD.ingresos.length===0 && evD.egresos.length===0 && (
         <div style={{ padding:'32px 20px', textAlign:'center', color:NA.text2 }}>
           <i className="ti ti-calendar-off" style={{ fontSize:28, opacity:.3, display:'block', marginBottom:8 }}/>
           Sin eventos para este día.
           {abrirAgendar && (
             <div style={{ marginTop:12 }}>
-              <Btn label="Agregar clase" icon="ti-plus" bg={NA.light} color={NA.dark}
-                onClick={() => abrirAgendar(diaSelec)}/>
+              <button onClick={() => abrirAgendar(diaSelec)}
+                style={{ padding:'9px 20px', background:NA.dark, color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                Agregar clase
+              </button>
             </div>
           )}
         </div>
+      )}
+
+      {/* ── DRAWER de detalle ── */}
+      {claseSelec && (
+        <ClaseDrawer
+          clase={claseSelec}
+          ingresoVinc={ingresoDeClase(claseSelec)}
+          cobrado={tieneCobro(claseSelec)}
+          puedeAdmin={puedeAdmin}
+          onClose={() => setClaseSelec(null)}
+          cambiarEstado={cambiarEstado}
+          abrirEditClase={abrirEditClase}
+          abrirIngreso={abrirIngreso}
+          liquidarClase={liquidarClase}
+          duplicarClase={duplicarClase}
+        />
       )}
     </div>
   );
 };
 
-// ── Chip de estadística ───────────────────────────────────────────────────────
-const StatChip = ({ icon, val, label, color, bg }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:5, background: bg, padding:'5px 10px', borderRadius:99 }}>
-    <i className={`ti ${icon}`} style={{ fontSize:12, color }}/>
-    <span style={{ fontSize:12, fontWeight:600, color }}>{val}</span>
-    <span style={{ fontSize:11, color, opacity:.7 }}>{label}</span>
+// ── Pequeños helpers ──────────────────────────────────────────────────────────
+const Chip = ({ icon, val, label, c, bg }) => (
+  <div style={{ display:'flex', alignItems:'center', gap:5, background:bg, padding:'5px 10px', borderRadius:99 }}>
+    <i className={`ti ${icon}`} style={{ fontSize:12, color:c }}/>
+    <span style={{ fontSize:12, fontWeight:600, color:c }}>{val}</span>
+    <span style={{ fontSize:11, color:c, opacity:.7 }}>{label}</span>
   </div>
 );
 
-// ── Sección con header coloreado ──────────────────────────────────────────────
 const Section = ({ color, bg, label, children }) => (
   <div>
-    <div style={{ padding:'7px 18px', background: bg, borderBottom:`0.5px solid ${NA.border}`, borderTop:`0.5px solid ${NA.border}` }}>
+    <div style={{ padding:'7px 18px', background:bg, borderBottom:`0.5px solid ${NA.border}`, borderTop:`0.5px solid ${NA.border}` }}>
       <span style={{ fontSize:10, fontWeight:700, color, textTransform:'uppercase', letterSpacing:'.08em' }}>{label}</span>
     </div>
     {children}
