@@ -181,36 +181,49 @@ const Secretaria = () => {
   );
 
   const MenuCard = ({ icon, title, sub, color, onClick }) => (
-    <button
-      onClick={onClick}
+    <button onClick={onClick}
+      onMouseDown={e => e.currentTarget.style.transform='scale(0.95)'}
+      onMouseUp={e => e.currentTarget.style.transform='scale(1)'}
+      onTouchStart={e => e.currentTarget.style.transform='scale(0.95)'}
+      onTouchEnd={e => e.currentTarget.style.transform='scale(1)'}
       style={{
-        background: color, padding: '24px 16px', borderRadius: 16, color: '#fff',
-        textAlign: 'center', border: 'none', cursor: 'pointer',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-        transition: 'transform .15s, box-shadow .15s',
-      }}
-      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
-      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-    >
-      <i className={`ti ${icon}`} style={{ fontSize: 30 }} aria-hidden="true" />
-      <div style={{ fontWeight: 500, fontSize: 14 }}>{title}</div>
-      <div style={{ fontSize: 11, opacity: 0.75 }}>{sub}</div>
+        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+        gap:12, padding:'26px 14px 22px', borderRadius:20, border:'none',
+        background:'rgba(255,255,255,.06)',
+        cursor:'pointer', textAlign:'center', width:'100%',
+        transition:'transform .12s ease', position:'relative', overflow:'hidden',
+        boxShadow:'0 0 0 1px rgba(255,255,255,.08)',
+      }}>
+      <div style={{ position:'absolute', top:'-20%', left:'50%', transform:'translateX(-50%)',
+        width:110, height:110, borderRadius:'50%',
+        background:`radial-gradient(circle, ${color}28 0%, transparent 70%)`, pointerEvents:'none' }}/>
+      <div style={{ width:54, height:54, borderRadius:18,
+        background:`linear-gradient(140deg, ${color} 0%, ${color}bb 100%)`,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        boxShadow:`0 6px 20px ${color}50, inset 0 1px 0 rgba(255,255,255,.2)`,
+        position:'relative', zIndex:1 }}>
+        <i className={`ti ${icon}`} style={{ fontSize:26, color:'#fff' }}/>
+      </div>
+      <div style={{ position:'relative', zIndex:1 }}>
+        <p style={{ margin:0, fontSize:14, fontWeight:700, color:'#fff', letterSpacing:'-.01em' }}>{title}</p>
+        {sub && <p style={{ margin:'4px 0 0', fontSize:11, color:'rgba(255,255,255,.38)' }}>{sub}</p>}
+      </div>
     </button>
   );
 
   // --- RENDERIZADO DE VISTAS ---
   if (view === 'INICIO') {
     return (
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: '20px 4px 60px' }}>
-        {/* ── Presencia del día ── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '20px 16px 60px' }}>
+        {/* Presencia del día */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 500, color: NA.text, margin: 0 }}>Panel de Secretaría</h1>
-            <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Gestioná agenda, caja y cuentas corrientes</p>
+            <p style={{ margin:0, fontSize:11, color:'rgba(46,207,196,.7)', fontWeight:600, letterSpacing:'.08em', textTransform:'uppercase' }}>Panel de</p>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', margin: '4px 0 0', letterSpacing:'-.02em' }}>Secretaría</h1>
           </div>
           <PresenciaWidget />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <MenuCard icon="ti-device-desktop" title="Monitor"    sub="Estados"      color={NA.darker}  onClick={() => setView('MONITOR')} />
           <MenuCard icon="ti-calendar-plus"  title="Agendar"    sub="Nueva clase"  color={NA.dark}    onClick={() => setView('CALENDARIO')} />
           {isAdmin && (
