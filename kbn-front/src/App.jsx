@@ -147,6 +147,7 @@ function App() {
   return (
     <AuthProvider>
       <HashRouter>
+        <BgSwitcher />
         <style>{`
           :root {
             --header-h: 64px;
