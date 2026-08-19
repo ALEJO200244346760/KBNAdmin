@@ -218,7 +218,7 @@ function App() {
           paddingTop: 'calc(var(--header-h) + env(safe-area-inset-top, 0px))',
           minHeight: '100dvh',
           boxSizing: 'border-box',
-          backgroundColor: NA.bg,
+          backgroundColor: 'transparent',
         }}>
           <Routes>
             <Route path="/" element={<HomeRedirect />} />
