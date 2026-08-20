@@ -10,7 +10,7 @@ const ROLE_LABELS = {
 };
 
 const HOME_ROUTES = ["/", "/admin", "/secretaria", "/instructor", "/inicio"];
-const DARK_ROUTES = ["/inicio", "/secretaria"];
+const DARK_ROUTES = ["/inicio", "/secretaria", "/monitor"];
 
 export default function Header() {
   const { user, logout } = useAuth();

@@ -10,7 +10,7 @@ const MonitorCalendario = ({
   <div>
     {/* ── BANNER ALERTAS ── */}
     {alertas.length > 0 && (
-      <details style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderRadius:14, padding:'12px 16px', marginBottom:14 }}>
+      <details style={{ background:'rgba(234,88,12,.15)', border:'1px solid #FED7AA', borderRadius:14, padding:'12px 16px', marginBottom:14 }}>
         <summary style={{ fontWeight:700, color:'#9A3412', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:8, listStyle:'none' }}>
           <i className="ti ti-alert-triangle" style={{ color:'#EA580C', fontSize:17 }}/>
           {alertas.length} clase{alertas.length>1?'s':''} sin cobro registrado
@@ -19,10 +19,10 @@ const MonitorCalendario = ({
           {alertas.map(a => {
             const f = a.fecha?.toString();
             return (
-              <div key={a.id} style={{ background:'#fff', borderRadius:10, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+              <div key={a.id} style={{ background:'rgba(255,255,255,.07)', borderRadius:10, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
                 <div>
-                  <p style={{ margin:0, fontWeight:600, color:NA.text, fontSize:13 }}>{a.alumno}</p>
-                  <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2 }}>
+                  <p style={{ margin:0, fontWeight:600, color:'rgba(255,255,255,.9)', fontSize:13 }}>{a.alumno}</p>
+                  <p style={{ margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,.5)' }}>
                     {fmt(f)} · {a.nombreInstructor} · {a.horas}h {a.tipoAula && `· ${a.tipoAula}`}
                   </p>
                 </div>
@@ -39,7 +39,7 @@ const MonitorCalendario = ({
     )}
 
     {/* ── FILTROS ── */}
-    <div style={{ background:'#fff', borderRadius:14, border:`0.5px solid ${NA.border}`, padding:'10px 14px', marginBottom:12, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+    <div style={{ background:'rgba(255,255,255,.07)', borderRadius:14, border:`0.5px solid rgba(255,255,255,.1)`, padding:'10px 14px', marginBottom:12, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
       {[
         { v:'TODO',     l:'Todo'       },
         { v:'CLASES',   l:'📅 Clases'  },
@@ -55,33 +55,33 @@ const MonitorCalendario = ({
         </button>
       ))}
       <select value={filtroInst} onChange={e => setFiltroInst(e.target.value)}
-        style={{ padding:'6px 10px', borderRadius:8, border:`0.5px solid ${NA.border}`, fontSize:12, color:NA.text, background:NA.bg, marginLeft:'auto' }}>
+        style={{ padding:'6px 10px', borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:12, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.04)', marginLeft:'auto' }}>
         <option value="">Todos los instructores</option>
         {instructores.map(i => <option key={i} value={i}>{i}</option>)}
       </select>
       <button onClick={cargar}
-        style={{ padding:'6px 12px', borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+        style={{ padding:'6px 12px', borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.07)', color:'rgba(255,255,255,.5)', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
         <i className="ti ti-refresh" style={{ fontSize:14 }}/> Actualizar
       </button>
     </div>
 
     {/* ── CALENDARIO ── */}
-    <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
+    <div style={{ background:'rgba(255,255,255,.07)', borderRadius:16, border:`0.5px solid rgba(255,255,255,.1)`, overflow:'hidden', marginBottom:14 }}>
       {/* Header mes */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
-        <button onClick={() => navMes(-1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <i className="ti ti-chevron-left" style={{ fontSize:15, color:NA.text2 }}/>
+        <button onClick={() => navMes(-1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.07)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <i className="ti ti-chevron-left" style={{ fontSize:15, color:'rgba(255,255,255,.5)' }}/>
         </button>
-        <span style={{ fontWeight:700, fontSize:16, color:NA.text }}>{MESES[mes.m]} {mes.y}</span>
-        <button onClick={() => navMes(1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <i className="ti ti-chevron-right" style={{ fontSize:15, color:NA.text2 }}/>
+        <span style={{ fontWeight:700, fontSize:16, color:'rgba(255,255,255,.9)' }}>{MESES[mes.m]} {mes.y}</span>
+        <button onClick={() => navMes(1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.07)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <i className="ti ti-chevron-right" style={{ fontSize:15, color:'rgba(255,255,255,.5)' }}/>
         </button>
       </div>
 
       {/* Días semana */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:`0.5px solid ${NA.border}` }}>
         {DIAS_S.map(d => (
-          <div key={d} style={{ textAlign:'center', padding:'7px 0', fontSize:11, fontWeight:600, color:NA.text2 }}>{d}</div>
+          <div key={d} style={{ textAlign:'center', padding:'7px 0', fontSize:11, fontWeight:600, color:'rgba(255,255,255,.5)' }}>{d}</div>
         ))}
       </div>
 
@@ -89,7 +89,7 @@ const MonitorCalendario = ({
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
         {grilla.map((dia, idx) => {
           if (!dia) return (
-            <div key={`e${idx}`} style={{ minHeight:56, borderRight:`0.5px solid ${NA.border}`, borderBottom:`0.5px solid ${NA.border}`, background:'#fafafa' }}/>
+            <div key={`e${idx}`} style={{ minHeight:56, borderRight:`0.5px solid ${NA.border}`, borderBottom:`0.5px solid ${NA.border}`, background:'rgba(0,0,0,.2)' }}/>
           );
           const ev    = dotsD[dia] || {};
           const selec = diaSelec === dia;
@@ -120,7 +120,7 @@ const MonitorCalendario = ({
     {/* ── LEYENDA ── */}
     <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:14 }}>
       {[['#EA580C','Sin cobro'],['#0F6E56','Clase'],['#059669','Ingreso'],['#DC2626','Egreso']].map(([c,l]) => (
-        <span key={l} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:NA.text2 }}>
+        <span key={l} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'rgba(255,255,255,.5)' }}>
           <span style={{ width:8, height:8, borderRadius:'50%', background:c, display:'inline-block' }}/>{l}
         </span>
       ))}
