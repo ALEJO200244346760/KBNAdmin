@@ -205,7 +205,7 @@ const InstructorForm = () => {
   ];
 
   if (loading) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', background:NA.bg }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
       <div style={{ textAlign:'center' }}>
         <div style={{ width:36, height:36, border:`3px solid ${NA.mid}`, borderTopColor:NA.dark, borderRadius:'50%', animation:'ispin .7s linear infinite', margin:'0 auto 12px' }}/>
         <p style={{ color:NA.text2, fontSize:13 }}>Cargando tus clases...</p>
@@ -215,7 +215,7 @@ const InstructorForm = () => {
   );
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 12px 100px', fontFamily: 'system-ui, sans-serif', background: NA.bg, minHeight: '100dvh' }}>
+    <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 12px 100px', fontFamily: 'system-ui, sans-serif', minHeight: '100dvh' }}>
       <style>{`@keyframes ispin{to{transform:rotate(360deg)}}`}</style>
 
       {/* ── Header personal ── */}

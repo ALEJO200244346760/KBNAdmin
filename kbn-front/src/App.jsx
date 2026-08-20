@@ -129,7 +129,7 @@ const HomeRedirect = () => {
 // ── App ────────────────────────────────────────────────────────────────────
 
 // Rutas con fondo claro (pantallas de trabajo internas)
-const LIGHT_ROUTES = ['/monitor', '/reportes', '/clientes', '/usuarios'];
+const LIGHT_ROUTES = ['/monitor', '/reportes', '/clientes', '/usuarios', '/instructor', '/mis-stats'];
 
 function BgSwitcher() {
   const { pathname } = useLocation();
