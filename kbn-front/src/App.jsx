@@ -129,15 +129,15 @@ const HomeRedirect = () => {
 // ── App ────────────────────────────────────────────────────────────────────
 
 // Rutas con fondo claro (pantallas de trabajo internas)
-const LIGHT_ROUTES = ['/monitor', '/reportes', '/clientes', '/usuarios', '/instructor', '/mis-stats'];
+const DARK_ONLY = ['/inicio', '/secretaria'];
 
 function BgSwitcher() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const isLight = LIGHT_ROUTES.some(r => pathname.startsWith(r));
-    document.body.style.background = isLight
-      ? '#f0faf7'
-      : 'linear-gradient(160deg, #0a0e0d 0%, #0d1a18 50%, #0a1215 100%)';
+    const isDark = DARK_ONLY.some(r => pathname === r || pathname.startsWith(r + '/'));
+    document.body.style.background = isDark
+      ? 'linear-gradient(160deg, #0a0e0d 0%, #0d1a18 50%, #0a1215 100%)'
+      : '#f0faf7';
     document.body.style.minHeight = '100dvh';
   }, [pathname]);
   return null;
