@@ -92,7 +92,7 @@ export const Inp = ({ label, ...props }) => (
     <input {...props} style={{
       width:'100%', padding:'10px 12px', borderRadius:10,
       border:`0.5px solid rgba(255,255,255,.1)`, fontSize:14, color:'rgba(255,255,255,.9)',
-      background:'rgba(255,255,255,.06)', boxSizing:'border-box', fontFamily:'inherit',
+      background:'rgba(255,255,255,.07)', boxSizing:'border-box', fontFamily:'inherit',
       ...(props.style||{}),
     }}/>
   </div>

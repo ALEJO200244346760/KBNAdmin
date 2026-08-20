@@ -150,7 +150,7 @@ const MonitorResumen = ({ mes, resumen }) => {
   });
 
   return (
-    <div style={{ background:'rgba(255,255,255,.06)', borderRadius:14, border:`0.5px solid rgba(255,255,255,.1)`, overflow:'hidden', marginTop:14 }}>
+    <div style={{ background:'rgba(255,255,255,.07)', borderRadius:14, border:`0.5px solid rgba(255,255,255,.1)`, overflow:'hidden', marginTop:14 }}>
 
       {/* Título */}
       <div style={{ padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}`, display:'flex', alignItems:'center', gap:8 }}>
@@ -163,7 +163,7 @@ const MonitorResumen = ({ mes, resumen }) => {
       {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:NA.border, gap:'0.5px' }}>
         {stats.map(({ l, v, c, icon }) => (
-          <div key={l} style={{ padding:'14px 10px', background:'rgba(255,255,255,.06)', textAlign:'center' }}>
+          <div key={l} style={{ padding:'14px 10px', background:'rgba(255,255,255,.07)', textAlign:'center' }}>
             <i className={`ti ${icon}`} style={{ fontSize:18, color:c, display:'block', marginBottom:4 }}/>
             <p style={{ margin:0, fontSize:22, fontWeight:800, color:c, lineHeight:1 }}>{v}</p>
             <p style={{ margin:'4px 0 0', fontSize:10, color:'rgba(255,255,255,.5)', textTransform:'uppercase', letterSpacing:'.04em' }}>{l}</p>
@@ -255,7 +255,7 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
       display:'flex', alignItems:'center', justifyContent:'center', zIndex:999, padding:16
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background:'rgba(255,255,255,.06)', borderRadius:20, width:'100%', maxWidth: 440, maxHeight:'85vh', 
+        background:'rgba(255,255,255,.07)', borderRadius:20, width:'100%', maxWidth: 440, maxHeight:'85vh', 
         display:'flex', flexDirection:'column', overflow:'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
       }}>
         

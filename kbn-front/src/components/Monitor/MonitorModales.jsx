@@ -15,13 +15,13 @@ const Overlay = ({ onClick, children }) => (
 // Usar data-zone="header"|"body"|"footer" en los hijos.
 const Modal = ({ onClick, header, body, footer, maxWidth = 440 }) => (
   <div onClick={onClick} style={{
-    background:'rgba(255,255,255,.06)', borderRadius:20, width:'100%', maxWidth,
+    background:'rgba(255,255,255,.07)', borderRadius:20, width:'100%', maxWidth,
     maxHeight:'92vh', display:'flex', flexDirection:'column',
     boxSizing:'border-box', overflow:'hidden',
   }}>
     {header && <div style={{ padding:'20px 24px 16px', flexShrink:0, borderBottom:`0.5px solid ${NA.border}` }}>{header}</div>}
     <div style={{ flex:1, overflowY:'auto', padding:'18px 24px' }}>{body}</div>
-    {footer && <div style={{ padding:'14px 24px', borderTop:`0.5px solid ${NA.border}`, background:'rgba(255,255,255,.06)', flexShrink:0 }}>{footer}</div>}
+    {footer && <div style={{ padding:'14px 24px', borderTop:`0.5px solid ${NA.border}`, background:'rgba(255,255,255,.07)', flexShrink:0 }}>{footer}</div>}
   </div>
 );
 
@@ -46,8 +46,8 @@ export const ModalEditarClase = ({
         header={
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
             <div>
-              <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:NA.text }}>Editar clase</h2>
-              <p style={{ margin:'3px 0 0', fontSize:12, color:NA.text2 }}>
+              <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'rgba(255,255,255,.9)' }}>Editar clase</h2>
+              <p style={{ margin:'3px 0 0', fontSize:12, color:'rgba(255,255,255,.5)' }}>
                 <strong>{editClase.alumno}</strong> · {fmt(editClase.fecha?.toString())} · {editClase.nombreInstructor}
               </p>
             </div>
@@ -162,7 +162,7 @@ export const ModalEditarClase = ({
                               <Tag label={`${clasesVinc.length} clase${clasesVinc.length>1?'s':''} más`} color="#4338CA" bg="#EEF2FF" small/>
                             )}
                           </div>
-                          <span style={{ fontSize:11, color:NA.text2 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>
                             {i.fecha} · {i.detalles?.split('|')[0].trim() || i.actividad || '—'}
                           </span>
                         </div>
@@ -182,7 +182,7 @@ export const ModalEditarClase = ({
               style={{ width:38, height:22, borderRadius:11, border:'none', cursor:'pointer', flexShrink:0,
                 background: editForm.notificar ? '#F59E0B' : '#D1D5DB', position:'relative', transition:'background .2s' }}>
               <span style={{ position:'absolute', top:2, left: editForm.notificar ? 18 : 2, width:18, height:18,
-                borderRadius:'50%', background:'rgba(255,255,255,.06)', transition:'left .2s' }}/>
+                borderRadius:'50%', background:'rgba(255,255,255,.07)', transition:'left .2s' }}/>
             </button>
             <div>
               <p style={{ margin:0, fontSize:12, fontWeight:600, color:'#713F12' }}>
@@ -231,8 +231,8 @@ export const ModalNuevoIngreso = ({
         header={
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
             <div>
-              <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:NA.text }}>Registrar cobro</h2>
-              <p style={{ margin:'3px 0 0', fontSize:12, color:NA.text2 }}>{ingresoFecha}</p>
+              <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)' }}>Registrar cobro</h2>
+              <p style={{ margin:'3px 0 0', fontSize:12, color:'rgba(255,255,255,.5)' }}>{ingresoFecha}</p>
             </div>
             <button onClick={onClose} style={{ ...closeBtnSx }}>
               <i className="ti ti-x" style={{ fontSize:15 }}/>
@@ -262,7 +262,7 @@ export const ModalNuevoIngreso = ({
                       }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                         <div>
-                          <span style={{ fontWeight:600, fontSize:13, color:NA.text }}>{a.alumno}</span>
+                          <span style={{ fontWeight:600, fontSize:13, color:'rgba(255,255,255,.9)' }}>{a.alumno}</span>
                           <span style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginLeft:8 }}>
                             {a.nombreInstructor}{a.tipoAula && ` · ${a.tipoAula}`}{a.horas && ` · ${a.horas}h`}
                             {a.hora && ` · ${String(a.hora).substring(0,5)}`}
@@ -339,7 +339,7 @@ export const ModalNuevoIngreso = ({
               <label style={sx.label}>Instructor</label>
               <select value={ingresoForm.instructor}
                 onChange={e => setIngresoForm(p => ({...p, instructor:e.target.value}))}
-                style={{ width:'100%', padding:'10px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', boxSizing:'border-box' }}>
+                style={{ width:'100%', padding:'10px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box' }}>
                 <option value="">Sin especificar</option>
                 {instructores.map(i => <option key={i} value={i}>{i}</option>)}
               </select>
@@ -348,7 +348,7 @@ export const ModalNuevoIngreso = ({
               <label style={sx.label}>Asignado a</label>
               <select value={ingresoForm.asignadoA}
                 onChange={e => setIngresoForm(p => ({...p, asignadoA:e.target.value}))}
-                style={{ width:'100%', padding:'10px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', boxSizing:'border-box' }}>
+                style={{ width:'100%', padding:'10px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box' }}>
                 <option value="IGNA">IGNA</option>
                 <option value="JOSE">JOSE</option>
                 <option value="AMBOS">AMBOS</option>
@@ -363,13 +363,13 @@ export const ModalNuevoIngreso = ({
             <label style={sx.label}>Actividad</label>
             <input type="text" value={ingresoForm.actividad}
               onChange={e => setIngresoForm(p => ({...p, actividad:e.target.value}))}
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', boxSizing:'border-box' }}/>
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box' }}/>
           </div>
           <div>
             <label style={sx.label}>Detalles / Alumnos</label>
             <textarea rows={2} value={ingresoForm.detalles}
               onChange={e => setIngresoForm(p => ({...p, detalles:e.target.value}))}
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
           </div>
         </>}
 
@@ -454,14 +454,14 @@ export const ModalAgendar = ({
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:NA.text }}>
+                <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'rgba(255,255,255,.9)' }}>
                   {esDuplicado ? 'Duplicar clase' : 'Agendar clase'}
                 </h2>
                 {esDuplicado && (
                   <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, background:'#EDE9FE', color:'#6D28D9' }}>COPIA</span>
                 )}
               </div>
-              <p style={{ margin:'3px 0 0', fontSize:12, color:NA.text2 }}>{fmt(form.fecha)}</p>
+              <p style={{ margin:'3px 0 0', fontSize:12, color:'rgba(255,255,255,.5)' }}>{fmt(form.fecha)}</p>
             </div>
             <button onClick={onClose} style={{ ...closeBtnSx }}>
               <i className="ti ti-x" style={{ fontSize:15 }}/>
@@ -503,7 +503,7 @@ export const ModalAgendar = ({
             <div>
               <label style={sx.label}>Instructor <span style={{ fontWeight:400, color:'#9ca3af' }}>(opcional)</span></label>
               <select value={form.instructorId} onChange={e => set('instructorId', e.target.value)}
-                style={{ width:'100%', padding:'10px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', boxSizing:'border-box' }}>
+                style={{ width:'100%', padding:'10px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box' }}>
                 <option value="">Sin asignar</option>
                 {instructores.map(i => <option key={i.id} value={i.id}>{i.nombre} {i.apellido}</option>)}
               </select>
@@ -559,7 +559,7 @@ export const ModalAgendar = ({
               </div>
               <div>
                 <label style={{ fontSize:11, color:'rgba(255,255,255,.6)', display:'block', marginBottom:4 }}>Total est.</label>
-                <div style={{ padding:'10px 12px', borderRadius:10, background:NA.primary, color:NA.darker, fontSize:16, fontWeight:700, textAlign:'right' }}>
+                <div style={{ padding:'10px 12px', borderRadius:10, background:NA.primary, color:'rgba(255,255,255,.9)', fontSize:16, fontWeight:700, textAlign:'right' }}>
                   {totalEst || '—'}
                 </div>
               </div>
@@ -571,7 +571,7 @@ export const ModalAgendar = ({
             <label style={sx.label}>Notas</label>
             <textarea rows={2} value={form.notas} onChange={e => set('notas', e.target.value)}
               placeholder="Nivel del alumno, observaciones..."
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:13, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
           </div>
         </>}
 
