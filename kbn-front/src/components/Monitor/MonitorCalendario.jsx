@@ -89,7 +89,7 @@ const MonitorCalendario = ({
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
         {grilla.map((dia, idx) => {
           if (!dia) return (
-            <div key={`e${idx}`} style={{ minHeight:56, borderRight:`0.5px solid ${NA.border}`, borderBottom:`0.5px solid ${NA.border}`, background:'rgba(0,0,0,.2)' }}/>
+            <div key={`e${idx}`} style={{ minHeight:56, borderRight:`0.5px solid rgba(255,255,255,.08)`, borderBottom:`0.5px solid rgba(255,255,255,.08)`, background:'rgba(0,0,0,.2)' }}/>
           );
           const ev    = dotsD[dia] || {};
           const selec = diaSelec === dia;
@@ -97,8 +97,8 @@ const MonitorCalendario = ({
           return (
             <div key={dia} onClick={() => setDiaSelec(selec ? null : dia)}
               style={{ minHeight:56, padding:'5px', cursor:'pointer', boxSizing:'border-box',
-                borderRight:`0.5px solid ${NA.border}`, borderBottom:`0.5px solid ${NA.border}`,
-                background: selec ? NA.light : hoy ? '#F0FDF4' : '#fff', transition:'background .1s' }}>
+                borderRight:`0.5px solid rgba(255,255,255,.08)`, borderBottom:`0.5px solid rgba(255,255,255,.08)`,
+                background: selec ? 'rgba(46,207,196,.25)' : hoy ? 'rgba(46,207,196,.1)' : 'transparent', transition:'background .1s' }}>
               <div style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:3,
                 background: hoy ? NA.dark : 'transparent',
                 color:      hoy ? '#fff'  : NA.text,
