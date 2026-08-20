@@ -101,7 +101,7 @@ const MonitorCalendario = ({
                 background: selec ? 'rgba(46,207,196,.25)' : hoy ? 'rgba(46,207,196,.1)' : 'transparent', transition:'background .1s' }}>
               <div style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:3,
                 background: hoy ? NA.dark : 'transparent',
-                color:      hoy ? '#fff'  : NA.text,
+                color:      hoy ? '#0a0e0d' : 'rgba(255,255,255,.85)',
                 fontSize:12, fontWeight: hoy ? 700 : 400 }}>
                 {parseInt(dia.split('-')[2])}
               </div>
