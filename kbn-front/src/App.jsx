@@ -135,9 +135,11 @@ function BgSwitcher() {
   const { pathname } = useLocation();
   useEffect(() => {
     const isDark = DARK_ONLY.some(r => pathname === r || pathname.startsWith(r + '/'));
+    // Monitor, Reportes, Clientes, Usuarios, Instructor → fondo claro
+    const isLight = ['/monitor', '/reportes', '/clientes', '/usuarios', '/instructor', '/mis-stats', '/login', '/register', '/forgot-password', '/reset-password'].some(r => pathname === r || pathname.startsWith(r + '/'));
     document.body.style.background = isDark
       ? 'linear-gradient(160deg, #0a0e0d 0%, #0d1a18 50%, #0a1215 100%)'
-      : '#f0faf7';
+      : isLight ? '#f0faf7' : '#0a0e0d';
     document.body.style.minHeight = '100dvh';
   }, [pathname]);
   return null;
