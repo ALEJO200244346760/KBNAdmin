@@ -88,11 +88,11 @@ export const Btn = ({ label, color='#fff', bg=NA.dark, onClick, small, icon, dis
 
 export const Inp = ({ label, ...props }) => (
   <div style={{ marginBottom:12 }}>
-    {label && <label style={{ fontSize:11, color:NA.text2, display:'block', marginBottom:4, fontWeight:500 }}>{label}</label>}
+    {label && <label style={{ fontSize:11, color:'rgba(255,255,255,.5)', display:'block', marginBottom:4, fontWeight:500 }}>{label}</label>}
     <input {...props} style={{
       width:'100%', padding:'10px 12px', borderRadius:10,
-      border:`0.5px solid ${NA.border}`, fontSize:14, color:NA.text,
-      background:'#fff', boxSizing:'border-box', fontFamily:'inherit',
+      border:`0.5px solid rgba(255,255,255,.1)`, fontSize:14, color:'rgba(255,255,255,.9)',
+      background:'rgba(255,255,255,.06)', boxSizing:'border-box', fontFamily:'inherit',
       ...(props.style||{}),
     }}/>
   </div>

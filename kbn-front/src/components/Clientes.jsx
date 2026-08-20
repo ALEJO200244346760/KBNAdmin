@@ -8,10 +8,10 @@ const NA = {
 };
 
 const sx = {
-  label: { fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5, fontWeight: 500 },
+  label: { fontSize: 11, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 5, fontWeight: 500 },
   input: {
     width: '100%', padding: '11px 13px', borderRadius: 10,
-    border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text,
+    border: `0.5px solid ${NA.border}`, background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.9)',
     fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none',
   },
 };
@@ -48,7 +48,7 @@ const TxtInput = (props) => (
 // ── Tarjeta de cliente ────────────────────────────────────────────────────────
 const ClienteCard = ({ c, onEdit, onDelete, eliminando }) => (
   <div style={{
-    background: '#fff', borderRadius: 14, border: `0.5px solid ${NA.border}`,
+    background: 'rgba(255,255,255,.07)', borderRadius: 14, border: `0.5px solid ${NA.border}`,
     padding: 16, display: 'flex', justifyContent: 'space-between',
     alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
   }}>
@@ -85,7 +85,7 @@ const ClienteCard = ({ c, onEdit, onDelete, eliminando }) => (
       )}
 
       {c.notas && (
-        <p style={{ margin: '6px 0 0', fontSize: 11, color: NA.text2, fontStyle: 'italic' }}>
+        <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(255,255,255,.5)', fontStyle: 'italic' }}>
           {c.notas}
         </p>
       )}
@@ -94,11 +94,11 @@ const ClienteCard = ({ c, onEdit, onDelete, eliminando }) => (
     {/* Acciones */}
     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
       <button onClick={() => onEdit(c)} aria-label="Editar"
-        style={{ width: 34, height: 34, borderRadius: 9, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.dark, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        style={{ width: 34, height: 34, borderRadius: 9, border: `0.5px solid ${NA.border}`, background: 'rgba(255,255,255,.07)', color: NA.dark, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <i className="ti ti-edit" style={{ fontSize: 16 }}/>
       </button>
       <button onClick={() => onDelete(c)} disabled={eliminando} aria-label="Eliminar"
-        style={{ width: 34, height: 34, borderRadius: 9, border: '0.5px solid #FECACA', background: '#fff', color: eliminando ? '#9ca3af' : '#DC2626', cursor: eliminando ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        style={{ width: 34, height: 34, borderRadius: 9, border: '0.5px solid #FECACA', background: 'rgba(255,255,255,.07)', color: eliminando ? '#9ca3af' : '#DC2626', cursor: eliminando ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <i className={`ti ${eliminando ? 'ti-loader-2' : 'ti-trash'}`} style={{ fontSize: 16, ...(eliminando ? { animation: 'cspin .7s linear infinite' } : {}) }}/>
       </button>
     </div>
@@ -112,7 +112,7 @@ const ModalCliente = ({ form, setForm, onSubmit, onClose, guardando, editando })
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(8,80,65,.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}
       onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 460, maxHeight: '92vh', overflowY: 'auto', boxSizing: 'border-box' }}
+      <div style={{ background: 'rgba(255,255,255,.07)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 460, maxHeight: '92vh', overflowY: 'auto', boxSizing: 'border-box' }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -136,7 +136,7 @@ const ModalCliente = ({ form, setForm, onSubmit, onClose, guardando, editando })
             }}>
             <span style={{
               position: 'absolute', top: 2, left: form.esNino ? 20 : 2, width: 18, height: 18,
-              borderRadius: '50%', background: '#fff', transition: 'left .2s',
+              borderRadius: '50%', background: 'rgba(255,255,255,.07)', transition: 'left .2s',
             }}/>
           </button>
           <div>
@@ -150,7 +150,7 @@ const ModalCliente = ({ form, setForm, onSubmit, onClose, guardando, editando })
         </div>
 
         {/* Datos del alumno */}
-        <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+        <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
           {form.esNino ? 'Datos del niño' : 'Datos del alumno'}
         </p>
 
@@ -186,7 +186,7 @@ const ModalCliente = ({ form, setForm, onSubmit, onClose, guardando, editando })
         {form.esNino && (
           <>
             <div style={{ margin: '16px 0 10px', height: 1, background: NA.border }}/>
-            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
               Datos del padre / tutor
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -216,7 +216,7 @@ const ModalCliente = ({ form, setForm, onSubmit, onClose, guardando, editando })
         {/* Botones */}
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={onClose}
-            style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.5)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             Cancelar
           </button>
           <button onClick={onSubmit} disabled={guardando || !form.nombre.trim()}
@@ -346,7 +346,7 @@ export default function Clientes() {
 
       {/* ── Buscador ── */}
       <div style={{ position: 'relative', marginBottom: 16 }}>
-        <i className="ti ti-search" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: NA.text2, pointerEvents: 'none' }}/>
+        <i className="ti ti-search" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'rgba(255,255,255,.5)', pointerEvents: 'none' }}/>
         <input
           type="text" placeholder="Buscar por nombre, apellido o email..."
           value={query} onChange={e => setQuery(e.target.value)}
@@ -354,7 +354,7 @@ export default function Clientes() {
         />
         {query && (
           <button onClick={() => setQuery('')}
-            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: NA.text2, fontSize: 16 }}>
+            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', fontSize: 16 }}>
             <i className="ti ti-x"/>
           </button>
         )}

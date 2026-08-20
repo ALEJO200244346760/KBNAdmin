@@ -150,7 +150,7 @@ const MonitorResumen = ({ mes, resumen }) => {
   });
 
   return (
-    <div style={{ background:'#fff', borderRadius:14, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginTop:14 }}>
+    <div style={{ background:'rgba(255,255,255,.06)', borderRadius:14, border:`0.5px solid rgba(255,255,255,.1)`, overflow:'hidden', marginTop:14 }}>
 
       {/* Título */}
       <div style={{ padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}`, display:'flex', alignItems:'center', gap:8 }}>
@@ -163,10 +163,10 @@ const MonitorResumen = ({ mes, resumen }) => {
       {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:NA.border, gap:'0.5px' }}>
         {stats.map(({ l, v, c, icon }) => (
-          <div key={l} style={{ padding:'14px 10px', background:'#fff', textAlign:'center' }}>
+          <div key={l} style={{ padding:'14px 10px', background:'rgba(255,255,255,.06)', textAlign:'center' }}>
             <i className={`ti ${icon}`} style={{ fontSize:18, color:c, display:'block', marginBottom:4 }}/>
             <p style={{ margin:0, fontSize:22, fontWeight:800, color:c, lineHeight:1 }}>{v}</p>
-            <p style={{ margin:'4px 0 0', fontSize:10, color:NA.text2, textTransform:'uppercase', letterSpacing:'.04em' }}>{l}</p>
+            <p style={{ margin:'4px 0 0', fontSize:10, color:'rgba(255,255,255,.5)', textTransform:'uppercase', letterSpacing:'.04em' }}>{l}</p>
           </div>
         ))}
       </div>
@@ -174,7 +174,7 @@ const MonitorResumen = ({ mes, resumen }) => {
       {/* Movimientos */}
       {Object.keys(totIngresos).length > 0 && (
         <div style={{ padding:'14px 18px', borderTop:`0.5px solid ${NA.border}` }}>
-          <p style={{ margin:'0 0 10px', fontSize:10, color:NA.text2, fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>
+          <p style={{ margin:'0 0 10px', fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>
             Movimientos del mes
           </p>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -184,8 +184,8 @@ const MonitorResumen = ({ mes, resumen }) => {
               const neto   = entra - sale;
               const simbol = simbolo(m);
               return (
-                <div key={m} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:NA.bg, borderRadius:10, padding:'10px 14px' }}>
-                  <span style={{ fontSize:13, color:NA.text2, fontWeight:500 }}>{m}</span>
+                <div key={m} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(255,255,255,.04)', borderRadius:10, padding:'10px 14px' }}>
+                  <span style={{ fontSize:13, color:'rgba(255,255,255,.5)', fontWeight:500 }}>{m}</span>
                   <div style={{ display:'flex', gap:14, alignItems:'center' }}>
                     <span style={{ fontSize:12, color:'#059669' }}>↑ {simbol}{entra.toFixed(2)}</span>
                     {sale > 0 && <span style={{ fontSize:12, color:'#DC2626' }}>↓ {simbol}{sale.toFixed(2)}</span>}
@@ -203,7 +203,7 @@ const MonitorResumen = ({ mes, resumen }) => {
       {/* Botones de Instructores */}
       {Object.keys(instCounts).length > 0 && (
         <div style={{ padding:'14px 18px', borderTop:`0.5px solid ${NA.border}` }}>
-          <p style={{ margin:'0 0 10px', fontSize:10, color:NA.text2, fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>
+          <p style={{ margin:'0 0 10px', fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>
             Clases por Instructor
           </p>
           <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
@@ -215,7 +215,7 @@ const MonitorResumen = ({ mes, resumen }) => {
                   onClick={() => setModalInst(item)}
                   style={{
                     padding:'6px 14px', borderRadius:99, fontSize:13, fontWeight:700,
-                    background: NA.light, color: NA.darker, border:`1px solid ${NA.border}`,
+                    background: 'rgba(46,207,196,.15)', color: NA.darker, border:`1px solid ${NA.border}`,
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                     boxShadow: '0 2px 4px rgba(0,0,0,0.05)', transition: 'all 0.2s'
                   }}>
@@ -255,12 +255,12 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
       display:'flex', alignItems:'center', justifyContent:'center', zIndex:999, padding:16
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background:'#fff', borderRadius:20, width:'100%', maxWidth: 440, maxHeight:'85vh', 
+        background:'rgba(255,255,255,.06)', borderRadius:20, width:'100%', maxWidth: 440, maxHeight:'85vh', 
         display:'flex', flexDirection:'column', overflow:'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
       }}>
         
         {/* Header del Modal */}
-        <div style={{ padding:'18px 20px', borderBottom:`1px solid ${NA.border}`, background:NA.bg, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+        <div style={{ padding:'18px 20px', borderBottom:`1px solid ${NA.border}`, background:'rgba(255,255,255,.04)', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
             <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:NA.darker, textTransform:'capitalize' }}>{inst.nombre}</h2>
             <div style={{ display:'flex', gap: 12, marginTop: 6 }}>
@@ -282,7 +282,7 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
         {/* Lista de Registros FUSIONADA */}
         <div style={{ padding:'16px 20px', overflowY:'auto', flex: 1, display:'flex', flexDirection:'column', gap: 10 }}>
           {registrosOrdenados.length === 0 ? (
-            <p style={{ color: NA.text2, fontSize: 13, textAlign:'center' }}>No hay registros.</p>
+            <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign:'center' }}>No hay registros.</p>
           ) : (
             registrosOrdenados.map((r, i) => {
               const esAgenda = r._tipo === 'AGENDA';
@@ -314,8 +314,8 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
                   </div>
 
                   {/* Fila inferior: Data Dura (Horas, Cobro, etc) */}
-                  <div style={{ display:'flex', gap: 12, fontSize:12, color: NA.text, alignItems:'center', flexWrap:'wrap' }}>
-                    <span style={{ fontWeight: 700, color: NA.dark, background: NA.light, padding:'2px 6px', borderRadius:4 }}>
+                  <div style={{ display:'flex', gap: 12, fontSize:12, color: 'rgba(255,255,255,.9)', alignItems:'center', flexWrap:'wrap' }}>
+                    <span style={{ fontWeight: 700, color: NA.dark, background: 'rgba(46,207,196,.15)', padding:'2px 6px', borderRadius:4 }}>
                       <i className="ti ti-clock"/> {r._horasReales}h
                     </span>
                     
@@ -331,7 +331,7 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
                         <span style={{ color: '#059669', fontWeight:600 }}>
                           <i className="ti ti-cash"/> Monto: R$ {parseFloat(r.total||0).toFixed(2)}
                         </span>
-                        <span style={{ color: NA.text2, fontSize:11, fontStyle:'italic' }}>#{r.id}</span>
+                        <span style={{ color: 'rgba(255,255,255,.5)', fontSize:11, fontStyle:'italic' }}>#{r.id}</span>
                       </>
                     )}
                   </div>

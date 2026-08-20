@@ -18,9 +18,9 @@ const MonitorCalendario = ({
           {alertas.map(a => {
             const f = a.fecha?.toString();
             return (
-              <div key={a.id} style={{ background:'#fff', borderRadius:10, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+              <div key={a.id} style={{ background:'rgba(255,255,255,.06)', borderRadius:10, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
                 <div>
-                  <p style={{ margin:0, fontWeight:600, color:NA.text, fontSize:13 }}>{a.alumno}</p>
+                  <p style={{ margin:0, fontWeight:600, color:'rgba(255,255,255,.9)', fontSize:13 }}>{a.alumno}</p>
                   <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2 }}>
                     {fmt(f)} · {a.nombreInstructor} · {a.horas}h {a.tipoAula && `· ${a.tipoAula}`}
                   </p>
@@ -38,7 +38,7 @@ const MonitorCalendario = ({
     )}
 
     {/* ── FILTROS ── */}
-    <div style={{ background:'#fff', borderRadius:14, border:`0.5px solid ${NA.border}`, padding:'10px 14px', marginBottom:12, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+    <div style={{ background:'rgba(255,255,255,.06)', borderRadius:14, border:`0.5px solid rgba(255,255,255,.1)`, padding:'10px 14px', marginBottom:12, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
       {[
         { v:'TODO',     l:'Todo'       },
         { v:'CLASES',   l:'📅 Clases'  },
@@ -54,25 +54,25 @@ const MonitorCalendario = ({
         </button>
       ))}
       <select value={filtroInst} onChange={e => setFiltroInst(e.target.value)}
-        style={{ padding:'6px 10px', borderRadius:8, border:`0.5px solid ${NA.border}`, fontSize:12, color:NA.text, background:NA.bg, marginLeft:'auto' }}>
+        style={{ padding:'6px 10px', borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:12, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.04)', marginLeft:'auto' }}>
         <option value="">Todos los instructores</option>
         {instructores.map(i => <option key={i} value={i}>{i}</option>)}
       </select>
       <button onClick={cargar}
-        style={{ padding:'6px 12px', borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+        style={{ padding:'6px 12px', borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:'rgba(255,255,255,.5)', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
         <i className="ti ti-refresh" style={{ fontSize:14 }}/> Actualizar
       </button>
     </div>
 
     {/* ── CALENDARIO ── */}
-    <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
+    <div style={{ background:'rgba(255,255,255,.06)', borderRadius:16, border:`0.5px solid rgba(255,255,255,.1)`, overflow:'hidden', marginBottom:14 }}>
       {/* Header mes */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}` }}>
-        <button onClick={() => navMes(-1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <button onClick={() => navMes(-1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <i className="ti ti-chevron-left" style={{ fontSize:15, color:NA.text2 }}/>
         </button>
         <span style={{ fontWeight:700, fontSize:16, color:NA.text }}>{MESES[mes.m]} {mes.y}</span>
-        <button onClick={() => navMes(1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid ${NA.border}`, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <button onClick={() => navMes(1)} style={{ width:32, height:32, borderRadius:8, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <i className="ti ti-chevron-right" style={{ fontSize:15, color:NA.text2 }}/>
         </button>
       </div>
@@ -97,7 +97,7 @@ const MonitorCalendario = ({
             <div key={dia} onClick={() => setDiaSelec(selec ? null : dia)}
               style={{ minHeight:56, padding:'5px', cursor:'pointer', boxSizing:'border-box',
                 borderRight:`0.5px solid ${NA.border}`, borderBottom:`0.5px solid ${NA.border}`,
-                background: selec ? NA.light : hoy ? '#F0FDF4' : '#fff', transition:'background .1s' }}>
+                background: selec ? 'rgba(46,207,196,.2)' : hoy ? 'rgba(46,207,196,.08)' : 'transparent', transition:'background .1s' }}>
               <div style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:3,
                 background: hoy ? NA.dark : 'transparent',
                 color:      hoy ? '#fff'  : NA.text,

@@ -74,7 +74,7 @@ const ClaseDrawer = ({
         style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.4)', zIndex:400, backdropFilter:'blur(2px)' }}/>
       <div style={{
         position:'fixed', bottom:0, left:0, right:0, zIndex:401,
-        background:'#fff', borderRadius:'22px 22px 0 0',
+        background:'rgba(255,255,255,.06)', borderRadius:'22px 22px 0 0',
         paddingBottom:'max(env(safe-area-inset-bottom),20px)',
         maxHeight:'88vh', overflowY:'auto',
         boxShadow:'0 -8px 40px rgba(0,0,0,.2)',
@@ -151,13 +151,13 @@ const ClaseDrawer = ({
           )}
 
           {/* Editar hora de entrada */}
-          <div style={{ background:NA.bg, borderRadius:14, padding:'14px 16px' }}>
-            <p style={{ margin:'0 0 10px', fontSize:11, color:NA.text2, fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
+          <div style={{ background:'rgba(255,255,255,.04)', borderRadius:14, padding:'14px 16px' }}>
+            <p style={{ margin:'0 0 10px', fontSize:11, color:'rgba(255,255,255,.5)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
               Hora de entrada
             </p>
             <div style={{ display:'flex', gap:10, alignItems:'center' }}>
               <input type="time" value={hora} onChange={e => setHora(e.target.value)}
-                style={{ flex:1, padding:'12px 14px', borderRadius:10, border:`0.5px solid ${NA.border}`, fontSize:16, color:NA.text, background:'#fff', fontFamily:'inherit' }}/>
+                style={{ flex:1, padding:'12px 14px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:16, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.06)', fontFamily:'inherit' }}/>
               <button onClick={guardarHora} disabled={!hora || saving}
                 style={{ padding:'12px 20px', borderRadius:10, border:'none', background: hora ? NA.dark : NA.border, color:'#fff', fontSize:14, fontWeight:600, cursor: hora ? 'pointer' : 'default' }}>
                 {saving ? '...' : 'Guardar'}
@@ -182,7 +182,7 @@ const ClaseDrawer = ({
           {puedeAdmin && eliminarClase && (
             <button
               onClick={() => { if(window.confirm(`¿Eliminar clase de ${clase.alumno}?`)) { eliminarClase(clase.id); onClose(); }}}
-              style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px solid #FCA5A5', background:'#fff', color:'#DC2626', fontSize:14, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px solid #FCA5A5', background:'rgba(255,255,255,.06)', color:'#DC2626', fontSize:14, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
               <i className="ti ti-trash" style={{ fontSize:16 }}/> Eliminar clase
             </button>
           )}
@@ -278,7 +278,7 @@ const MonitorDia = ({
   if (!diaSelec) return null;
 
   return (
-    <div style={{ background:'#fff', borderRadius:16, border:`0.5px solid ${NA.border}`, overflow:'hidden', marginBottom:14 }}>
+    <div style={{ background:'rgba(255,255,255,.06)', borderRadius:16, border:`0.5px solid rgba(255,255,255,.1)`, overflow:'hidden', marginBottom:14 }}>
 
       {/* ── HEADER ── */}
       <div style={{ padding:'14px 16px', borderBottom:`0.5px solid ${NA.border}` }}>
@@ -288,7 +288,7 @@ const MonitorDia = ({
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
             {navDia && (
               <button onClick={() => navDia(-1)}
-                style={{ width:32, height:32, borderRadius:9, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                style={{ width:32, height:32, borderRadius:9, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:'rgba(255,255,255,.5)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
                 <i className="ti ti-chevron-left" style={{ fontSize:16 }}/>
               </button>
             )}
@@ -300,7 +300,7 @@ const MonitorDia = ({
             </div>
             {navDia && (
               <button onClick={() => navDia(1)}
-                style={{ width:32, height:32, borderRadius:9, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.text2, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                style={{ width:32, height:32, borderRadius:9, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:'rgba(255,255,255,.5)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
                 <i className="ti ti-chevron-right" style={{ fontSize:16 }}/>
               </button>
             )}
@@ -321,7 +321,7 @@ const MonitorDia = ({
             )}
             {abrirAgendar && (
               <button onClick={() => abrirAgendar(diaSelec)}
-                style={{ padding:'8px 14px', borderRadius:10, border:`0.5px solid ${NA.border}`, background:'#fff', color:NA.dark, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+                style={{ padding:'8px 14px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:NA.dark, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
                 <i className="ti ti-plus" style={{ fontSize:15 }}/> Clase
               </button>
             )}
@@ -362,7 +362,7 @@ const MonitorDia = ({
               const hora = HORA_INICIO+i;
               return (
                 <div key={hora} style={{ position:'absolute', top:i*PX_H+10, width:'100%', display:'flex', alignItems:'center', gap:4 }}>
-                  <span style={{ fontSize:10, color:NA.text2, fontWeight:500, width:'100%', textAlign:'right', paddingRight:8 }}>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:500, width:'100%', textAlign:'right', paddingRight:8 }}>
                     {hora}:00
                   </span>
                 </div>
@@ -482,7 +482,7 @@ const MonitorDia = ({
         {/* Clases sin horario */}
         {sinPos.length > 0 && (
           <div style={{ borderTop:`0.5px solid ${NA.border}`, padding:'10px 14px' }}>
-            <p style={{ margin:'0 0 8px', fontSize:10, color:NA.text2, fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
+            <p style={{ margin:'0 0 8px', fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
               Sin horario asignado
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -542,7 +542,7 @@ const MonitorDia = ({
                 <p style={{ margin:0, fontSize:12, color:NA.text2 }}>
                   {i.actividad}{i.instructor && ` · ${i.instructor}`} · {i.formaPago}
                 </p>
-                {i.detalles && <p style={{ margin:'2px 0 0', fontSize:11, color:NA.text2, fontStyle:'italic' }}>{i.detalles.split('|')[0].trim()}</p>}
+                {i.detalles && <p style={{ margin:'2px 0 0', fontSize:11, color:'rgba(255,255,255,.5)', fontStyle:'italic' }}>{i.detalles.split('|')[0].trim()}</p>}
                 {clasesVinc.length > 0 && (
                   <p style={{ margin:'3px 0 0', fontSize:11, color:'#059669' }}>
                     <i className="ti ti-link" style={{ fontSize:10, marginRight:3 }}/>{clasesVinc.map(c=>c.alumno).join(', ')}
