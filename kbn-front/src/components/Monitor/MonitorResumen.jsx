@@ -155,7 +155,7 @@ const MonitorResumen = ({ mes, resumen }) => {
       {/* Título */}
       <div style={{ padding:'12px 18px', borderBottom:`0.5px solid ${NA.border}`, display:'flex', alignItems:'center', gap:8 }}>
         <i className="ti ti-chart-bar" style={{ fontSize:16, color:NA.dark }}/>
-        <p style={{ margin:0, fontWeight:700, fontSize:14, color:NA.text }}>
+        <p style={{ margin:0, fontWeight:700, fontSize:14, color:'rgba(255,255,255,.9)' }}>
           Resumen {MESES_S[mes.m]} {mes.y}
         </p>
       </div>
@@ -215,7 +215,7 @@ const MonitorResumen = ({ mes, resumen }) => {
                   onClick={() => setModalInst(item)}
                   style={{
                     padding:'6px 14px', borderRadius:99, fontSize:13, fontWeight:700,
-                    background: 'rgba(46,207,196,.15)', color: NA.darker, border:`1px solid ${NA.border}`,
+                    background: 'rgba(46,207,196,.15)', color:'rgba(255,255,255,.9)', border:`1px solid rgba(255,255,255,.1)`,
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                     boxShadow: '0 2px 4px rgba(0,0,0,0.05)', transition: 'all 0.2s'
                   }}>
@@ -229,7 +229,7 @@ const MonitorResumen = ({ mes, resumen }) => {
 
       {/* Alertas */}
       {alertasMes.length > 0 && (
-        <div style={{ padding:'12px 18px', borderTop:`0.5px solid ${NA.border}`, background:'#FFF7ED', display:'flex', alignItems:'center', gap:8 }}>
+        <div style={{ padding:'12px 18px', borderTop:`0.5px solid ${NA.border}`, background:'rgba(234,88,12,.15)', display:'flex', alignItems:'center', gap:8 }}>
           <i className="ti ti-alert-triangle" style={{ color:'#EA580C', fontSize:16 }}/>
           <p style={{ margin:0, fontSize:12, color:'#9A3412' }}>
             <strong>{alertasMes.length}</strong> clase{alertasMes.length>1?'s':''} sin cobro este mes.
@@ -262,7 +262,7 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
         {/* Header del Modal */}
         <div style={{ padding:'18px 20px', borderBottom:`1px solid ${NA.border}`, background:'rgba(255,255,255,.04)', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
-            <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:NA.darker, textTransform:'capitalize' }}>{inst.nombre}</h2>
+            <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:'rgba(255,255,255,.9)', textTransform:'capitalize' }}>{inst.nombre}</h2>
             <div style={{ display:'flex', gap: 12, marginTop: 6 }}>
               <span style={{ fontSize:13, fontWeight:600, color: NA.dark }}>
                 <i className="ti ti-calendar" style={{ marginRight:4 }}/> {inst.clases} Clases
@@ -299,7 +299,7 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
                 }}>
                   {/* Fila superior: Fecha y Badge del Origen */}
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 6, alignItems:'center' }}>
-                    <span style={{ fontSize: 12, fontWeight:700, color: NA.text2 }}>{r.fecha}</span>
+                    <span style={{ fontSize: 12, fontWeight:700, color: 'rgba(255,255,255,.9)' }}>{r.fecha}</span>
                     <span style={{ fontSize: 10, fontWeight:700, textTransform:'uppercase', color: esAgenda ? NA.text2 : '#059669', background: esAgenda ? NA.bg : '#D1FAE5', padding:'3px 8px', borderRadius:6 }}>
                       {esAgenda ? 'Agenda' : 'Ingreso Auto-Detectado'}
                     </span>
@@ -307,7 +307,7 @@ const ModalDetalleInstructor = ({ inst, onClose }) => {
                   
                   {/* Fila del Medio: Alumno y Siglas */}
                   <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom: 8 }}>
-                    <span style={{ fontSize: 15, fontWeight:800, color: NA.darker }}>
+                    <span style={{ fontSize: 15, fontWeight:800, color:'rgba(255,255,255,.9)' }}>
                       {alumno}
                     </span>
                     <Tag label={tipoAula} color={NA.darker} bg={NA.light} small />
