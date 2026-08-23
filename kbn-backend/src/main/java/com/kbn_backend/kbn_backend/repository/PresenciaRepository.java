@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface PresenciaRepository extends JpaRepository<Presencia, Long> {
     Optional<Presencia> findByFecha(LocalDate fecha);
+    // Devuelve el registro más reciente — para mantener la presencia entre días
+    Optional<Presencia> findTopByOrderByFechaDesc();
 }

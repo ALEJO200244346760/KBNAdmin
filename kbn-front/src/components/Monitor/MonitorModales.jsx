@@ -15,7 +15,7 @@ const Overlay = ({ onClick, children }) => (
 // Usar data-zone="header"|"body"|"footer" en los hijos.
 const Modal = ({ onClick, header, body, footer, maxWidth = 440 }) => (
   <div onClick={onClick} style={{
-    background:'rgba(255,255,255,.07)', borderRadius:20, width:'100%', maxWidth,
+    background:'#1a2e2a', borderRadius:20, width:'100%', maxWidth,
     maxHeight:'92vh', display:'flex', flexDirection:'column',
     boxSizing:'border-box', overflow:'hidden',
   }}>

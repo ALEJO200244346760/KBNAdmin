@@ -26,18 +26,28 @@ public class PresenciaController {
         public void setModificadoPor(String m) { this.modificadoPor = m; }
     }
 
-    // GET /api/presencia/hoy — devuelve el estado de hoy (crea AUSENTES si no existe)
+    // GET /api/presencia/hoy — devuelve el estado actual
+    // Si no hay registro de hoy, usa el último conocido (no resetea a AUSENTES)
     @GetMapping("/hoy")
     public ResponseEntity<Presencia> getHoy() {
         LocalDate hoy = LocalDate.now();
-        Presencia p = presenciaRepository.findByFecha(hoy)
-                .orElseGet(() -> {
-                    Presencia nueva = new Presencia();
-                    nueva.setFecha(hoy);
-                    nueva.setPresentes("AUSENTES");
-                    return presenciaRepository.save(nueva);
-                });
-        return ResponseEntity.ok(p);
+
+        // Buscar registro de hoy
+        Optional<Presencia> hoyOpt = presenciaRepository.findByFecha(hoy);
+        if (hoyOpt.isPresent()) {
+            return ResponseEntity.ok(hoyOpt.get());
+        }
+
+        // No hay registro de hoy → copiar el último conocido
+        Optional<Presencia> ultimoOpt = presenciaRepository.findTopByOrderByFechaDesc();
+        String presentes = ultimoOpt.map(Presencia::getPresentes).orElse("AUSENTES");
+
+        // Crear registro de hoy con el valor persistido
+        Presencia nueva = new Presencia();
+        nueva.setFecha(hoy);
+        nueva.setPresentes(presentes);
+        nueva.setModificadoPor(ultimoOpt.map(Presencia::getModificadoPor).orElse(null));
+        return ResponseEntity.ok(presenciaRepository.save(nueva));
     }
 
     // GET /api/presencia/{fecha} — estado de una fecha específica (yyyy-MM-dd)
