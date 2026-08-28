@@ -185,13 +185,15 @@ public class AgendaController {
             // Calcular y acumular deuda
             double horas    = agenda.getHoras();
             double deuda    = Math.round(tarifaHora * horas * 100.0) / 100.0;
-            String actividad = agenda.getTipoAula() != null ? agenda.getTipoAula() : "Clase";
-            String alumno    = agenda.getAlumno()   != null ? agenda.getAlumno()   : "";
-            String fechaStr  = agenda.getFecha()    != null ? agenda.getFecha().toString() : "";
+            String actividad    = agenda.getTipoAula()        != null ? agenda.getTipoAula()        : "Clase";
+            String alumno       = agenda.getAlumno()          != null ? agenda.getAlumno()          : "";
+            String descripcion  = agenda.getHotelDerivacion() != null ? agenda.getHotelDerivacion() : "";
+            String fechaStr     = agenda.getFecha()           != null ? agenda.getFecha().toString() : "";
 
             String nota = actividad + " · " + horas + "h × " + tarifaHora
                     + " BRL/h = " + deuda + " BRL"
-                    + (alumno.isBlank() ? "" : " (" + alumno + ")")
+                    + (alumno.isBlank()      ? "" : " (" + alumno + ")")
+                    + (descripcion.isBlank() ? "" : " [" + descripcion + "]")
                     + " — " + fechaStr;
 
             // Defensive: montoTotal puede ser null en tarjetas recién creadas
