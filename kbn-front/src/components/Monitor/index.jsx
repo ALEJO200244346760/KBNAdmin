@@ -400,10 +400,10 @@ const Monitor = () => {
     } catch (e) { alert('No se pudo eliminar.'); }
   };
 
-  // ── Guardar hora salida rápida ──────────────────────────────────────────────
-  const onSaveHoraSalida = async (id, horaSalida) => {
+  // ── Guardar hora de entrada rápida desde el drawer ─────────────────────────
+  const onSaveHoraEntrada = async (id, hora) => {
     try {
-      const res = await api.patch(`/api/agenda/${id}`, { horaSalida });
+      const res = await api.patch(`/api/agenda/${id}`, { hora });
       setAgenda(p => p.map(a => a.id === id ? res.data : a));
     } catch (e) { alert('No se pudo guardar.'); }
   };
@@ -619,7 +619,7 @@ const Monitor = () => {
         navDia={navDia}
         onDragHora={onDragHora}
         eliminarClase={eliminarClase}
-        onSaveHoraSalida={onSaveHoraSalida}
+        onSaveHoraEntrada={onSaveHoraEntrada}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>
