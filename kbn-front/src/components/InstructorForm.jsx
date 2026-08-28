@@ -521,6 +521,11 @@ const ClaseCard = ({ clase, col, mostrarConfirmar, onConfirmar }) => {
             {clase.horas      && <span><i className="ti ti-hourglass" style={{ marginRight:3 }}/>{clase.horas}h</span>}
             {clase.lugar      && <span><i className="ti ti-map-pin"   style={{ marginRight:3 }}/>{clase.lugar}</span>}
           </div>
+          {clase.hotelDerivacion && (
+            <p style={{ margin:'4px 0 0', fontSize:12, fontWeight:600, color:NA.darker }}>
+              <i className="ti ti-user" style={{ marginRight:4 }}/>{clase.hotelDerivacion}
+            </p>
+          )}
           {clase.tarifa && (
             <p style={{ margin:'4px 0 0', fontSize:11, color:NA.dark }}>
               R$ {clase.tarifa}/h
