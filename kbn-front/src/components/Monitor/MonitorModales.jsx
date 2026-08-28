@@ -28,6 +28,74 @@ const Modal = ({ onClick, header, body, footer, maxWidth = 440 }) => (
 const sx  = { label: { fontSize:11, color:'rgba(255,255,255,.5)', display:'block', marginBottom:5, fontWeight:500 } };
 const closeBtnSx = { width:28, height:28, borderRadius:8, border:'none', background:'#f3f4f6', color:'#6b7280', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 };
 
+// ── Grupo de ingresos por fecha (tab colapsable) ──────────────────────────────
+const FechaGroup = ({ fecha, ingresos, esMismoDia, haySelec, editForm, setEditForm, agenda, editClase }) => {
+  const [open, setOpen] = React.useState(esMismoDia || haySelec);
+
+  // Formato de fecha legible
+  const fechaLabel = (() => {
+    if (!fecha || fecha === 'Sin fecha') return 'Sin fecha';
+    const [y, m, d] = fecha.split('-');
+    return `${d}/${m}/${y}`;
+  })();
+
+  return (
+    <div style={{ borderRadius:10, border:`0.5px solid ${open ? 'rgba(46,207,196,.4)' : 'rgba(255,255,255,.12)'}`, overflow:'hidden' }}>
+      {/* Tab header */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width:'100%', padding:'9px 14px', textAlign:'left', cursor:'pointer', border:'none',
+          background: esMismoDia ? 'rgba(46,207,196,.15)' : 'rgba(255,255,255,.06)',
+          display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:13, fontWeight:700, color: esMismoDia ? '#2ECFC4' : 'rgba(255,255,255,.85)' }}>
+            {fechaLabel}
+          </span>
+          {esMismoDia && <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:99, background:'rgba(46,207,196,.2)', color:'#2ECFC4' }}>mismo día</span>}
+          {haySelec && <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:99, background:'rgba(46,207,196,.2)', color:'#2ECFC4' }}>✓ seleccionado</span>}
+          <span style={{ fontSize:11, color:'rgba(255,255,255,.4)' }}>{ingresos.length} ingreso{ingresos.length>1?'s':''}</span>
+        </div>
+        <i className={`ti ti-chevron-${open?'up':'down'}`} style={{ fontSize:13, color:'rgba(255,255,255,.4)' }}/>
+      </button>
+
+      {/* Lista de ingresos */}
+      {open && (
+        <div style={{ display:'flex', flexDirection:'column', gap:1, background:'rgba(0,0,0,.2)' }}>
+          {ingresos.map(i => {
+            const sel = String(editForm.ingresoIdSelec) === String(i.id);
+            const clasesVinc = agenda.filter(a => a.ingresoId === i.id && a.id !== editClase?.id);
+            const desc = i.detalles?.split('|')[0].trim() || i.actividad || '';
+            return (
+              <button key={i.id} type="button"
+                onClick={() => setEditForm(p => ({...p, ingresoIdSelec: String(i.id), cobrada:true}))}
+                style={{ padding:'10px 14px', textAlign:'left', cursor:'pointer', border:'none',
+                  borderTop:'0.5px solid rgba(255,255,255,.06)',
+                  background: sel ? 'rgba(46,207,196,.2)' : 'transparent',
+                  display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                <div style={{ minWidth:0, flex:1 }}>
+                  <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:2 }}>
+                    <span style={{ fontSize:13, fontWeight:700, color: sel ? '#2ECFC4' : 'rgba(255,255,255,.9)' }}>
+                      #{i.id} · {parseFloat(i.total||0).toFixed(2)} {labelMon(i.moneda)}
+                    </span>
+                    {clasesVinc.length > 0 && (
+                      <span style={{ fontSize:10, fontWeight:600, padding:'2px 7px', borderRadius:99, background:'rgba(99,102,241,.2)', color:'#A5B4FC' }}>
+                        {clasesVinc.length} clase{clasesVinc.length>1?'s':''} más
+                      </span>
+                    )}
+                  </div>
+                  {desc && (
+                    <span style={{ fontSize:11, color:'rgba(255,255,255,.55)' }}>{desc}</span>
+                  )}
+                </div>
+                {sel && <i className="ti ti-check" style={{ color:'#2ECFC4', fontSize:16, flexShrink:0 }}/>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MODAL: EDITAR CLASE
 // ══════════════════════════════════════════════════════════════════════════════
@@ -126,53 +194,46 @@ export const ModalEditarClase = ({
             <button type="button"
               onClick={() => setEditForm(p => ({...p, ingresoIdSelec:'', cobrada:false}))}
               style={{
-                width:'100%', padding:'10px 14px', borderRadius:10, marginBottom:8,
+                width:'100%', padding:'10px 14px', borderRadius:10, marginBottom:10,
                 textAlign:'left', cursor:'pointer', fontSize:13, fontWeight:600,
-                border:`1.5px solid ${!editForm.ingresoIdSelec ? '#DC2626' : NA.border}`,
-                background: !editForm.ingresoIdSelec ? '#FEF2F2' : '#fff',
-                color:      !editForm.ingresoIdSelec ? '#DC2626' : NA.text2,
+                border:`1.5px solid ${!editForm.ingresoIdSelec ? '#DC2626' : 'rgba(255,255,255,.15)'}`,
+                background: !editForm.ingresoIdSelec ? 'rgba(220,38,38,.2)' : 'rgba(255,255,255,.05)',
+                color: !editForm.ingresoIdSelec ? '#FCA5A5' : 'rgba(255,255,255,.5)',
               }}>
               ✗ Sin cobro registrado
             </button>
 
             {ingresosDisponiblesEdit.length === 0 ? (
-              <p style={{ fontSize:12, color:'#9ca3af' }}>No hay ingresos disponibles.</p>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {ingresosDisponiblesEdit.map(i => {
-                  const sel = String(editForm.ingresoIdSelec) === String(i.id);
-                  const clasesVinc = agenda.filter(a => a.ingresoId === i.id && a.id !== editClase?.id);
-                  const esMismoDia = i.fecha === editClase?.fecha?.toString();
-                  return (
-                    <button key={i.id} type="button"
-                      onClick={() => setEditForm(p => ({...p, ingresoIdSelec: String(i.id), cobrada:true}))}
-                      style={{
-                        padding:'10px 14px', borderRadius:10, textAlign:'left', cursor:'pointer',
-                        border:`1.5px solid ${sel ? NA.dark : NA.border}`,
-                        background: sel ? NA.light : '#fff',
-                      }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
-                        <div style={{ minWidth:0, flex:1 }}>
-                          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:3 }}>
-                            <span style={{ fontSize:13, fontWeight:700, color: sel ? NA.darker : NA.text }}>
-                              #{i.id} · {parseFloat(i.total||0).toFixed(2)} {labelMon(i.moneda)}
-                            </span>
-                            {esMismoDia && <Tag label="mismo día" color="#065F46" bg="#D1FAE5" small/>}
-                            {clasesVinc.length > 0 && (
-                              <Tag label={`${clasesVinc.length} clase${clasesVinc.length>1?'s':''} más`} color="#4338CA" bg="#EEF2FF" small/>
-                            )}
-                          </div>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>
-                            {i.fecha} · {i.detalles?.split('|')[0].trim() || i.actividad || '—'}
-                          </span>
-                        </div>
-                        {sel && <i className="ti ti-check" style={{ color:NA.dark, fontSize:16, flexShrink:0 }}/>}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              <p style={{ fontSize:12, color:'rgba(255,255,255,.4)' }}>No hay ingresos disponibles.</p>
+            ) : (() => {
+              // Agrupar por fecha
+              const porFecha = {};
+              ingresosDisponiblesEdit.forEach(i => {
+                const f = i.fecha || 'Sin fecha';
+                if (!porFecha[f]) porFecha[f] = [];
+                porFecha[f].push(i);
+              });
+              const fechas = Object.keys(porFecha).sort((a,b) => b.localeCompare(a));
+              const fechaClase = editClase?.fecha?.toString();
+
+              return (
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {fechas.map(fecha => {
+                    const esMismoDia = fecha === fechaClase;
+                    const ingresos   = porFecha[fecha];
+                    const haySelec   = ingresos.some(i => String(editForm.ingresoIdSelec) === String(i.id));
+                    const [open, setOpen] = [haySelec || esMismoDia, null]; // siempre abierto si es mismo día o hay selec
+
+                    return (
+                      <FechaGroup key={fecha} fecha={fecha} ingresos={ingresos}
+                        esMismoDia={esMismoDia} haySelec={haySelec}
+                        editForm={editForm} setEditForm={setEditForm}
+                        agenda={agenda} editClase={editClase}/>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Notificar instructor */}
