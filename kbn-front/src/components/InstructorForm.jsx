@@ -427,7 +427,65 @@ const InstructorForm = () => {
             </div>
           )}
 
-          {/* Cuenta corriente — administración lo gestiona */}
+          {/* ── DEUDA POR CLASES FINALIZADAS ── */}
+          {(() => {
+            const finalizadas = clasesActivas.filter(a => a.estado === 'FINALIZADA' && a.tarifa && a.horas);
+            if (finalizadas.length === 0) return null;
+
+            // Agrupar por moneda/canal
+            const totales = {};
+            finalizadas.forEach(a => {
+              const moneda = 'BRL';
+              const total  = parseFloat(a.tarifa) * parseFloat(a.horas);
+              totales[moneda] = (totales[moneda] || 0) + total;
+            });
+
+            return (
+              <div style={{ background:'#fff', borderRadius:16, border:`1.5px solid ${NA.dark}`, padding:18 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                  <p style={{ margin:0, fontSize:11, fontWeight:700, color:NA.text2, textTransform:'uppercase', letterSpacing:'.06em' }}>
+                    Clases finalizadas — a pagar
+                  </p>
+                  <span style={{ fontSize:11, color:NA.text2 }}>{finalizadas.length} clase{finalizadas.length>1?'s':''}</span>
+                </div>
+
+                {/* Total por moneda */}
+                {Object.entries(totales).map(([m, total]) => (
+                  <div key={m} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                    <span style={{ fontSize:13, color:NA.text2 }}>{m}</span>
+                    <span style={{ fontSize:24, fontWeight:800, color:NA.dark }}>R$ {total.toFixed(0)}</span>
+                  </div>
+                ))}
+
+                {/* Lista de clases */}
+                <div style={{ display:'flex', flexDirection:'column', gap:6, borderTop:`0.5px solid ${NA.border}`, paddingTop:12 }}>
+                  {finalizadas.sort((a,b) => String(b.fecha).localeCompare(String(a.fecha))).map(a => {
+                    const col   = colorTipo(a.tipoAula);
+                    const total = (parseFloat(a.tarifa) * parseFloat(a.horas)).toFixed(0);
+                    return (
+                      <div key={a.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderRadius:10, background:NA.bg }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:2 }}>
+                            <span style={{ fontWeight:600, fontSize:13, color:NA.text }}>{a.alumno}</span>
+                            {a.tipoAula && <span style={{ fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:99, background:col.bg, color:col.text }}>{a.tipoAula}</span>}
+                          </div>
+                          <span style={{ fontSize:11, color:NA.text2 }}>
+                            {String(a.fecha).substring(5)} · {a.horas}h × R$ {a.tarifa}/h
+                            {a.hotelDerivacion && <span style={{ color:NA.dark, fontWeight:600 }}> · {a.hotelDerivacion}</span>}
+                          </span>
+                        </div>
+                        <span style={{ fontWeight:700, fontSize:14, color:NA.darker, flexShrink:0, marginLeft:8 }}>
+                          R$ {total}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Cuenta corriente */}
           <div style={{ background: NA.darker, borderRadius:16, padding:18 }}>
             <p style={{ margin:'0 0 10px', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.5)', textTransform:'uppercase', letterSpacing:'.06em' }}>
               Cuenta corriente
