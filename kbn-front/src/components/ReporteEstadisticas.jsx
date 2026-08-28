@@ -635,7 +635,17 @@ const ReporteEstadisticas = () => {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
+                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>
+                      {parseFloat(item.comision) > 0
+                        ? formatCurrency(parseFloat(item.total) + parseFloat(item.comision))
+                        : formatCurrency(item.total)
+                      } <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span>
+                    </span>
+                    {parseFloat(item.comision) > 0 && (
+                      <span style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', padding: '1px 7px', borderRadius: 99 }}>
+                        💳 caja: {formatCurrency(item.total)}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.actividad} · {item.instructor}</div>
                 </div>
@@ -741,7 +751,17 @@ const ReporteEstadisticas = () => {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
-                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>{formatCurrency(item.total)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
+                    <span style={{ color: NA.dark, fontWeight: 500, fontSize: 15 }}>
+                      {parseFloat(item.comision) > 0
+                        ? formatCurrency(parseFloat(item.total) + parseFloat(item.comision))
+                        : formatCurrency(item.total)
+                      } <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span>
+                    </span>
+                    {parseFloat(item.comision) > 0 && (
+                      <span style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', padding: '1px 7px', borderRadius: 99 }}>
+                        💳 caja: {formatCurrency(item.total)}
+                      </span>
+                    )}
                     {parseFloat(item.gastosAsociados) > 0 && <span style={{ color: '#B91C1C', fontSize: 11 }}>-{formatCurrency(item.gastosAsociados)} gastos</span>}
                     <span style={styles.pill(NA.mid, NA.darker)}>{item.asignadoA}</span>
                   </div>
