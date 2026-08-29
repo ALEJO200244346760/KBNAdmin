@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/pasivos")
@@ -220,6 +222,173 @@ public class PasivoController {
         pasivoFresco.setMontoTotal(totalBRL);
 
         return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivoFresco)));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LIMPIEZA DE DUPLICADOS DE REPARTO
+    //
+    // Contexto: durante un tiempo el reparto a los dueños se ejecutaba dos
+    // veces — una al crear el ingreso (Ingreso.jsx) y otra al asignarlo
+    // (Estadísticas). Los de Ingreso.jsx quedaron con una nota que termina
+    // en la fecha, sin el sufijo " = monto MONEDA" ni "| Reparto:".
+    //
+    // Un movimiento se considera duplicado SOLO si cumple TODO:
+    //   1. montoPagado < 0        → es deuda (nunca toca pagos ni adelantos)
+    //   2. fecha >= FECHA_DESDE   → 2026-08-13 en adelante
+    //   3. la nota es del tipo "<pct>% de <algo> — <fecha>" y NO contiene
+    //      " = " ni "| Reparto:"  → descarta liquidaciones de clase (APK/APWF…)
+    //   4. existe OTRO movimiento en la MISMA tarjeta con idéntica fecha,
+    //      idéntico monto e idéntico porcentaje que SÍ tiene " = " o
+    //      "| Reparto:" → o sea, el "gemelo bueno" que hay que conservar
+    //
+    // El emparejamiento es 1 a 1: si hay 2 buenos y 3 candidatos, borra 2.
+    // ══════════════════════════════════════════════════════════════════════
+
+    private static final LocalDate FECHA_DESDE = LocalDate.of(2026, 8, 13);
+
+    // "16% de Ingreso — 2026-08-16"  /  "12,5% de Clase de Kite — 2026-08-20"
+    private static final Pattern NOTA_SIN_SUFIJO =
+            Pattern.compile("^\\s*(\\d+(?:[.,]\\d+)?)\\s*%\\s+de\\s+.+?—\\s*\\d{4}-\\d{2}-\\d{2}\\s*$");
+    // Captura el porcentaje de cualquier nota de reparto
+    private static final Pattern PCT = Pattern.compile("^\\s*(\\d+(?:[.,]\\d+)?)\\s*%");
+
+    private String pctDe(String nota) {
+        if (nota == null) return null;
+        Matcher m = PCT.matcher(nota);
+        return m.find() ? m.group(1).replace(',', '.') : null;
+    }
+
+    private boolean esCandidatoDuplicado(PagoPasivo p) {
+        if (p.getMontoPagado() == null || p.getMontoPagado() >= 0) return false;      // solo deuda
+        if (p.getFecha() == null || p.getFecha().isBefore(FECHA_DESDE)) return false; // solo desde 13/08
+        String nota = p.getNota();
+        if (nota == null) return false;
+        if (nota.contains(" = ") || nota.contains("| Reparto:")) return false;        // ese es el bueno
+        return NOTA_SIN_SUFIJO.matcher(nota).matches();
+    }
+
+    private boolean esGemeloBueno(PagoPasivo p) {
+        if (p.getMontoPagado() == null || p.getMontoPagado() >= 0) return false;
+        if (p.getFecha() == null || p.getFecha().isBefore(FECHA_DESDE)) return false;
+        String nota = p.getNota();
+        if (nota == null) return false;
+        if (!(nota.contains(" = ") || nota.contains("| Reparto:"))) return false;
+        return pctDe(nota) != null;
+    }
+
+    /** Clave de emparejamiento: fecha + monto exacto + porcentaje. */
+    private String claveMatch(PagoPasivo p) {
+        String pct = pctDe(p.getNota());
+        return p.getFecha() + "|" + String.format(Locale.US, "%.2f", p.getMontoPagado()) + "|" + pct;
+    }
+
+    /** Devuelve los movimientos a borrar de un pasivo, ya emparejados 1 a 1. */
+    private List<PagoPasivo> duplicadosDe(Pasivo pasivo) {
+        List<PagoPasivo> res = new ArrayList<>();
+        if (pasivo.getHistorialPagos() == null) return res;
+
+        // Contar gemelos buenos por clave
+        Map<String, Integer> buenos = new HashMap<>();
+        for (PagoPasivo p : pasivo.getHistorialPagos()) {
+            if (esGemeloBueno(p)) buenos.merge(claveMatch(p), 1, Integer::sum);
+        }
+        // Consumir un bueno por cada candidato
+        for (PagoPasivo p : pasivo.getHistorialPagos()) {
+            if (!esCandidatoDuplicado(p)) continue;
+            String k = claveMatch(p);
+            int disponibles = buenos.getOrDefault(k, 0);
+            if (disponibles > 0) {
+                buenos.put(k, disponibles - 1);
+                res.add(p);
+            }
+        }
+        return res;
+    }
+
+    private Map<String, Object> filaPreview(Pasivo pasivo, PagoPasivo p) {
+        Map<String, Object> f = new LinkedHashMap<>();
+        f.put("pagoId",  p.getId());
+        f.put("tarjeta", pasivo.getTitulo());
+        f.put("fecha",   String.valueOf(p.getFecha()));
+        f.put("monto",   p.getMontoPagado());
+        f.put("moneda",  p.getMoneda());
+        f.put("nota",    p.getNota());
+        return f;
+    }
+
+    // 4c. PREVIEW — no borra nada, solo lista qué se borraría
+    @GetMapping("/duplicados/preview")
+    public ResponseEntity<Map<String, Object>> previewDuplicados() {
+        List<Map<String, Object>> filas = new ArrayList<>();
+        Map<String, Integer> porTarjeta = new LinkedHashMap<>();
+
+        for (Pasivo pasivo : pasivoRepository.findAll()) {
+            List<PagoPasivo> dups = duplicadosDe(pasivo);
+            if (dups.isEmpty()) continue;
+            porTarjeta.put(pasivo.getTitulo(), dups.size());
+            for (PagoPasivo p : dups) filas.add(filaPreview(pasivo, p));
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("desde", FECHA_DESDE.toString());
+        out.put("totalAEliminar", filas.size());
+        out.put("porTarjeta", porTarjeta);
+        out.put("movimientos", filas);
+        return ResponseEntity.ok(out);
+    }
+
+    // 4d. EJECUTAR — borra los duplicados y recalcula el saldo BRL de cada tarjeta
+    @Transactional
+    @DeleteMapping("/duplicados")
+    public ResponseEntity<Map<String, Object>> eliminarDuplicados(
+            @RequestParam(defaultValue = "false") boolean confirmar) {
+
+        if (!confirmar) {
+            Map<String, Object> aviso = new LinkedHashMap<>();
+            aviso.put("error", "Falta confirmar. Llamá a DELETE /api/pasivos/duplicados?confirmar=true");
+            return ResponseEntity.badRequest().body(aviso);
+        }
+
+        List<Map<String, Object>> borrados = new ArrayList<>();
+        Map<String, Integer> porTarjeta = new LinkedHashMap<>();
+        List<Long> tarjetasTocadas = new ArrayList<>();
+
+        for (Pasivo pasivo : pasivoRepository.findAll()) {
+            List<PagoPasivo> dups = duplicadosDe(pasivo);
+            if (dups.isEmpty()) continue;
+            porTarjeta.put(pasivo.getTitulo(), dups.size());
+            tarjetasTocadas.add(pasivo.getId());
+            for (PagoPasivo p : dups) {
+                borrados.add(filaPreview(pasivo, p));
+                pagoPasivoRepository.delete(p);
+            }
+        }
+        pagoPasivoRepository.flush();
+
+        // Recalcular montoTotal (solo BRL) de cada tarjeta afectada
+        for (Long id : tarjetasTocadas) {
+            Pasivo fresco = pasivoRepository.findById(id).orElse(null);
+            if (fresco == null) continue;
+            double totalBRL = 0;
+            if (fresco.getHistorialPagos() != null) {
+                for (PagoPasivo p : fresco.getHistorialPagos()) {
+                    String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
+                            ? p.getMoneda()
+                            : detectarMonedaDeLaNota(p.getNota());
+                    if (monedaBaseDeCanal(canal).equals("BRL")) {
+                        totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                    }
+                }
+            }
+            fresco.setMontoTotal(totalBRL);
+            pasivoRepository.save(fresco);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("eliminados", borrados.size());
+        out.put("porTarjeta", porTarjeta);
+        out.put("detalle", borrados);
+        return ResponseEntity.ok(out);
     }
 
     // 5. Obtener una tarjeta por ID (con saldos por moneda)
