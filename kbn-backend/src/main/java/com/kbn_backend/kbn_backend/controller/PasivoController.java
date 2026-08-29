@@ -198,30 +198,18 @@ public class PasivoController {
         if (pago.getPasivo() == null || !pago.getPasivo().getId().equals(pasivoId))
             return ResponseEntity.badRequest().body("Ese movimiento no pertenece a esta tarjeta.");
 
-        // Borrar el movimiento primero
-        pagoPasivoRepository.delete(pago);
-        pagoPasivoRepository.flush(); // asegurar que el delete llegó a BD antes de releer
-
-        // Refrescar el pasivo desde BD para tener el historial actualizado (sin el pago borrado)
-        Pasivo pasivoFresco = pasivoRepository.findById(pasivoId).orElse(pasivo);
+        // Sacar el pago de la colección del padre.
+        // Con cascade=ALL + orphanRemoval=true, esto es lo que dispara el DELETE.
+        // Llamar solo a pagoPasivoRepository.delete() no alcanza: el save()
+        // posterior del padre lo reinserta por cascade con el mismo id.
+        pasivo.getHistorialPagos().removeIf(x -> x.getId().equals(pagoId));
 
         // Recalcular montoTotal desde cero sumando solo movimientos BRL del historial.
         // Esto garantiza consistencia independientemente del estado previo de montoTotal,
         // evitando el error de restar un monto en EUR/USD de un total en BRL.
-        double totalBRL = 0;
-        if (pasivoFresco.getHistorialPagos() != null) {
-            for (PagoPasivo p : pasivoFresco.getHistorialPagos()) {
-                String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
-                        ? p.getMoneda()
-                        : detectarMonedaDeLaNota(p.getNota());
-                if (monedaBaseDeCanal(canal).equals("BRL")) {
-                    totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-                }
-            }
-        }
-        pasivoFresco.setMontoTotal(totalBRL);
+        recalcularTotalBRL(pasivo);
 
-        return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivoFresco)));
+        return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivo)));
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -245,6 +233,22 @@ public class PasivoController {
     // ══════════════════════════════════════════════════════════════════════
 
     private static final LocalDate FECHA_DESDE = LocalDate.of(2026, 8, 13);
+
+    /** Recalcula montoTotal (solo canales BRL) a partir del historial actual. */
+    private void recalcularTotalBRL(Pasivo pasivo) {
+        double totalBRL = 0;
+        if (pasivo.getHistorialPagos() != null) {
+            for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
+                        ? p.getMoneda()
+                        : detectarMonedaDeLaNota(p.getNota());
+                if (monedaBaseDeCanal(canal).equals("BRL")) {
+                    totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                }
+            }
+        }
+        pasivo.setMontoTotal(totalBRL);
+    }
 
     // "16% de Ingreso — 2026-08-16"  /  "12,5% de Clase de Kite — 2026-08-20"
     private static final Pattern NOTA_SIN_SUFIJO =
@@ -351,42 +355,38 @@ public class PasivoController {
 
         List<Map<String, Object>> borrados = new ArrayList<>();
         Map<String, Integer> porTarjeta = new LinkedHashMap<>();
-        List<Long> tarjetasTocadas = new ArrayList<>();
 
         for (Pasivo pasivo : pasivoRepository.findAll()) {
             List<PagoPasivo> dups = duplicadosDe(pasivo);
             if (dups.isEmpty()) continue;
             porTarjeta.put(pasivo.getTitulo(), dups.size());
-            tarjetasTocadas.add(pasivo.getId());
-            for (PagoPasivo p : dups) {
-                borrados.add(filaPreview(pasivo, p));
-                pagoPasivoRepository.delete(p);
-            }
-        }
-        pagoPasivoRepository.flush();
+            for (PagoPasivo p : dups) borrados.add(filaPreview(pasivo, p));
 
-        // Recalcular montoTotal (solo BRL) de cada tarjeta afectada
-        for (Long id : tarjetasTocadas) {
-            Pasivo fresco = pasivoRepository.findById(id).orElse(null);
-            if (fresco == null) continue;
-            double totalBRL = 0;
-            if (fresco.getHistorialPagos() != null) {
-                for (PagoPasivo p : fresco.getHistorialPagos()) {
-                    String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
-                            ? p.getMoneda()
-                            : detectarMonedaDeLaNota(p.getNota());
-                    if (monedaBaseDeCanal(canal).equals("BRL")) {
-                        totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-                    }
-                }
-            }
-            fresco.setMontoTotal(totalBRL);
-            pasivoRepository.save(fresco);
+            // IMPORTANTE: con cascade=ALL + orphanRemoval=true hay que sacar el
+            // hijo de la colección del padre. Si solo se llama a
+            // pagoPasivoRepository.delete(), el save() posterior del padre lo
+            // vuelve a insertar por cascade (con el mismo id) y el borrado
+            // parece no haber ocurrido nunca.
+            Set<Long> aBorrar = new HashSet<>();
+            for (PagoPasivo p : dups) aBorrar.add(p.getId());
+            pasivo.getHistorialPagos().removeIf(p -> aBorrar.contains(p.getId()));
+
+            recalcularTotalBRL(pasivo);
+            pasivoRepository.save(pasivo);
         }
+        pasivoRepository.flush();
+
+        // Verificación: volver a analizar desde cero y confirmar que no quedan
+        int remanentes = 0;
+        for (Pasivo pasivo : pasivoRepository.findAll()) remanentes += duplicadosDe(pasivo).size();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("eliminados", borrados.size());
         out.put("porTarjeta", porTarjeta);
+        out.put("duplicadosRestantes", remanentes);
+        out.put("verificacion", remanentes == 0
+                ? "OK — no quedan duplicados con gemelo"
+                : "ATENCION — todavia quedan " + remanentes);
         out.put("detalle", borrados);
         return ResponseEntity.ok(out);
     }
@@ -483,6 +483,7 @@ public class PasivoController {
         List<Long> noEncontrados = new ArrayList<>();
         List<Long> rechazados    = new ArrayList<>();
         Set<Long>  tarjetas      = new LinkedHashSet<>();
+        Set<Long>  idsBorrados   = new HashSet<>();
 
         for (Long id : req.getIds()) {
             PagoPasivo p = pagoPasivoRepository.findById(id).orElse(null);
@@ -498,26 +499,18 @@ public class PasivoController {
             borrados.add(f);
 
             if (p.getPasivo() != null) tarjetas.add(p.getPasivo().getId());
-            pagoPasivoRepository.delete(p);
+            idsBorrados.add(p.getId());
         }
-        pagoPasivoRepository.flush();
 
+        // Sacar los hijos de la colección del padre (orphanRemoval hace el DELETE)
         for (Long tid : tarjetas) {
-            Pasivo fresco = pasivoRepository.findById(tid).orElse(null);
-            if (fresco == null) continue;
-            double totalBRL = 0;
-            if (fresco.getHistorialPagos() != null) {
-                for (PagoPasivo p : fresco.getHistorialPagos()) {
-                    String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
-                            ? p.getMoneda() : detectarMonedaDeLaNota(p.getNota());
-                    if (monedaBaseDeCanal(canal).equals("BRL")) {
-                        totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-                    }
-                }
-            }
-            fresco.setMontoTotal(totalBRL);
-            pasivoRepository.save(fresco);
+            Pasivo pasivo = pasivoRepository.findById(tid).orElse(null);
+            if (pasivo == null) continue;
+            pasivo.getHistorialPagos().removeIf(x -> idsBorrados.contains(x.getId()));
+            recalcularTotalBRL(pasivo);
+            pasivoRepository.save(pasivo);
         }
+        pasivoRepository.flush();
 
         out.put("eliminados", borrados.size());
         out.put("detalle", borrados);
