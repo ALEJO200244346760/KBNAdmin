@@ -84,6 +84,7 @@ const Ingreso = ({ formData, setView, axiosConfig }) => {
   const [todasClases,     setTodasClases]     = useState([]);
   const [clasesSelec,     setClasesSelec]     = useState([]);
   const [loadingClases,   setLoadingClases]   = useState(false);
+  const [pasivos,         setPasivos]         = useState([]);
 
   // Buscar clases al montar y cuando cambia la fecha
   useEffect(() => {
@@ -93,6 +94,13 @@ const Ingreso = ({ formData, setView, axiosConfig }) => {
       .then(r => setTodasClases(r.data))
       .catch(console.error)
       .finally(() => setLoadingClases(false));
+  }, [axiosConfig]);
+
+  useEffect(() => {
+    if (!axiosConfig) return;
+    axios.get(`${API}/api/pasivos`, axiosConfig)
+      .then(r => setPasivos(r.data))
+      .catch(console.error);
   }, [axiosConfig]);
 
   // Clases relevantes: ±14 días de la fecha del ingreso, no rechazadas
@@ -130,7 +138,7 @@ const Ingreso = ({ formData, setView, axiosConfig }) => {
           detalles,
         ].filter(Boolean).join(' · '),
         instructor: opcionActual.label,
-        asignadoA:  'NINGUNO',  // se asigna después desde Estadísticas
+        asignadoA:  asignadoAuto,
         total:      String(totalFinal),
         moneda,
         formaPago,
@@ -140,8 +148,24 @@ const Ingreso = ({ formData, setView, axiosConfig }) => {
 
       await axios.post(`${API}/api/clases/guardar`, payload, axiosConfig);
 
-      // El reparto a los dueños NO se hace acá.
-      // Se hace desde Estadísticas al asignar el ingreso, para evitar duplicados.
+      // Reparto a los dueños — se hace SOLO acá (no en Estadísticas)
+      if (totalFinal > 0 && pasivos.length > 0) {
+        const { pIgna, pJose, pHans, mIgna, mJose, mHans } = calcularReparto(asignadoAuto, totalFinal);
+        const sufijo = `${tipoActividad || 'Ingreso'} — ${fecha}`;
+        const acumular = async (titulo, montoD, pct) => {
+          const p = pasivos.find(x => x.titulo?.trim().toLowerCase() === titulo.trim().toLowerCase());
+          if (!p || montoD <= 0) return;
+          await axios.put(`${API}/api/pasivos/${p.id}/acumular`,
+            { monto: -montoD, nota: `${pct}% de ${sufijo} = ${montoD.toFixed(2)} ${moneda}`, fecha, moneda },
+            axiosConfig
+          );
+        };
+        await Promise.allSettled([
+          acumular(PASIVO_TITULOS.JOSE, mJose, pJose),
+          acumular(PASIVO_TITULOS.IGNA, mIgna, pIgna),
+          acumular(PASIVO_TITULOS.HANS, mHans, pHans),
+        ]);
+      }
 
       setView();
     } catch(err) {
@@ -348,16 +372,27 @@ const Ingreso = ({ formData, setView, axiosConfig }) => {
             ))}
           </div>
 
-          {/* Aviso: el reparto se hace después */}
-          <div style={{ background:'#FEF9C3', border:'0.5px solid #FDE68A', borderRadius:14, padding:'14px 18px', marginBottom:16, display:'flex', gap:10, alignItems:'flex-start' }}>
-            <i className="ti ti-info-circle" style={{ fontSize:18, color:'#D97706', flexShrink:0, marginTop:1 }}/>
-            <div>
-              <p style={{ margin:0, fontSize:13, fontWeight:600, color:'#713F12' }}>Queda pendiente de asignación</p>
-              <p style={{ margin:'3px 0 0', fontSize:12, color:'#92400E' }}>
-                El reparto a Igna, José y Hans se hace desde Estadísticas al asignar este ingreso.
-              </p>
-            </div>
-          </div>
+          {/* Reparto de dueños */}
+          {(() => {
+            const { pIgna, pJose, pHans, mIgna, mJose, mHans } = calcularReparto(asignadoAuto, totalFinal);
+            return (
+              <div style={{ background:NA.light, borderRadius:14, padding:'14px 18px', marginBottom:16 }}>
+                <p style={{ margin:'0 0 10px', fontSize:11, fontWeight:700, color:NA.darker, textTransform:'uppercase', letterSpacing:'.06em' }}>
+                  Reparto automático
+                </p>
+                {[
+                  { n:'Igna', pct:pIgna, m:mIgna },
+                  { n:'José', pct:pJose, m:mJose },
+                  { n:'Hans', pct:pHans, m:mHans },
+                ].map(({ n, pct, m }) => (
+                  <div key={n} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                    <span style={{ fontSize:13, color:NA.text2 }}>{n} <span style={{ fontSize:11, opacity:.6 }}>({pct}%)</span></span>
+                    <span style={{ fontSize:14, fontWeight:700, color:NA.darker }}>{labelMon(moneda)} {m.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           <button type="submit" disabled={guardando}
             style={{ width:'100%', padding:'17px', borderRadius:14, border:'none',

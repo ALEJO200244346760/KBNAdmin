@@ -80,6 +80,60 @@ const labelMoneda = (m) => {
   return MAP[m] || m;
 };
 
+// ── Agrupa una lista de movimientos por fecha, en tabs colapsables ───────────
+// Mismo patrón que el selector de cobros del Monitor.
+const GruposPorFecha = ({ items, renderItem, color, bg, borde }) => {
+  const grupos = React.useMemo(() => {
+    const map = {};
+    items.forEach(i => {
+      const f = i.fecha || 'Sin fecha';
+      (map[f] = map[f] || []).push(i);
+    });
+    return Object.keys(map).sort((a, b) => b.localeCompare(a)).map(f => [f, map[f]]);
+  }, [items]);
+
+  // Abierto por defecto: solo el grupo más reciente
+  const [abiertos, setAbiertos] = React.useState(() => new Set(grupos.length ? [grupos[0][0]] : []));
+  const toggle = f => setAbiertos(prev => {
+    const n = new Set(prev);
+    n.has(f) ? n.delete(f) : n.add(f);
+    return n;
+  });
+
+  const fmtFecha = f => {
+    if (!f || f === 'Sin fecha') return 'Sin fecha';
+    const [y, m, d] = f.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  return (
+    <div>
+      {grupos.map(([fecha, lista]) => {
+        const open = abiertos.has(fecha);
+        return (
+          <div key={fecha}>
+            <button onClick={() => toggle(fecha)}
+              style={{
+                width: '100%', padding: '9px 20px', textAlign: 'left', cursor: 'pointer',
+                border: 'none', borderTop: `0.5px solid ${borde}`, background: bg,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color }}>{fmtFecha(fecha)}</span>
+                <span style={{ fontSize: 11, color: NA.text2 }}>
+                  {lista.length} movimiento{lista.length > 1 ? 's' : ''}
+                </span>
+              </span>
+              <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 14, color }} />
+            </button>
+            {open && lista.map(renderItem)}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const ReporteEstadisticas = () => {
   const { token } = useAuth();
 
@@ -231,19 +285,8 @@ const ReporteEstadisticas = () => {
   const handlePendienteChange = (id, val) =>
     setPendientes(prev => prev.map(p => p.id === id ? { ...p, asignadoA: val } : p));
 
-  const acumularEnPasivo = async (pasivo, monto, item, etiqueta) => {
-    if (!pasivo) { console.warn('[saveAssignment] No se acumuló', etiqueta, '— tarjeta no encontrada.'); return; }
-    if (monto <= 0) { console.warn('[saveAssignment] monto 0 para', etiqueta); return; }
-    const montoRedondeado = Math.round(monto * 100) / 100;
-    const nota = `${etiqueta} de ${item.actividad || 'Clase'} — ${item.fecha} = ${montoRedondeado.toFixed(2)} ${item.moneda}`;
-    try {
-      const res = await api.put(`/api/pasivos/${pasivo.id}/acumular`, { monto: -montoRedondeado, nota, fecha: item.fecha });
-      console.log('[saveAssignment] OK ->', pasivo.titulo, res.status);
-    } catch (e) {
-      console.error(`[saveAssignment] ERROR en ${pasivo.titulo}:`, e.response?.data || e.message);
-    }
-  };
-
+  // El reparto a los dueños se hace UNA sola vez, al crear el ingreso (Ingreso.jsx).
+  // Acá solo se actualiza a quién queda asignado — no se toca ninguna cuenta corriente.
   const saveAssignment = async (item, asignadoA) => {
     if (!asignadoA || asignadoA === 'NINGUNO') return alert('Selecciona un instructor válido.');
     if (asignandoRef.current.has(item.id)) return;
@@ -260,29 +303,7 @@ const ReporteEstadisticas = () => {
 
     try {
       await api.put(`/api/clases/asignar/${item.id}`, { asignadoA, detalles: base + notaPct });
-      const resPasivos = await api.get('/api/pasivos');
-      const pasivosActuales = resPasivos.data;
-      setPasivos(pasivosActuales);
-      const buscar = (titulo) => pasivosActuales.find(p => p.titulo.trim().toLowerCase() === titulo.trim().toLowerCase());
-      const pJoseObj = buscar(PASIVO_TITULOS.JOSE);
-      const pIgnaObj = buscar(PASIVO_TITULOS.IGNA);
-      const pHansObj = buscar(PASIVO_TITULOS.HANS);
-      const faltantes = [];
-      if (!pJoseObj) faltantes.push(PASIVO_TITULOS.JOSE);
-      if (!pIgnaObj) faltantes.push(PASIVO_TITULOS.IGNA);
-      if (!pHansObj) faltantes.push(PASIVO_TITULOS.HANS);
-      await Promise.all([
-        acumularEnPasivo(pJoseObj, mJose, item, `${fmt(pJose)}%`),
-        acumularEnPasivo(pIgnaObj, mIgna, item, `${fmt(pIgna)}%`),
-        acumularEnPasivo(pHansObj, mHans, item, `${fmt(pHans)}%`),
-      ]);
-      fetchPasivos();
       fetchData();
-      if (faltantes.length > 0) {
-        alert(`Asignado correctamente, pero no se encontraron: ${faltantes.join(', ')}. Verificá el nombre en Pasivos.`);
-      } else {
-        alert('Asignado correctamente. Montos acumulados en Cuentas Corrientes de José, Igna y Hans.');
-      }
     } catch (e) {
       console.error('[saveAssignment] ERROR:', e.response?.data || e.message);
       alert('Error de red o no autorizado al asignar.');
@@ -699,7 +720,7 @@ const ReporteEstadisticas = () => {
         </div>
         {showEgresos && (egresosFiltrados.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No se registraron egresos con estos filtros.</div>
-          : egresosFiltrados.map(item => {
+          : <GruposPorFecha items={egresosFiltrados} color="#991B1B" bg="#FEF2F2" borde={NA.border} renderItem={item => {
             const monto = parseFloat(item.total) || parseFloat(item.gastosAsociados) || 0;
             return (
               <div key={item.id}>
@@ -729,7 +750,7 @@ const ReporteEstadisticas = () => {
                 {expandedId === item.id && <RenderDetails item={item} />}
               </div>
             );
-          })
+          }} />
         )}
       </div>
 
@@ -745,7 +766,7 @@ const ReporteEstadisticas = () => {
         </div>
         {showIngresos && (asignadosFiltrados.length === 0
           ? <div style={{ padding: '20px', textAlign: 'center', color: NA.text2, fontSize: 14 }}>No hay ingresos asignados con estos filtros.</div>
-          : asignadosFiltrados.map(item => (
+          : <GruposPorFecha items={asignadosFiltrados} color={NA.darker} bg={NA.light} borde={NA.border} renderItem={item => (
             <div key={item.id}>
               <div style={styles.row}>
                 <div style={{ flex: 1 }}>
@@ -783,7 +804,7 @@ const ReporteEstadisticas = () => {
               </div>
               {expandedId === item.id && <RenderDetails item={item} />}
             </div>
-          ))
+          )} />
         )}
       </div>
 
