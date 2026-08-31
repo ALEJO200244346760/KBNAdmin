@@ -2,8 +2,10 @@ package com.kbn_backend.kbn_backend.controller;
 
 import com.kbn_backend.kbn_backend.model.Pasivo;
 import com.kbn_backend.kbn_backend.model.PagoPasivo;
+import com.kbn_backend.kbn_backend.model.ClaseRegistro;
 import com.kbn_backend.kbn_backend.repository.PasivoRepository;
 import com.kbn_backend.kbn_backend.repository.PagoPasivoRepository;
+import com.kbn_backend.kbn_backend.repository.ClaseRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ public class PasivoController {
 
     @Autowired private PasivoRepository pasivoRepository;
     @Autowired private PagoPasivoRepository pagoPasivoRepository;
+    @Autowired private ClaseRepository claseRepository;
 
     // ── DTO para acumular ────────────────────────────────────────────────────
     public static class AcumularRequest {
@@ -539,6 +542,209 @@ public class PasivoController {
         if (!noEncontrados.isEmpty()) out.put("noEncontrados", noEncontrados);
         if (!rechazados.isEmpty())    out.put("rechazadosPorSerPositivos", rechazados);
         return ResponseEntity.ok(out);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // SINCRONIZAR REPARTOS CON ESTADÍSTICAS
+    //
+    // Estadísticas calcula el reparto al vuelo desde el monto ACTUAL de cada
+    // ingreso, así que es la fuente de verdad. Las tarjetas, en cambio, tienen
+    // el reparto congelado de cuando se creó cada movimiento — desactualizado
+    // si el ingreso se editó, y a veces duplicado.
+    //
+    // Este proceso, por cada dueño (Igna, José, Hans):
+    //   1. borra TODOS sus movimientos que sean "reparto de un ingreso"
+    //      (nota que arranca con "<pct>% de ..."), sin importar duplicados ni
+    //      montos viejos;
+    //   2. los reconstruye desde los ingresos, con el porcentaje que
+    //      corresponde a la asignación y el monto actual.
+    //
+    // NO toca: pagos, adelantos, deudas manuales, ni liquidaciones de clase a
+    // freelancers (esas notas no arrancan con "%").
+    // ══════════════════════════════════════════════════════════════════════
+
+    private static final String T_IGNA = "Igna Krebs";
+    private static final String T_JOSE = "José Sánchez";
+    private static final String T_HANS = "Hans Leonhard Wurbs";
+
+    // Un movimiento de reparto arranca con "<pct>% de "
+    private static final Pattern ES_REPARTO = Pattern.compile("^\\s*\\d+(?:[.,]\\d+)?\\s*%\\s+de\\s+");
+
+    private boolean notaEsReparto(String nota) {
+        return nota != null && ES_REPARTO.matcher(nota).find();
+    }
+
+    private Map<String, Double> porcentajesReparto(String asignadoA) {
+        double pIgna, pJose;
+        String a = asignadoA == null ? "" : asignadoA.trim().toUpperCase();
+        switch (a) {
+            case "IGNA":  pIgna = 16;   pJose = 8;    break;
+            case "JOSE":  pIgna = 8;    pJose = 16;   break;
+            case "AMBOS": pIgna = 12.5; pJose = 12.5; break;
+            default:      pIgna = 10;   pJose = 10;   break;
+        }
+        Map<String, Double> m = new LinkedHashMap<>();
+        m.put(T_IGNA, pIgna);
+        m.put(T_JOSE, pJose);
+        m.put(T_HANS, 5.0);
+        return m;
+    }
+
+    private double parseMonto(String s) {
+        if (s == null || s.isBlank()) return 0;
+        try { return Double.parseDouble(s.trim().replace(",", ".")); }
+        catch (Exception e) { return 0; }
+    }
+
+    private LocalDate parseFechaSafe(String s) {
+        try { return LocalDate.parse(s); } catch (Exception e) { return LocalDate.now(); }
+    }
+
+    private String fmtPctReparto(double pct) {
+        return pct == Math.floor(pct) ? String.valueOf((int) pct)
+                                      : String.valueOf(pct).replace('.', ',');
+    }
+
+    private Pasivo buscarTarjeta(String titulo) {
+        for (Pasivo p : pasivoRepository.findAll()) {
+            if (p.getTitulo() != null && p.getTitulo().trim().equalsIgnoreCase(titulo.trim())) return p;
+        }
+        return null;
+    }
+
+    // GET /api/pasivos/sync-reparto/preview   — no modifica nada
+    @GetMapping("/sync-reparto/preview")
+    public ResponseEntity<Map<String, Object>> previewSyncReparto() {
+        return ResponseEntity.ok(sincronizarRepartos(false));
+    }
+
+    // POST /api/pasivos/sync-reparto?confirmar=true   — aplica
+    @Transactional
+    @PostMapping("/sync-reparto")
+    public ResponseEntity<Map<String, Object>> ejecutarSyncReparto(
+            @RequestParam(defaultValue = "false") boolean confirmar) {
+        if (!confirmar) {
+            Map<String, Object> aviso = new LinkedHashMap<>();
+            aviso.put("error", "Falta confirmar. Agregá ?confirmar=true.");
+            aviso.put("sugerencia", "Mirá antes GET /api/pasivos/sync-reparto/preview");
+            return ResponseEntity.badRequest().body(aviso);
+        }
+        return ResponseEntity.ok(sincronizarRepartos(true));
+    }
+
+    private Map<String, Object> sincronizarRepartos(boolean ejecutar) {
+        // ── Paso 1: qué reparto DEBERÍA tener cada dueño, por ingreso ────────
+        //   además juntamos, por dueño, el total esperado.
+        Map<String, Double> esperadoPorDueno = new LinkedHashMap<>();
+        esperadoPorDueno.put(T_IGNA, 0.0);
+        esperadoPorDueno.put(T_JOSE, 0.0);
+        esperadoPorDueno.put(T_HANS, 0.0);
+
+        // Movimientos nuevos a crear, agrupados por dueño
+        Map<String, List<PagoPasivo>> nuevosPorDueno = new LinkedHashMap<>();
+        nuevosPorDueno.put(T_IGNA, new ArrayList<>());
+        nuevosPorDueno.put(T_JOSE, new ArrayList<>());
+        nuevosPorDueno.put(T_HANS, new ArrayList<>());
+
+        int ingresosConsiderados = 0, sinAsignar = 0;
+
+        for (ClaseRegistro r : claseRepository.findAll()) {
+            if (!"INGRESO".equalsIgnoreCase(r.getTipoTransaccion())) continue;
+            String asignado = r.getAsignadoA();
+            if (asignado == null || asignado.isBlank() || "NINGUNO".equalsIgnoreCase(asignado)) {
+                sinAsignar++;
+                continue;
+            }
+            double total = parseMonto(r.getTotal());
+            if (total <= 0) continue;
+            ingresosConsiderados++;
+
+            String moneda = r.getMoneda() != null && !r.getMoneda().isBlank() ? r.getMoneda() : "BRL";
+            String actividad = r.getActividad() != null && !r.getActividad().isBlank()
+                    ? r.getActividad() : "Ingreso";
+            LocalDate fecha = parseFechaSafe(r.getFecha());
+
+            for (Map.Entry<String, Double> e : porcentajesReparto(asignado).entrySet()) {
+                String titulo = e.getKey();
+                double pct    = e.getValue();
+                double monto  = Math.round(total * pct / 100.0 * 100.0) / 100.0;
+                if (monto <= 0) continue;
+
+                esperadoPorDueno.merge(titulo, monto, Double::sum);
+
+                if (ejecutar) {
+                    PagoPasivo mov = new PagoPasivo();
+                    mov.setMontoPagado(-monto);
+                    mov.setFecha(fecha);
+                    mov.setMoneda(moneda);
+                    mov.setNota(fmtPctReparto(pct) + "% de " + actividad + " — " + r.getFecha()
+                            + " = " + String.format(Locale.US, "%.2f", monto) + " " + moneda);
+                    nuevosPorDueno.get(titulo).add(mov);
+                }
+            }
+        }
+
+        // ── Paso 2: por cada tarjeta, medir lo viejo y (si ejecutar) reemplazar
+        List<Map<String, Object>> detalle = new ArrayList<>();
+        for (String titulo : new String[]{ T_IGNA, T_JOSE, T_HANS }) {
+            Pasivo pasivo = buscarTarjeta(titulo);
+            Map<String, Object> f = new LinkedHashMap<>();
+            f.put("tarjeta", titulo);
+
+            if (pasivo == null) { f.put("error", "tarjeta no encontrada"); detalle.add(f); continue; }
+
+            double viejoReparto = 0, otros = 0;
+            int nViejos = 0, nOtros = 0;
+            List<Long> idsReparto = new ArrayList<>();
+            for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                double m = p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                if (notaEsReparto(p.getNota())) {
+                    viejoReparto += m; nViejos++; idsReparto.add(p.getId());
+                } else {
+                    otros += m; nOtros++;
+                }
+            }
+            double esperado = esperadoPorDueno.getOrDefault(titulo, 0.0);
+
+            f.put("repartoViejo",      Math.round(viejoReparto * 100.0) / 100.0);
+            f.put("movsRepartoViejo",  nViejos);
+            f.put("repartoEsperado",   Math.round(-esperado * 100.0) / 100.0);
+            f.put("otrosMovimientos",  nOtros);
+            f.put("sumaOtros",         Math.round(otros * 100.0) / 100.0);
+            f.put("saldoActual",       Math.round((viejoReparto + otros) * 100.0) / 100.0);
+            f.put("saldoLuegoDeSync",  Math.round((otros - esperado) * 100.0) / 100.0);
+            f.put("ajuste",            Math.round((( otros - esperado) - (viejoReparto + otros)) * 100.0) / 100.0);
+
+            if (ejecutar) {
+                // borrar los viejos de reparto (sacándolos de la colección)
+                pasivo.getHistorialPagos().removeIf(p -> idsReparto.contains(p.getId()));
+                // agregar los nuevos
+                for (PagoPasivo mov : nuevosPorDueno.get(titulo)) {
+                    mov.setPasivo(pasivo);
+                    pasivo.getHistorialPagos().add(mov);
+                }
+                // recalcular saldo = suma total del historial (todo en reales)
+                double nuevoTotal = 0;
+                for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                    nuevoTotal += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                }
+                pasivo.setMontoTotal(Math.round(nuevoTotal * 100.0) / 100.0);
+                pasivoRepository.save(pasivo);
+                f.put("movsRepartoNuevos", nuevosPorDueno.get(titulo).size());
+                f.put("accion", "sincronizada");
+            } else {
+                f.put("movsRepartoNuevos", nuevosPorDueno.get(titulo).size());
+                f.put("accion", "preview (no se modificó)");
+            }
+            detalle.add(f);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("modo", ejecutar ? "EJECUTADO" : "PREVIEW — agregá ?confirmar=true para aplicar");
+        out.put("ingresosConsiderados", ingresosConsiderados);
+        out.put("ingresosSinAsignar", sinAsignar);
+        out.put("porTarjeta", detalle);
+        return out;
     }
 
     // 5. Obtener una tarjeta por ID (con saldos por moneda)
