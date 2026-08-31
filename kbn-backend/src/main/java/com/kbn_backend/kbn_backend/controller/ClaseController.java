@@ -6,6 +6,7 @@ import com.kbn_backend.kbn_backend.model.PagoPasivo;
 import com.kbn_backend.kbn_backend.repository.ClaseRepository;
 import com.kbn_backend.kbn_backend.repository.PasivoRepository;
 import com.kbn_backend.kbn_backend.repository.PagoPasivoRepository;
+import com.kbn_backend.kbn_backend.service.RepartoService;
 import com.kbn_backend.kbn_backend.service.FinanzasService;
 import com.kbn_backend.kbn_backend.dto.ReporteKiteDTO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ public class ClaseController {
 
     @Autowired
     private PagoPasivoRepository pagoPasivoRepository;
+
+    @Autowired
+    private RepartoService repartoService;
 
     // --- DTO INTERNO PARA ASIGNACIONES ---
     public static class AsignacionRequest {
@@ -93,7 +97,9 @@ public class ClaseController {
                         registro.setDetalles(request.getDetalles());
                     }
 
-                    claseRepository.save(registro);
+                    ClaseRegistro guardado = claseRepository.save(registro);
+                    // Cambió el asignado → cambian los porcentajes del reparto
+                    repartoService.recalcular(guardado);
                     return ResponseEntity.ok("Asignación actualizada correctamente.");
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -140,6 +146,8 @@ public class ClaseController {
                     if (detalles.getDetalleFormaPago() != null) registro.setDetalleFormaPago(detalles.getDetalleFormaPago());
 
                     ClaseRegistro actualizado = claseRepository.save(registro);
+                    // El monto/moneda/fecha pudo cambiar → rehacer el reparto de este ingreso
+                    repartoService.recalcular(actualizado);
                     return ResponseEntity.ok(actualizado);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -185,6 +193,11 @@ public class ClaseController {
                             pagoPasivoRepository.save(reversion);
                             pasivoRepository.save(pasivo);
                         });
+                    }
+
+                    // Si es un INGRESO, revertir el reparto que había generado
+                    if ("INGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
+                        repartoService.limpiar(registro.getId());
                     }
 
                     claseRepository.delete(registro);

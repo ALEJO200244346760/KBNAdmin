@@ -6,6 +6,7 @@ import com.kbn_backend.kbn_backend.model.ClaseRegistro;
 import com.kbn_backend.kbn_backend.repository.PasivoRepository;
 import com.kbn_backend.kbn_backend.repository.PagoPasivoRepository;
 import com.kbn_backend.kbn_backend.repository.ClaseRepository;
+import com.kbn_backend.kbn_backend.service.RepartoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class PasivoController {
     @Autowired private PasivoRepository pasivoRepository;
     @Autowired private PagoPasivoRepository pagoPasivoRepository;
     @Autowired private ClaseRepository claseRepository;
+    @Autowired private RepartoService repartoService;
 
     // ── DTO para acumular ────────────────────────────────────────────────────
     public static class AcumularRequest {
@@ -716,22 +718,15 @@ public class PasivoController {
             f.put("ajuste",            Math.round((( otros - esperado) - (viejoReparto + otros)) * 100.0) / 100.0);
 
             if (ejecutar) {
-                // borrar los viejos de reparto (sacándolos de la colección)
+                // Borrar TODO movimiento de reparto viejo de esta tarjeta
+                // (tengan o no origenIngresoId), sacándolos de la colección.
                 pasivo.getHistorialPagos().removeIf(p -> idsReparto.contains(p.getId()));
-                // agregar los nuevos
-                for (PagoPasivo mov : nuevosPorDueno.get(titulo)) {
-                    mov.setPasivo(pasivo);
-                    pasivo.getHistorialPagos().add(mov);
-                }
-                // recalcular saldo = suma total del historial (todo en reales)
-                double nuevoTotal = 0;
-                for (PagoPasivo p : pasivo.getHistorialPagos()) {
-                    nuevoTotal += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-                }
-                pasivo.setMontoTotal(Math.round(nuevoTotal * 100.0) / 100.0);
+                double t = 0;
+                for (PagoPasivo p : pasivo.getHistorialPagos())
+                    t += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                pasivo.setMontoTotal(Math.round(t * 100.0) / 100.0);
                 pasivoRepository.save(pasivo);
-                f.put("movsRepartoNuevos", nuevosPorDueno.get(titulo).size());
-                f.put("accion", "sincronizada");
+                f.put("accion", "reparto viejo borrado");
             } else {
                 f.put("movsRepartoNuevos", nuevosPorDueno.get(titulo).size());
                 f.put("accion", "preview (no se modificó)");
@@ -739,10 +734,25 @@ public class PasivoController {
             detalle.add(f);
         }
 
+        // Recrear el reparto ingreso por ingreso usando el servicio, que marca
+        // origenIngresoId. Así, de acá en más, editar/borrar cada ingreso
+        // mantiene el reparto sincronizado solo.
+        int recreados = 0;
+        if (ejecutar) {
+            for (ClaseRegistro r : claseRepository.findAll()) {
+                if (!"INGRESO".equalsIgnoreCase(r.getTipoTransaccion())) continue;
+                String a = r.getAsignadoA();
+                if (a == null || a.isBlank() || "NINGUNO".equalsIgnoreCase(a)) continue;
+                repartoService.recalcular(r);
+                recreados++;
+            }
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("modo", ejecutar ? "EJECUTADO" : "PREVIEW — agregá ?confirmar=true para aplicar");
         out.put("ingresosConsiderados", ingresosConsiderados);
         out.put("ingresosSinAsignar", sinAsignar);
+        if (ejecutar) out.put("ingresosRepartidos", recreados);
         out.put("porTarjeta", detalle);
         return out;
     }

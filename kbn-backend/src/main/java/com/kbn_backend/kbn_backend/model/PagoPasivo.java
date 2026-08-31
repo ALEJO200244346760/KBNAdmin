@@ -19,6 +19,11 @@ public class PagoPasivo {
     // Null = BRL legacy (antes de este campo)
     private String moneda;
 
+    // Id del ClaseRegistro (ingreso) que generó este movimiento de reparto.
+    // null = movimiento manual (pago, adelanto, deuda) o liquidación de clase.
+    // Permite resincronizar el reparto cuando el ingreso se edita o se borra.
+    private Long origenIngresoId;
+
     @ManyToOne
     @JoinColumn(name = "pasivo_id")
     @JsonBackReference // ESTO ES VITAL
