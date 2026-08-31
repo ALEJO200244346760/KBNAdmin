@@ -68,21 +68,36 @@ public class PasivoController {
     //         USD_EFECTIVO, USD_MARIANA                 → USD
     //         EUR_WIZE_IGNA                             → EUR
     // Para movimientos legacy (moneda == null), parsea la nota.
+    // Todos los montos están expresados en REALES, sin importar en qué caja
+    // esté físicamente la plata (Wise, USD efectivo, Stone, etc.).
+    // Por eso el saldo es uno solo, en BRL. El canal se conserva como dato
+    // informativo en cada movimiento, pero ya no separa el saldo.
     private Map<String, Double> calcularSaldosPorMoneda(Pasivo pasivo) {
         Map<String, Double> saldos = new LinkedHashMap<>();
         if (pasivo.getHistorialPagos() == null) return saldos;
+        double total = 0;
         for (PagoPasivo p : pasivo.getHistorialPagos()) {
-            String canal;
-            if (p.getMoneda() != null && !p.getMoneda().isBlank()) {
-                canal = p.getMoneda();
-            } else {
-                canal = detectarMonedaDeLaNota(p.getNota());
-            }
-            String monedaBase = monedaBaseDeCanal(canal);
-            double monto = p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-            saldos.merge(monedaBase, monto, Double::sum);
+            total += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
         }
+        saldos.put("BRL", Math.round(total * 100.0) / 100.0);
         return saldos;
+    }
+
+    // Desglose informativo por caja — no afecta el saldo, solo muestra dónde
+    // está repartida la plata.
+    private Map<String, Double> calcularDesglosePorCaja(Pasivo pasivo) {
+        Map<String, Double> porCaja = new LinkedHashMap<>();
+        if (pasivo.getHistorialPagos() == null) return porCaja;
+        for (PagoPasivo p : pasivo.getHistorialPagos()) {
+            String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
+                    ? p.getMoneda()
+                    : detectarMonedaDeLaNota(p.getNota());
+            if (canal == null || canal.isBlank()) canal = "BRL";
+            double monto = p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+            porCaja.merge(canal, monto, Double::sum);
+        }
+        porCaja.entrySet().removeIf(e -> Math.abs(e.getValue()) < 0.001);
+        return porCaja;
     }
 
     // ── DTO de respuesta enriquecido (incluye saldos por moneda) ────────────
@@ -98,6 +113,7 @@ public class PasivoController {
         dto.put("montoTotal",    p.getMontoTotal());
         dto.put("historialPagos", p.getHistorialPagos()); // PagoPasivo ya expone moneda
         dto.put("saldosPorMoneda", calcularSaldosPorMoneda(p));
+        dto.put("desglosePorCaja",  calcularDesglosePorCaja(p));
         return dto;
     }
 
@@ -144,22 +160,11 @@ public class PasivoController {
                 .map(pasivo -> {
                     double monto = request.getMonto() != null ? request.getMonto() : 0;
 
-                    // montoTotal solo se actualiza para movimientos en la moneda
-                    // base de la tarjeta (BRL) o cuando no hay moneda (legacy).
-                    // Para monedas distintas, el saldo "real" vive en el historial.
-                    String monedaMov = request.getMoneda();
-                    String monedaBase = pasivo.getMoneda() != null ? pasivo.getMoneda() : "BRL";
-                    boolean esMismaMoneda = monedaMov == null
-                            || monedaMov.isBlank()
-                            || monedaMov.equals("BRL")
-                            || monedaMov.equals(monedaBase)
-                            || monedaMov.startsWith("R$_"); // R$_STONE_JOSE etc. = BRL
-
-                    if (esMismaMoneda) {
-                        pasivo.setMontoTotal(pasivo.getMontoTotal() + monto);
-                    }
-                    // Para otras monedas (EUR, USD), montoTotal NO cambia —
-                    // el saldo se puede leer siempre de saldosPorMoneda.
+                    // Todos los montos están expresados en reales, sin importar
+                    // en qué caja esté la plata (Wise, USD efectivo, Stone...).
+                    // Por eso montoTotal suma SIEMPRE, sea cual sea el canal.
+                    double totalPrevio = pasivo.getMontoTotal() != null ? pasivo.getMontoTotal() : 0;
+                    pasivo.setMontoTotal(totalPrevio + monto);
 
                     PagoPasivo registro = new PagoPasivo();
                     registro.setMontoPagado(monto);
@@ -234,17 +239,12 @@ public class PasivoController {
 
     private static final LocalDate FECHA_DESDE = LocalDate.of(2026, 8, 13);
 
-    /** Recalcula montoTotal (solo canales BRL) a partir del historial actual. */
+    /** Recalcula montoTotal sumando TODO el historial (todo está en reales). */
     private void recalcularTotalBRL(Pasivo pasivo) {
         double totalBRL = 0;
         if (pasivo.getHistorialPagos() != null) {
             for (PagoPasivo p : pasivo.getHistorialPagos()) {
-                String canal = (p.getMoneda() != null && !p.getMoneda().isBlank())
-                        ? p.getMoneda()
-                        : detectarMonedaDeLaNota(p.getNota());
-                if (monedaBaseDeCanal(canal).equals("BRL")) {
-                    totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-                }
+                totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
             }
         }
         pasivo.setMontoTotal(totalBRL);
@@ -539,23 +539,52 @@ public class PasivoController {
                     if (pasivo.getHistorialPagos() == null) {
                         return ResponseEntity.ok(enriquecerPasivo(pasivo));
                     }
-                    double totalBRL = 0;
+                    // Todo está en reales: se suma el historial completo.
+                    double total = 0;
                     for (PagoPasivo p : pasivo.getHistorialPagos()) {
-                        String canal;
-                        if (p.getMoneda() != null && !p.getMoneda().isBlank()) {
-                            canal = p.getMoneda();
-                        } else {
-                            canal = detectarMonedaDeLaNota(p.getNota());
-                        }
-                        boolean esBRL = monedaBaseDeCanal(canal).equals("BRL");
-                        if (esBRL) {
-                            totalBRL += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
-                        }
+                        total += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
                     }
-                    pasivo.setMontoTotal(totalBRL);
+                    pasivo.setMontoTotal(Math.round(total * 100.0) / 100.0);
                     return ResponseEntity.ok(enriquecerPasivo(pasivoRepository.save(pasivo)));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    // 6b. RECALCULAR montoTotal de TODAS las tarjetas de una sola vez.
+    //     Necesario después de reexpresar montos a reales: los montoTotal
+    //     guardados quedaron sin sumar los movimientos en canales EUR/USD.
+    @Transactional
+    @PostMapping("/recalcular-todos")
+    public ResponseEntity<Map<String, Object>> recalcularTodos() {
+        List<Map<String, Object>> filas = new ArrayList<>();
+
+        for (Pasivo pasivo : pasivoRepository.findAll()) {
+            double antes = pasivo.getMontoTotal() != null ? pasivo.getMontoTotal() : 0;
+            double total = 0;
+            int movs = 0;
+            if (pasivo.getHistorialPagos() != null) {
+                for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                    total += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                    movs++;
+                }
+            }
+            total = Math.round(total * 100.0) / 100.0;
+            pasivo.setMontoTotal(total);
+            pasivoRepository.save(pasivo);
+
+            Map<String, Object> f = new LinkedHashMap<>();
+            f.put("tarjeta",      pasivo.getTitulo());
+            f.put("movimientos",  movs);
+            f.put("antes",        Math.round(antes * 100.0) / 100.0);
+            f.put("ahora",        total);
+            f.put("diferencia",   Math.round((total - antes) * 100.0) / 100.0);
+            filas.add(f);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("tarjetasActualizadas", filas.size());
+        out.put("detalle", filas);
+        return ResponseEntity.ok(out);
     }
 
     // 7. CORREGIR MONEDA de un PagoPasivo existente ──────────────────────────

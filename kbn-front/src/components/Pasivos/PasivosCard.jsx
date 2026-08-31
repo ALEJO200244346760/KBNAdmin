@@ -6,11 +6,14 @@ const PasivosCard = ({ p, onTransaction, onHistory, onEdit, onDelete }) => {
   const estado  = getEstado(balance);
   const decoded = decodeTarifa(p.descripcion);
 
-  // saldosPorMoneda viene del backend (calculado del historial)
-  const saldos = p.saldosPorMoneda || {};
-  const saldosEntries = Object.entries(saldos).filter(([, v]) => Math.abs(v) > 0.001);
-  const tieneMultiMoneda = saldosEntries.length > 1 ||
-    (saldosEntries.length === 1 && !['BRL', 'R$_STONE_JOSE', 'R$_STONE_IGNA', 'R$_EFECTIVO'].includes(saldosEntries[0][0]));
+  // Todos los montos están en reales. El saldo es uno solo.
+  const saldos    = p.saldosPorMoneda || {};
+  const saldoBRL  = typeof saldos.BRL === 'number' ? saldos.BRL : balance;
+
+  // Desglose informativo: en qué caja está la plata (no afecta el saldo)
+  const cajas = Object.entries(p.desglosePorCaja || {})
+    .filter(([, v]) => Math.abs(v) > 0.001)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 
   return (
     <div style={{
@@ -56,33 +59,36 @@ const PasivosCard = ({ p, onTransaction, onHistory, onEdit, onDelete }) => {
         {decoded.descripcion || '—'}
       </p>
 
-      {/* ── Saldo ── */}
-      {tieneMultiMoneda ? (
-        <div style={{ marginBottom: 16 }}>
-          <span style={{ display: 'block', fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Saldo por moneda</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {saldosEntries.map(([mon, val]) => {
+      {/* ── Saldo único en reales ── */}
+      <div style={{ background: estado.bg, borderRadius: 12, padding: '14px', textAlign: 'center', marginBottom: cajas.length > 0 ? 8 : 16 }}>
+        <span style={{ display: 'block', fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+          Saldo actual
+        </span>
+        <span style={{ fontSize: 24, fontWeight: 600, color: estado.color }}>
+          R$ {Math.abs(saldoBRL).toFixed(2)}
+        </span>
+      </div>
+
+      {/* ── Dónde está la plata (informativo) ── */}
+      {cajas.length > 0 && (
+        <details style={{ marginBottom: 16 }}>
+          <summary style={{ fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', cursor: 'pointer', listStyle: 'none', padding: '4px 0' }}>
+            Por caja ({cajas.length}) ▾
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+            {cajas.map(([caja, val]) => {
               const esNeg = val < -0.001;
-              const c  = esNeg ? '#B91C1C' : NA.dark;
-              const bg = esNeg ? '#FEF2F2' : NA.light;
               return (
-                <div key={mon} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: bg, borderRadius: 10, padding: '8px 12px' }}>
-                  <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(mon)}</span>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: c }}>
-                    {simboloMoneda(mon)} {Math.abs(val).toFixed(2)}
+                <div key={caja} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', borderRadius: 8, padding: '6px 10px' }}>
+                  <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(caja)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: esNeg ? '#B91C1C' : NA.dark }}>
+                    R$ {Math.abs(val).toFixed(2)}
                   </span>
                 </div>
               );
             })}
           </div>
-        </div>
-      ) : (
-        <div style={{ background: estado.bg, borderRadius: 12, padding: '14px', textAlign: 'center', marginBottom: 16 }}>
-          <span style={{ display: 'block', fontSize: 10, color: NA.text2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Saldo actual</span>
-          <span style={{ fontSize: 24, fontWeight: 600, color: estado.color }}>
-            {p.moneda} {Math.abs(balance).toFixed(2)}
-          </span>
-        </div>
+        </details>
       )}
 
       {/* ── Botones de transacción ── */}
