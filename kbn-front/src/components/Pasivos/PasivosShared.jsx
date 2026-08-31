@@ -84,6 +84,27 @@ const MONEDA_LABELS = {
   EUR: 'Euros (EUR)',
   ARS: 'Pesos (ARS)',
 };
+// Nombre de la CAJA donde está la plata.
+// Ojo: no es la moneda del monto. Todos los montos están en reales; el canal
+// sólo indica de qué cuenta salió o entró (Wise, Stone, efectivo...).
+export const labelCaja = (m) => {
+  if (!m) return 'Reales';
+  const mapa = {
+    'BRL':            'Reales',
+    'R$_STONE_JOSE':  'Stone José',
+    'R$_STONE_IGNA':  'Stone Igna',
+    'R$_EFECTIVO':    'Efectivo R$',
+    'EUR_WIZE_IGNA':  'Wise Igna',
+    'USD_EFECTIVO':   'Efectivo USD',
+    'USD_MARIANA':    'Mariana USD',
+  };
+  if (mapa[m]) return mapa[m];
+  if (m.startsWith('R$_'))  return m.replace('R$_', '').replace(/_/g, ' ');
+  if (m.startsWith('EUR'))  return m.replace('EUR_', 'Wise ').replace(/_/g, ' ');
+  if (m.startsWith('USD'))  return m.replace('USD_', 'USD ').replace(/_/g, ' ');
+  return m.replace(/_/g, ' ');
+};
+
 export const labelMoneda = (m) => {
   if (!m) return 'BRL';
   if (m === 'BRL' || m.startsWith('R$_')) return 'Reales (BRL)';

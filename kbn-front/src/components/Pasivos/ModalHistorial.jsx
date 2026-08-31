@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { NA, sx, labelMoneda, simboloMoneda } from './PasivosShared';
+import { NA, sx, labelCaja } from './PasivosShared';
 
 // Normaliza la fecha a string "YYYY-MM-DD" venga como venga del backend
 const aClave = (f) => {
@@ -66,7 +66,7 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
                   background: esNeg ? '#FEF2F2' : NA.light,
                   color: esNeg ? '#B91C1C' : NA.dark,
                 }}>
-                  {labelMoneda(mon)}: {esNeg ? '-' : '+'}{simboloMoneda(mon)} {Math.abs(val).toFixed(2)}
+                  {esNeg ? '-' : '+'}R$ {Math.abs(val).toFixed(2)}
                 </span>
               );
             })}
@@ -114,7 +114,7 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {subtotales.map(([mon, val]) => (
                       <span key={mon} style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', color: val < 0 ? '#B91C1C' : NA.dark }}>
-                        {val < 0 ? '-' : '+'}{simboloMoneda(mon)} {Math.abs(val).toFixed(2)}
+                        {val < 0 ? '-' : '+'}R$ {Math.abs(val).toFixed(2)}
                       </span>
                     ))}
                     <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 14, color: NA.text2 }} />
@@ -138,7 +138,7 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
                           {mov.nota || 'Movimiento'}
                         </p>
                         {mov.moneda && (
-                          <p style={{ fontSize: 10, color: '#9ca3af', margin: '3px 0 0' }}>{labelMoneda(mov.moneda)}</p>
+                          <p style={{ fontSize: 10, color: '#9ca3af', margin: '3px 0 0' }}>{labelCaja(mov.moneda)}</p>
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NA, getEstado, decodeTarifa, simboloMoneda, labelMoneda } from './PasivosShared';
+import { NA, getEstado, decodeTarifa, simboloMoneda, labelMoneda, labelCaja } from './PasivosShared';
 
 const PasivosCard = ({ p, onTransaction, onHistory, onEdit, onDelete }) => {
   const balance = parseFloat(p.montoTotal) || 0;
@@ -80,7 +80,7 @@ const PasivosCard = ({ p, onTransaction, onHistory, onEdit, onDelete }) => {
               const esNeg = val < -0.001;
               return (
                 <div key={caja} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', borderRadius: 8, padding: '6px 10px' }}>
-                  <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(caja)}</span>
+                  <span style={{ fontSize: 11, color: NA.text2 }}>{labelCaja(caja)}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: esNeg ? '#B91C1C' : NA.dark }}>
                     R$ {Math.abs(val).toFixed(2)}
                   </span>
