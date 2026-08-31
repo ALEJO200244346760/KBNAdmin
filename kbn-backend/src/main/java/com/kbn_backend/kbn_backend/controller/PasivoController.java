@@ -166,6 +166,10 @@ public class PasivoController {
                     double totalPrevio = pasivo.getMontoTotal() != null ? pasivo.getMontoTotal() : 0;
                     pasivo.setMontoTotal(totalPrevio + monto);
 
+                    // El canal se sigue guardando en el movimiento: ya no define
+                    // la moneda del monto, pero sirve para saber de qué caja salió.
+                    String monedaMov = request.getMoneda();
+
                     PagoPasivo registro = new PagoPasivo();
                     registro.setMontoPagado(monto);
                     registro.setFecha(request.getFecha() != null ? LocalDate.parse(request.getFecha()) : LocalDate.now());
