@@ -126,9 +126,27 @@ public class PasivoController {
     }
 
     // 2. Crear
+    @Transactional
     @PostMapping
     public ResponseEntity<Pasivo> crearPasivo(@RequestBody Pasivo pasivo) {
-        return ResponseEntity.ok(pasivoRepository.save(pasivo));
+        double inicial = pasivo.getMontoTotal() != null ? pasivo.getMontoTotal() : 0;
+        Pasivo guardado = pasivoRepository.save(pasivo);
+
+        // El monto inicial también se registra como movimiento, para que el
+        // saldo siempre se pueda reconstruir desde el historial. Sin esto, la
+        // deuda original queda sólo en montoTotal y cualquier recálculo la pierde.
+        if (Math.abs(inicial) > 0.001) {
+            PagoPasivo mov = new PagoPasivo();
+            mov.setMontoPagado(inicial);
+            mov.setFecha(LocalDate.now());
+            mov.setMoneda("BRL");
+            mov.setNota("Saldo inicial de la cuenta");
+            mov.setPasivo(guardado);
+            guardado.getHistorialPagos().add(mov);
+            guardado.setMontoTotal(inicial);
+            guardado = pasivoRepository.save(guardado);
+        }
+        return ResponseEntity.ok(guardado);
     }
 
     // 3. Editar nombre/descripción/saldo manual
@@ -557,9 +575,17 @@ public class PasivoController {
     // 6b. RECALCULAR montoTotal de TODAS las tarjetas de una sola vez.
     //     Necesario después de reexpresar montos a reales: los montoTotal
     //     guardados quedaron sin sumar los movimientos en canales EUR/USD.
+    // CUIDADO: no todas las tarjetas tienen su saldo derivable del historial.
+    // Las que se crearon con un monto inicial lo guardaron sólo en montoTotal,
+    // sin generar un movimiento. Para esas, recalcular desde el historial
+    // BORRA la deuda original. Por eso este endpoint es preview por defecto y
+    // saltea las tarjetas donde detecta ese caso, salvo que se le insista.
     @Transactional
     @PostMapping("/recalcular-todos")
-    public ResponseEntity<Map<String, Object>> recalcularTodos() {
+    public ResponseEntity<Map<String, Object>> recalcularTodos(
+            @RequestParam(defaultValue = "false") boolean confirmar,
+            @RequestParam(defaultValue = "true")  boolean protegerSaldoInicial) {
+
         List<Map<String, Object>> filas = new ArrayList<>();
 
         for (Pasivo pasivo : pasivoRepository.findAll()) {
@@ -573,22 +599,97 @@ public class PasivoController {
                 }
             }
             total = Math.round(total * 100.0) / 100.0;
-            pasivo.setMontoTotal(total);
-            pasivoRepository.save(pasivo);
+            double dif = Math.round((total - antes) * 100.0) / 100.0;
+
+            // Señal de saldo inicial no registrado: pocos movimientos y una
+            // diferencia grande respecto del saldo guardado.
+            boolean sospechoso = movs <= 3 && Math.abs(dif) > 0.01;
 
             Map<String, Object> f = new LinkedHashMap<>();
-            f.put("tarjeta",      pasivo.getTitulo());
-            f.put("movimientos",  movs);
-            f.put("antes",        Math.round(antes * 100.0) / 100.0);
-            f.put("ahora",        total);
-            f.put("diferencia",   Math.round((total - antes) * 100.0) / 100.0);
+            f.put("tarjeta",     pasivo.getTitulo());
+            f.put("movimientos", movs);
+            f.put("actual",      Math.round(antes * 100.0) / 100.0);
+            f.put("sumaHistorial", total);
+            f.put("diferencia",  dif);
+
+            if (sospechoso && protegerSaldoInicial) {
+                f.put("accion", "SALTEADA — parece tener saldo inicial fuera del historial");
+                f.put("saldoInicialFaltante", Math.round((antes - total) * 100.0) / 100.0);
+                f.put("comoArreglar", "POST /api/pasivos/" + pasivo.getId()
+                        + "/fijar-saldo?saldo=" + Math.round(antes * 100.0) / 100.0);
+            } else if (confirmar) {
+                pasivo.setMontoTotal(total);
+                pasivoRepository.save(pasivo);
+                f.put("accion", "actualizada");
+            } else {
+                f.put("accion", "preview (no se modificó)");
+            }
             filas.add(f);
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("tarjetasActualizadas", filas.size());
+        out.put("modo", confirmar ? "EJECUTADO" : "PREVIEW — agregá ?confirmar=true para aplicar");
+        out.put("tarjetas", filas.size());
         out.put("detalle", filas);
         return ResponseEntity.ok(out);
+    }
+
+    // FIJAR SALDO — deja el saldo en el valor indicado creando el movimiento
+    // que falte para llegar a él. Sirve para restaurar tarjetas cuya deuda
+    // inicial nunca quedó registrada en el historial.
+    @Transactional
+    @PostMapping("/{id}/fijar-saldo")
+    public ResponseEntity<?> fijarSaldo(
+            @PathVariable Long id,
+            @RequestParam double saldo,
+            @RequestParam(required = false) String nota,
+            @RequestParam(defaultValue = "false") boolean confirmar) {
+
+        return pasivoRepository.findById(id)
+                .map(pasivo -> {
+                    double suma = 0;
+                    if (pasivo.getHistorialPagos() != null) {
+                        for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                            suma += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+                        }
+                    }
+                    suma = Math.round(suma * 100.0) / 100.0;
+                    double ajuste = Math.round((saldo - suma) * 100.0) / 100.0;
+
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("tarjeta", pasivo.getTitulo());
+                    out.put("sumaHistorial", suma);
+                    out.put("saldoObjetivo", saldo);
+                    out.put("movimientoAcrear", ajuste);
+
+                    if (Math.abs(ajuste) < 0.01) {
+                        out.put("accion", "nada que hacer — el historial ya da ese saldo");
+                        pasivo.setMontoTotal(saldo);
+                        pasivoRepository.save(pasivo);
+                        return ResponseEntity.ok(out);
+                    }
+                    if (!confirmar) {
+                        out.put("accion", "PREVIEW — agregá &confirmar=true para aplicar");
+                        return ResponseEntity.ok(out);
+                    }
+
+                    PagoPasivo mov = new PagoPasivo();
+                    mov.setMontoPagado(ajuste);
+                    mov.setFecha(LocalDate.now());
+                    mov.setMoneda("BRL");
+                    mov.setNota(nota != null && !nota.isBlank()
+                            ? nota
+                            : "Saldo inicial (no estaba registrado en el historial)");
+                    mov.setPasivo(pasivo);
+                    pasivo.getHistorialPagos().add(mov);
+
+                    pasivo.setMontoTotal(saldo);
+                    pasivoRepository.save(pasivo);
+
+                    out.put("accion", "movimiento creado — el saldo ahora sale del historial");
+                    return ResponseEntity.ok(out);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // 7. CORREGIR MONEDA de un PagoPasivo existente ──────────────────────────
