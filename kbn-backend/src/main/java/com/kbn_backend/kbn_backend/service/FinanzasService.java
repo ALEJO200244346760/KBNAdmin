@@ -24,8 +24,12 @@ public class FinanzasService {
 
         // 1. Inicialización según tipo de transacción
         if ("INGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
-            registro.setAsignadoA(null);
-            registro.setRevisado(false);
+            // Respetar el asignadoA que venga; sólo marcarlo como no revisado
+            // si llega sin asignar (para que aparezca en Pendientes).
+            boolean sinAsignar = registro.getAsignadoA() == null
+                    || registro.getAsignadoA().isBlank()
+                    || "NINGUNO".equalsIgnoreCase(registro.getAsignadoA());
+            registro.setRevisado(!sinAsignar);
         } else if ("EGRESO".equalsIgnoreCase(registro.getTipoTransaccion())) {
             registro.setAsignadoA(null);
             registro.setRevisado(true);

@@ -148,24 +148,8 @@ const Ingreso = ({ formData, setView, axiosConfig }) => {
 
       await axios.post(`${API}/api/clases/guardar`, payload, axiosConfig);
 
-      // Reparto a los dueños — se hace SOLO acá (no en Estadísticas)
-      if (totalFinal > 0 && pasivos.length > 0) {
-        const { pIgna, pJose, pHans, mIgna, mJose, mHans } = calcularReparto(asignadoAuto, totalFinal);
-        const sufijo = `${tipoActividad || 'Ingreso'} — ${fecha}`;
-        const acumular = async (titulo, montoD, pct) => {
-          const p = pasivos.find(x => x.titulo?.trim().toLowerCase() === titulo.trim().toLowerCase());
-          if (!p || montoD <= 0) return;
-          await axios.put(`${API}/api/pasivos/${p.id}/acumular`,
-            { monto: -montoD, nota: `${pct}% de ${sufijo} = ${montoD.toFixed(2)} ${moneda}`, fecha, moneda },
-            axiosConfig
-          );
-        };
-        await Promise.allSettled([
-          acumular(PASIVO_TITULOS.JOSE, mJose, pJose),
-          acumular(PASIVO_TITULOS.IGNA, mIgna, pIgna),
-          acumular(PASIVO_TITULOS.HANS, mHans, pHans),
-        ]);
-      }
+      // El reparto lo hace el backend en /clases/guardar (RepartoService),
+      // atado al id del ingreso. No se hace acá para no duplicar.
 
       setView();
     } catch(err) {

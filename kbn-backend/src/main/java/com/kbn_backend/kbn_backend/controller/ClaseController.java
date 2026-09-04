@@ -64,6 +64,9 @@ public class ClaseController {
         // - Descontar del Pasivo si corresponde
         // - Registrar el historial de pagos
         ClaseRegistro savedRegistro = finanzasService.guardarTransaccion(registro);
+        // Reparto a los dueños: lo hace el backend, atado al id del ingreso.
+        // Si viene asignado, crea los movimientos en las tarjetas; si no, no hace nada.
+        repartoService.recalcular(savedRegistro);
         return ResponseEntity.ok(savedRegistro);
     }
 
