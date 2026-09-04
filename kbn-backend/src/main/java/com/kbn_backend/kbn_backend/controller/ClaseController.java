@@ -147,6 +147,9 @@ public class ClaseController {
                     if (detalles.getComision() != null) registro.setComision(detalles.getComision());
                     if (detalles.getFormaPago() != null) registro.setFormaPago(detalles.getFormaPago());
                     if (detalles.getDetalleFormaPago() != null) registro.setDetalleFormaPago(detalles.getDetalleFormaPago());
+                    // Permitir cambiar la asignación desde el editor. El reparto
+                    // se recalcula abajo con este valor.
+                    if (detalles.getAsignadoA() != null) registro.setAsignadoA(detalles.getAsignadoA());
 
                     ClaseRegistro actualizado = claseRepository.save(registro);
                     // El monto/moneda/fecha pudo cambiar → rehacer el reparto de este ingreso

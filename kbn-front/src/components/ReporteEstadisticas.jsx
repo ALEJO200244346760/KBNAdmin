@@ -345,6 +345,7 @@ const ReporteEstadisticas = () => {
       formaPago: item.formaPago || '',
       detalles: item.detalles || '',
       instructor: item.instructor || '',
+      asignadoA: item.asignadoA || 'NINGUNO',
     });
   };
 
@@ -860,6 +861,22 @@ const ReporteEstadisticas = () => {
                   </select>
                 </div>
               </div>
+              {editItem.tipoTransaccion === 'INGRESO' && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Asignado a</label>
+                  <select value={editForm.asignadoA} onChange={(e) => handleEditFieldChange('asignadoA', e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box', background: '#fff' }}>
+                    <option value="NINGUNO">— Sin asignar —</option>
+                    <option value="IGNA">Igna (16% / 8% / 5%)</option>
+                    <option value="JOSE">Jose (8% / 16% / 5%)</option>
+                    <option value="AMBOS">Ambos (12,5% / 12,5% / 5%)</option>
+                    <option value="ALE">Ausentes (10% / 10% / 5%)</option>
+                  </select>
+                  <p style={{ fontSize: 10, color: NA.text2, margin: '4px 0 0' }}>
+                    Al guardar, el reparto en las cuentas de Igna, José y Hans se recalcula automáticamente.
+                  </p>
+                </div>
+              )}
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Instructor</label>
                 <input type="text" value={editForm.instructor} onChange={(e) => handleEditFieldChange('instructor', e.target.value)}
