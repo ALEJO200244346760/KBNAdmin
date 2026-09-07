@@ -357,7 +357,14 @@ const ReporteEstadisticas = () => {
     guardandoEdicionRef.current = true;
     setGuardandoEdicion(true);
     try {
-      await api.put(`/api/clases/${editItem.id}`, editForm);
+      // Limpiar la etiqueta "| Reparto:" vieja de los detalles. El reparto
+      // real lo recalcula el backend según asignadoA; dejar el texto viejo
+      // haría que el badge de la lista muestre la asignación equivocada.
+      const payload = { ...editForm };
+      if (payload.detalles && payload.detalles.includes('| Reparto:')) {
+        payload.detalles = payload.detalles.split('| Reparto:')[0].trim();
+      }
+      await api.put(`/api/clases/${editItem.id}`, payload);
       setEditItem(null);
       setEditForm(null);
       fetchData();
