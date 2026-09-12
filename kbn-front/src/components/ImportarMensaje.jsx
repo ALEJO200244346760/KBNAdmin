@@ -1,56 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import api from '../axiosConfig';
+import { usePresencia } from '../hooks/usePresencia';
 
 /* ══════════════════════════════════════════════════════════════════════════
-   IMPORTAR MENSAJE DEL GRUPO
+   IMPORTAR DEL GRUPO
 
-   Pegás el resumen que mandan por WhatsApp y la app arma las tarjetas.
-   Nada se guarda hasta que confirmás cada una — todo es editable antes.
+   Pegás el resumen que mandan por WhatsApp y salen las tarjetas listas para
+   revisar. Nada toca la base hasta que confirmás.
 
-   Reconoce:
-     · clases      "9hs a 10hs APWF 1HS Ceci-Igna"
-     · pagos       "Cecí 3,5hs apwf 1.225 R$ crédito stone José"
+   Formatos que entiende, todos sacados de mensajes reales:
+     Thalissa 11:20-12:20 Facu          · sin código de tipo
+     APKFrancesca 09:00-11:00 - Facu    · tipo pegado al nombre
+     Apwf Augusto 10:00:-11:00 José     · con typo en el rango
+     Rental wind Renata 10:00-11:00hs   · tipo de dos palabras
+     10hs APK Hana 10:00-12:00 Hans     · hora suelta más rango
+     Breno 12:30-  Igna                 · sin hora de salida
+     [28/8/26, 3:22 p.m.] Jose: ...     · encabezado de WhatsApp
    ══════════════════════════════════════════════════════════════════════════ */
 
-const NA = {
-  dark: '#0F3D3E', darker: '#0A2B2C', mid: '#E1F5EE', light: '#F0FAF7',
-  border: '#D4E9E2', text: '#1A3C34', text2: '#6B8F85', accent: '#2ECFC4',
+const C = {
+  fondo:  'rgba(255,255,255,.05)',
+  borde:  'rgba(255,255,255,.12)',
+  texto:  'rgba(255,255,255,.92)',
+  suave:  'rgba(255,255,255,.55)',
+  tenue:  'rgba(255,255,255,.35)',
+  clase:  '#2ECFC4',
+  pago:   '#FBBF24',
+  ok:     '#34D399',
+  error:  '#F87171',
 };
 
 // ── Vocabulario ───────────────────────────────────────────────────────────
 const TIPOS = {
-  APK:   { code: 'APK',   nombre: 'Aula Privada Kite',         actividad: 'Clase de Kite' },
-  PAK:   { code: 'APK',   nombre: 'Aula Privada Kite',         actividad: 'Clase de Kite' },
-  ASPK:  { code: 'ASPK',  nombre: 'Aula Semiprivada Kite',     actividad: 'Clase de Kite' },
-  APWF:  { code: 'APWF',  nombre: 'Aula Privada Wingfoil',     actividad: 'Clase de Wing' },
-  ASPWF: { code: 'ASPWF', nombre: 'Aula Semiprivada Wingfoil', actividad: 'Clase de Wing' },
-  APWS:  { code: 'APWS',  nombre: 'Aula Privada Windsurf',     actividad: 'Clase de Windsurf' },
-  APWD:  { code: 'APWS',  nombre: 'Aula Privada Windsurf',     actividad: 'Clase de Windsurf' },
-  ASPWS: { code: 'ASPWS', nombre: 'Aula Semiprivada Windsurf', actividad: 'Clase de Windsurf' },
-  RENTAL:{ code: 'RENTAL',nombre: 'Rental',                    actividad: 'Rental' },
+  ASPWF:{code:'ASPWF',act:'Clase de Wing'},     ASPWD:{code:'ASPWS',act:'Clase de Windsurf'},
+  ASPWS:{code:'ASPWS',act:'Clase de Windsurf'}, ASPK: {code:'ASPK', act:'Clase de Kite'},
+  APWF: {code:'APWF', act:'Clase de Wing'},     APWG: {code:'APWF', act:'Clase de Wing'},
+  APWD: {code:'APWS', act:'Clase de Windsurf'}, APWS: {code:'APWS', act:'Clase de Windsurf'},
+  APK:  {code:'APK',  act:'Clase de Kite'},     PAK:  {code:'APK',  act:'Clase de Kite'},
 };
+// Códigos largos primero: si no, APK se comería mal "APKFrancesca"
+const CODIGOS = Object.keys(TIPOS).sort((a, b) => b.length - a.length);
+const RE_CODIGO = new RegExp('(' + CODIGOS.join('|') + ')', 'i');
+const RE_RENTAL = /\b(rental|aluguel|alquil\w*)\s*(wind\w*|wing\w*|kite|foil)?/i;
 
 const CANALES = [
-  [/cr[eé]dito\s+stone\s+jos[eé]/i, 'R$_STONE_JOSE', 'Tarjeta Crédito'],
-  [/cr[eé]dito\s+stone\s+igna/i,    'R$_STONE_IGNA', 'Tarjeta Crédito'],
-  [/d[eé]bito\s+stone\s+jos[eé]/i,  'R$_STONE_JOSE', 'Tarjeta Débito'],
-  [/d[eé]bito\s+stone\s+igna/i,     'R$_STONE_IGNA', 'Tarjeta Débito'],
-  [/stone\s+jos[eé]/i,              'R$_STONE_JOSE', 'Transferencia'],
-  [/stone\s+igna/i,                 'R$_STONE_IGNA', 'Transferencia'],
-  [/wi[sz]e\s+igna/i,               'EUR_WIZE_IGNA', 'Transferencia'],
-  [/efectivo|dinheiro|cash/i,       'R$_EFECTIVO',   'Efectivo'],
-  [/\bpix\b/i,                      'R$_STONE_IGNA', 'Transferencia'],
-  [/d[oó]lar|usd/i,                 'USD_EFECTIVO',  'Efectivo'],
+  [/cr[eé]dito\s+stone\s+jos[eé]|carta\s+stone\s+jos[eé]/i, 'R$_STONE_JOSE', 'Tarjeta Crédito'],
+  [/cr[eé]dito\s+stone\s+igna|carta\s+stone\s+igna/i,       'R$_STONE_IGNA', 'Tarjeta Crédito'],
+  [/d[eé]bito\s+stone\s+jos[eé]/i, 'R$_STONE_JOSE', 'Tarjeta Débito'],
+  [/d[eé]bito\s+stone\s+igna/i,    'R$_STONE_IGNA', 'Tarjeta Débito'],
+  [/pix\s+stone\s+igna/i,          'R$_STONE_IGNA', 'Transferencia'],
+  [/pix\s+stone\s+jos[eé]/i,       'R$_STONE_JOSE', 'Transferencia'],
+  [/stone\s+jos[eé]/i,             'R$_STONE_JOSE', 'Transferencia'],
+  [/stone\s+igna/i,                'R$_STONE_IGNA', 'Transferencia'],
+  [/wi[sz]e\s+igna/i,              'EUR_WIZE_IGNA', 'Transferencia'],
+  [/\befectivo\b|\bdinheiro\b|\bcash\b/i, 'R$_EFECTIVO', 'Efectivo'],
+  [/\bpix\b/i,                     'R$_STONE_IGNA', 'Transferencia'],
+  [/\bd[oó]lar\w*\b|\busd\b/i,     'USD_EFECTIVO',  'Efectivo'],
 ];
 
-const RE_TIPO   = new RegExp('\\b(' + Object.keys(TIPOS).join('|') + ')\\b', 'i');
-const RE_HORAS  = /(\d+[.,]?\d*)\s*hs?\b/gi;
-const RE_RANGO  = /(\d{1,2})\s*hs?\s*a\s*(\d{1,2})\s*hs?/i;
-const RE_INICIO = /(?:^|[\s\-])(\d{1,2})\s*hs\b/i;
-const RE_FECHA  = /(\d{1,2})[/.](\d{1,2})/;
+const RE_RANGO       = /(\d{1,2})\s*[:.]?\s*(\d{2})?\s*:?\s*(?:-|–|—|\ba\b|hasta)\s*(?:(\d{1,2})\s*[:.]?\s*(\d{2})?)?/i;
+const RE_HORA_SUELTA = /(?:^|\s)(\d{1,2})\s*[:.]?(\d{2})?\s*hs?\b/i;
+const RE_HORAS_DUR   = /(\d+(?:[.,]\d+)?)\s*h(?:s|rs)?\b/i;
+const RE_FECHA       = /\[?(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?/;
+const RE_MONTO       = /(?:R\$\s*)(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{1,2})?)\b|(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{1,2})?)\s*R\$/gi;
 
-const normNum = (s) => {
-  if (!s) return null;
+const pad = (n) => String(n).padStart(2, '0');
+const num = (s) => {
+  if (s == null) return null;
   let t = String(s).trim();
   if (t.includes('.') && t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
   else if (t.includes(',')) t = t.replace(',', '.');
@@ -59,159 +75,282 @@ const normNum = (s) => {
   return isNaN(v) ? null : v;
 };
 
-const limpiarNombre = (s) =>
-  (s || '')
-    .replace(/^[\s\-–•*]+|[\s\-–•*]+$/g, '')
-    .replace(/[\-–]+/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/^(?:s|hs)\s+|\s+(?:s|hs)$/gi, '')
-    .trim()
-    .replace(/^[\s\-–:*]+|[\s\-–:*]+$/g, '');
-
-function detectarInstructor(texto, instructores) {
+function detectarInstructor(txt, instructores) {
   for (const ins of instructores) {
-    const primer = (ins.nombre || '').split(' ')[0];
-    if (!primer) continue;
-    const alias = [primer, ins.alias].filter(Boolean);
-    for (const a of alias) {
-      if (new RegExp('\\b' + a + '\\b', 'i').test(texto)) return { ins, match: a };
+    for (const a of (ins.aliases || [])) {
+      if (new RegExp('(^|[\\s\\-–])' + a + '([\\s\\-–.,!]|$)', 'i').test(txt)) return { ins, alias: a };
     }
   }
-  return { ins: null, match: null };
+  return { ins: null, alias: null };
+}
+
+function detectarTipo(linea) {
+  const r = RE_RENTAL.exec(linea);
+  if (r) {
+    const d = (r[2] || '').toLowerCase();
+    const act = d.startsWith('wind') ? 'Rental Windsurf'
+              : d.startsWith('wing') ? 'Rental Wingfoil'
+              : d.startsWith('kite') ? 'Rental Kite' : 'Rental';
+    return { code: 'RENTAL', act, match: r[0] };
+  }
+  const m = RE_CODIGO.exec(linea);
+  if (m) { const t = TIPOS[m[1].toUpperCase()]; return { code: t.code, act: t.act, match: m[1] }; }
+  return null;
 }
 
 function parseClase(linea, fecha, instructores) {
-  const m = RE_TIPO.exec(linea);
-  if (!m) return null;
-  const t = TIPOS[m[1].toUpperCase()];
+  const tipo = detectarTipo(linea);
 
-  let hora = null;
+  let hIni = null, hFin = null;
   const r = RE_RANGO.exec(linea);
-  if (r) hora = String(r[1]).padStart(2, '0') + ':00';
-  else {
-    const i = RE_INICIO.exec(linea);
-    if (i) hora = String(i[1]).padStart(2, '0') + ':00';
+  if (r && r[1] != null) {
+    hIni = `${pad(Math.min(23, +r[1]))}:${pad(r[2] ? +r[2] : 0)}`;
+    if (r[3] != null) hFin = `${pad(Math.min(23, +r[3]))}:${pad(r[4] ? +r[4] : 0)}`;
+  } else {
+    const s = RE_HORA_SUELTA.exec(linea);
+    if (s) hIni = `${pad(Math.min(23, +s[1]))}:${pad(s[2] ? +s[2] : 0)}`;
   }
+  const { ins, alias } = detectarInstructor(linea, instructores);
+  if (!hIni && !tipo) return null;
 
   let horas = null;
-  RE_HORAS.lastIndex = 0;
-  let hm;
-  while ((hm = RE_HORAS.exec(linea)) !== null) {
-    const v = normNum(hm[1]);
-    if (v === null) continue;
-    if (r && (v === parseFloat(r[1]) || v === parseFloat(r[2]))) continue;
-    if (v <= 8) { horas = v; break; }
+  if (hIni && hFin) {
+    const a = +hIni.split(':')[0] * 60 + +hIni.split(':')[1];
+    const b = +hFin.split(':')[0] * 60 + +hFin.split(':')[1];
+    if (b > a) horas = Math.round(((b - a) / 60) * 100) / 100;
   }
-  if (horas === null && r) horas = parseFloat(r[2]) - parseFloat(r[1]);
+  if (horas == null) {
+    const d = RE_HORAS_DUR.exec(linea.replace(RE_RANGO, ' '));
+    if (d) { const v = num(d[1]); if (v != null && v > 0 && v <= 8) horas = v; }
+  }
 
-  const { ins, match } = detectarInstructor(linea, instructores);
+  let al = linea;
+  if (tipo) al = al.replace(tipo.match, ' ');
+  al = al.replace(RE_RANGO, ' ').replace(RE_HORA_SUELTA, ' ').replace(RE_HORAS_DUR, ' ');
+  if (alias) al = al.replace(new RegExp('(^|[\\s\\-–])' + alias + '([\\s\\-–.,!]|$)', 'ig'), ' ');
+  al = al.replace(/\b(hs|h)\b/ig, ' ').replace(/[-–—:]+/g, ' ')
+         .replace(/\s{2,}/g, ' ').trim().replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, '');
 
-  let alumno = linea.replace(RE_TIPO, ' ').replace(RE_RANGO, ' ').replace(RE_HORAS, ' ');
-  if (match) alumno = alumno.replace(new RegExp('\\b' + match + '\\b', 'ig'), ' ');
-  alumno = limpiarNombre(alumno);
+  // Texto libre del tipo "No pago porq mañana alquila!" va a nota, no al nombre
+  let nota = null;
+  const mN = al.match(/\b(no pago|n[aã]o pago|falta pagar|pendiente)\b.*/i);
+  if (mN) { nota = mN[0].trim(); al = al.slice(0, mN.index).trim(); }
+  if (al && al.split(/\s+/).length > 4) { nota = nota ? `${al} · ${nota}` : al; al = null; }
+  if (al) al = al.replace(/R\$\s*\d[\d.,]*/g, '').replace(/\s{2,}/g, ' ').trim();
 
   return {
-    kind: 'CLASE', code: t.code, nombre: t.nombre, actividad: t.actividad,
-    fecha, hora, horas, alumno,
-    instructorId: ins ? ins.id : null, instructorNombre: ins ? ins.nombre : null,
-    linea: linea.trim(),
+    kind: 'CLASE', code: tipo ? tipo.code : null, actividad: tipo ? tipo.act : null,
+    fecha, hora: hIni, horaSalida: hFin, horas, alumno: al || null, nota,
+    instructorId: ins ? ins.id : null, linea: linea.trim(),
   };
 }
 
 function parsePago(linea, fecha) {
   let moneda = null, formaPago = null;
-  for (const [re, canal, forma] of CANALES) {
-    if (re.test(linea)) { moneda = canal; formaPago = forma; break; }
-  }
-  const m = RE_TIPO.exec(linea);
-  const t = m ? TIPOS[m[1].toUpperCase()] : null;
+  for (const [re, c, f] of CANALES) if (re.test(linea)) { moneda = c; formaPago = f; break; }
+  const tipo = detectarTipo(linea);
 
-  const nums = [];
-  const reNum = /(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)/g;
-  let mm;
-  while ((mm = reNum.exec(linea)) !== null) {
-    const v = normNum(mm[1]);
-    if (v === null) continue;
-    const resto = linea.slice(mm.index + mm[0].length, mm.index + mm[0].length + 3).toLowerCase();
-    if (resto.trim().startsWith('h')) continue;
-    nums.push(v);
+  // El PRIMER importe con R$. En "R$422 ... En total foi R$740" vale 422.
+  let monto = null, mm;
+  RE_MONTO.lastIndex = 0;
+  while ((mm = RE_MONTO.exec(linea)) !== null) {
+    const v = num(mm[1] != null ? mm[1] : mm[2]);
+    if (v != null && v > 0) { monto = v; break; }
   }
-  const monto = nums.length ? Math.max(...nums) : null;
+  if (monto == null) {
+    const cand = []; const reN = /(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)/g; let n;
+    while ((n = reN.exec(linea)) !== null) {
+      const sig = linea.slice(n.index + n[0].length, n.index + n[0].length + 3).toLowerCase();
+      if (/^\s*h/.test(sig)) continue;              // no confundir horas con plata
+      const v = num(n[1]); if (v != null) cand.push(v);
+    }
+    if (cand.length) monto = Math.max(...cand);
+  }
 
   let horas = null;
-  RE_HORAS.lastIndex = 0;
-  let hm2;
-  while ((hm2 = RE_HORAS.exec(linea)) !== null) {
-    const v = normNum(hm2[1]);
-    if (v !== null && v <= 8) { horas = v; break; }
-  }
+  const d = RE_HORAS_DUR.exec(linea);
+  if (d) { const v = num(d[1]); if (v != null && v > 0 && v <= 12) horas = v; }
 
-  let alumno = linea.replace(RE_TIPO, ' ').replace(RE_HORAS, ' ').replace(reNum, ' ');
-  for (const [re] of CANALES) alumno = alumno.replace(re, ' ');
-  alumno = alumno.replace(/R\$|\breais?\b/gi, ' ');
-  alumno = limpiarNombre(alumno);
+  let al = linea.replace(/\bpagamentos?\b|\bpagos?\b|\bse[nñ]a\b/ig, ' ');
+  if (tipo) al = al.replace(tipo.match, ' ');
+  al = al.replace(RE_MONTO, ' ').replace(RE_HORAS_DUR, ' ');
+  for (const [re] of CANALES) al = al.replace(re, ' ');
+  al = al.replace(/R\$|\breais?\b|\bcarta\b|\bde\b/ig, ' ')
+         .replace(/\b(en total foi|menos reserva ontem|total)\b.*/i, '')
+         .replace(/\d+/g, ' ').replace(/[-–—:]+/g, ' ').replace(/\s{2,}/g, ' ')
+         .trim().replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, '');
 
   return {
-    kind: 'INGRESO', code: t ? t.code : null, nombre: t ? t.nombre : 'Ingreso',
-    actividad: t ? t.actividad : 'Ingreso',
-    fecha, horas, monto, moneda, formaPago, alumno, linea: linea.trim(),
+    kind: 'INGRESO', code: tipo ? tipo.code : null, actividad: tipo ? tipo.act : 'Ingreso',
+    fecha, horas, monto, moneda, formaPago, alumno: al || null, linea: linea.trim(),
   };
 }
 
-function parseMensaje(texto, anio, instructores) {
-  const out = [];
-  let fecha = null, modoPago = false;
-  for (const raw of texto.split('\n')) {
-    const linea = raw.trim();
-    if (!linea) continue;
-    const low = linea.toLowerCase();
-    const f = RE_FECHA.exec(linea);
-    const tieneTipo = RE_TIPO.test(linea);
+function parseMensaje(texto, anioDef, instructores, fechaFallback, asignadoDefault) {
+  const out = []; let fecha = null, modo = 'clase';
 
-    if (f && linea.length < 40 && !tieneTipo) {
-      fecha = `${anio}-${String(+f[2]).padStart(2, '0')}-${String(+f[1]).padStart(2, '0')}`;
-      if (/pagamento|pago/.test(low)) modoPago = true;
+  for (const raw of texto.split('\n')) {
+    const l = raw.trim(); if (!l) continue;
+
+    // Encabezado de WhatsApp: [28/8/26, 3:22:04 p. m.] Jose Sanchez: resto
+    const wa = l.match(/^\[(\d{1,2})[/.](\d{1,2})[/.](\d{2,4}),[^\]]*\]\s*[^:]*:\s*(.*)$/);
+    if (wa) {
+      const y = wa[3].length === 2 ? 2000 + +wa[3] : +wa[3];
+      fecha = `${y}-${pad(+wa[2])}-${pad(+wa[1])}`;
+      const resto = wa[4].trim(); if (!resto) continue;
+      const it = /pagamento|pago/i.test(resto)
+        ? parsePago(resto, fecha) : parseClase(resto, fecha, instructores);
+      if (it) out.push(it);
       continue;
     }
-    if (/\bpagamentos?\b|\bpagos?\b/.test(low) && linea.length < 25) { modoPago = true; continue; }
-    if (/\bresumo\b|\baulas?\b|\bamanha\b|\bamanhã\b/.test(low) && !tieneTipo) {
-      modoPago = false;
-      if (f) fecha = `${anio}-${String(+f[2]).padStart(2, '0')}-${String(+f[1]).padStart(2, '0')}`;
+
+    const f = RE_FECHA.exec(l);
+    if (f && l.replace(RE_FECHA, '').replace(/[\s\-–]/g, '').length === 0) {
+      const y = f[3] ? (f[3].length === 2 ? 2000 + +f[3] : +f[3]) : anioDef;
+      fecha = `${y}-${pad(+f[2])}-${pad(+f[1])}`;
       continue;
     }
-    const item = modoPago ? parsePago(linea, fecha) : parseClase(linea, fecha, instructores);
-    if (item) out.push({ ...item, _id: Math.random().toString(36).slice(2), estado: 'pendiente' });
+    if (/^\s*(aulas?|resumo|clases?)\b/i.test(l) && !RE_CODIGO.test(l)) {
+      modo = 'clase';
+      if (f) {
+        const y = f[3] ? (f[3].length === 2 ? 2000 + +f[3] : +f[3]) : anioDef;
+        fecha = `${y}-${pad(+f[2])}-${pad(+f[1])}`;
+      }
+      continue;
+    }
+    if (/^\s*pagamentos?\s*$|^\s*pagos?\s*$/i.test(l)) { modo = 'pago'; continue; }
+    if (/^\s*(amanha|amanhã|manhã)\b/i.test(l)) { modo = 'clase'; continue; }
+
+    const inline = /^\s*pagamentos?\b/i.test(l);
+    const item = (modo === 'pago' || inline)
+      ? parsePago(l, fecha || fechaFallback)
+      : parseClase(l, fecha || fechaFallback, instructores);
+    if (item) out.push(item);
   }
-  return out;
+
+  return out.map((i) => ({
+    ...i,
+    _id: Math.random().toString(36).slice(2),
+    estado: 'pendiente',
+    sinFecha: !i.fecha,
+    fecha: i.fecha || fechaFallback,
+    ...(i.kind === 'INGRESO' ? { asignadoA: asignadoDefault } : {}),
+  }));
 }
 
 // ══════════════════════════════════════════════════════════════════════════
 
+const Campo = ({ label, ancho, children }) => (
+  <div style={ancho ? { gridColumn: 'span 2' } : undefined}>
+    <label style={{ fontSize: 10, color: C.tenue, display: 'block', marginBottom: 4 }}>{label}</label>
+    {children}
+  </div>
+);
+
+const Seccion = ({ titulo, cantidad, color, pie, children }) => (
+  <section style={{ marginTop: 24 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color }} />
+      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.texto }}>{titulo}</h3>
+      <span style={{ fontSize: 12, color: C.tenue }}>{cantidad}</span>
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>{children}</div>
+    {pie && <p style={{ fontSize: 11, color: C.tenue, margin: '9px 0 0', lineHeight: 1.5 }}>{pie}</p>}
+  </section>
+);
+
+const Tarjeta = ({ it, color, inp, onCambiar, onDescartar, onConfirmar, guardando, children }) => {
+  const ok = it.estado === 'ok';
+  const err = it.estado === 'error';
+  return (
+    <article style={{
+      background: ok ? 'rgba(52,211,153,.08)' : err ? 'rgba(248,113,113,.08)' : C.fondo,
+      border: `1px solid ${ok ? 'rgba(52,211,153,.3)' : err ? 'rgba(248,113,113,.35)' : C.borde}`,
+      borderLeft: `3px solid ${ok ? C.ok : err ? C.error : color}`,
+      borderRadius: 13, padding: 13, opacity: ok ? .7 : 1,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: ok ? 0 : 11 }}>
+        <strong style={{ fontSize: 15, color: C.texto, fontWeight: 600 }}>
+          {it.alumno || <span style={{ color: C.tenue, fontWeight: 400 }}>sin nombre</span>}
+        </strong>
+        <span style={{ fontSize: 11, color: C.tenue, flex: 1, overflow: 'hidden',
+          textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.linea}</span>
+        {ok && <span style={{ fontSize: 12, color: C.ok }}>guardado</span>}
+        {err && <span style={{ fontSize: 12, color: C.error }}>no se pudo guardar</span>}
+      </div>
+
+      {it.nota && !ok && (
+        <p style={{ margin: '0 0 9px', fontSize: 11, color: C.pago,
+          background: 'rgba(251,191,36,.1)', padding: '6px 9px', borderRadius: 7 }}>{it.nota}</p>
+      )}
+
+      {!ok && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 11 }}>
+            <Campo label={it.sinFecha ? 'Fecha — poner a mano' : 'Fecha'} ancho>
+              <input type="date" value={it.fecha || ''}
+                style={{ ...inp, borderColor: it.sinFecha ? 'rgba(251,191,36,.5)' : C.borde }}
+                onChange={(e) => onCambiar(it._id, 'fecha', e.target.value)} />
+            </Campo>
+            <Campo label={it.kind === 'CLASE' ? 'Alumno' : 'Detalle'} ancho>
+              <input type="text" value={it.alumno || ''} style={inp}
+                onChange={(e) => onCambiar(it._id, 'alumno', e.target.value)} />
+            </Campo>
+            {children}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => onConfirmar(it)} disabled={guardando}
+              style={{ background: '#047857', color: '#fff', border: 'none', borderRadius: 9,
+                padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {err ? 'Reintentar' : 'Confirmar'}
+            </button>
+            <button onClick={() => onDescartar(it._id)}
+              style={{ background: 'transparent', color: C.suave, border: `1px solid ${C.borde}`,
+                borderRadius: 9, padding: '8px 18px', fontSize: 13, cursor: 'pointer' }}>
+              Descartar
+            </button>
+          </div>
+        </>
+      )}
+    </article>
+  );
+};
+
 export default function ImportarMensaje({ onClose, onImportado }) {
   const [texto, setTexto] = useState('');
   const [items, setItems] = useState([]);
-  const [instructores, setInstructores] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [guardando, setGuardando] = useState(false);
+  const { asignadoAuto, opcionActual } = usePresencia();
+
+  const hoy = new Date().toISOString().slice(0, 10);
   const anio = new Date().getFullYear();
+  // Igual que en Ingreso: arranca con quien está presente hoy
+  const asignadoDefault = asignadoAuto === 'AUSENTES' ? 'ALE' : asignadoAuto;
 
   useEffect(() => {
     api.get('/api/admin/usuarios')
-      .then((r) => setInstructores((r.data || []).map((u) => ({
-        id: u.id, nombre: `${u.nombre} ${u.apellido}`.trim(), alias: u.nombre,
-      }))))
-      .catch(() => setInstructores([]));
+      .then((r) => setUsuarios((r.data || []).map((u) => {
+        const nombre = `${u.nombre || ''} ${u.apellido || ''}`.trim();
+        const pila = (u.nombre || '').trim();
+        const aliases = [...new Set([pila, pila.slice(0, 4)].filter((x) => x && x.length >= 3))];
+        return { id: u.id, nombre, aliases };
+      })))
+      .catch(() => setUsuarios([]));
   }, []);
 
   const analizar = () => {
-    const parsed = parseMensaje(texto, anio, instructores);
-    if (!parsed.length) { alert('No se reconoció ninguna clase ni pago en el mensaje.'); return; }
-    setItems(parsed);
+    const r = parseMensaje(texto, anio, usuarios, hoy, asignadoDefault);
+    if (!r.length) {
+      alert('No se reconoció ninguna clase ni pago. Revisá que las líneas tengan horario o monto.');
+      return;
+    }
+    setItems(r);
   };
 
   const cambiar = (id, campo, valor) =>
-    setItems((prev) => prev.map((it) => (it._id === id ? { ...it, [campo]: valor } : it)));
-
-  const descartar = (id) => setItems((prev) => prev.filter((it) => it._id !== id));
+    setItems((p) => p.map((it) => (it._id === id ? { ...it, [campo]: valor } : it)));
+  const descartar = (id) => setItems((p) => p.filter((it) => it._id !== id));
 
   const confirmarUno = async (it) => {
     setGuardando(true);
@@ -221,9 +360,11 @@ export default function ImportarMensaje({ onClose, onImportado }) {
           alumno: it.alumno || 'Sin nombre',
           fecha: it.fecha,
           hora: it.hora ? `${it.hora}:00` : null,
+          horaSalida: it.horaSalida ? `${it.horaSalida}:00` : null,
           horas: it.horas,
-          tipoAula: it.code,
+          tipoAula: it.code || 'OTRO',
           instructorId: it.instructorId || null,
+          lugar: it.nota || null,
           tarifa: 120,
           estado: 'PENDIENTE',
         });
@@ -240,14 +381,12 @@ export default function ImportarMensaje({ onClose, onImportado }) {
           comision: '0',
         });
       }
-      setItems((prev) => prev.map((x) => (x._id === it._id ? { ...x, estado: 'ok' } : x)));
+      setItems((p) => p.map((x) => (x._id === it._id ? { ...x, estado: 'ok' } : x)));
       if (onImportado) onImportado();
     } catch (e) {
-      console.error(e);
-      setItems((prev) => prev.map((x) => (x._id === it._id ? { ...x, estado: 'error' } : x)));
-    } finally {
-      setGuardando(false);
-    }
+      console.error('[Importar] no se pudo guardar:', e);
+      setItems((p) => p.map((x) => (x._id === it._id ? { ...x, estado: 'error' } : x)));
+    } finally { setGuardando(false); }
   };
 
   const confirmarTodos = async () => {
@@ -257,195 +396,151 @@ export default function ImportarMensaje({ onClose, onImportado }) {
     }
   };
 
-  const pendientes = items.filter((x) => x.estado === 'pendiente').length;
+  const clases = items.filter((i) => i.kind === 'CLASE');
+  const pagos  = items.filter((i) => i.kind === 'INGRESO');
+  const pend   = items.filter((i) => i.estado === 'pendiente').length;
+  const listos = items.filter((i) => i.estado === 'ok').length;
+
   const inp = {
-    padding: '7px 9px', borderRadius: 8, border: `1px solid ${NA.border}`,
-    fontSize: 13, boxSizing: 'border-box', background: '#fff', width: '100%',
+    width: '100%', padding: '9px 11px', borderRadius: 9, fontSize: 14,
+    border: `1px solid ${C.borde}`, background: 'rgba(255,255,255,.06)',
+    color: C.texto, fontFamily: 'inherit', boxSizing: 'border-box',
   };
-  const lbl = { fontSize: 10, color: NA.text2, display: 'block', marginBottom: 3 };
 
   return (
-    <div style={{ padding: 16, maxWidth: 880, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+    <div style={{ padding: '16px 16px 60px', maxWidth: 900, margin: '0 auto', color: C.texto }}>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         {onClose && (
-          <button onClick={onClose} style={{ background: '#fff', border: `1px solid ${NA.border}`,
-            borderRadius: 10, width: 34, height: 34, cursor: 'pointer', fontSize: 16 }}>←</button>
+          <button onClick={onClose} aria-label="Volver"
+            style={{ background: C.fondo, border: `1px solid ${C.borde}`, borderRadius: 11,
+              width: 36, height: 36, cursor: 'pointer', color: C.texto, fontSize: 17 }}>←</button>
         )}
-        <div>
-          <h2 style={{ margin: 0, fontSize: 18, color: NA.text, fontWeight: 600 }}>Importar del grupo</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: NA.text2 }}>
-            Pegá el resumen de WhatsApp y revisá las tarjetas antes de confirmar
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: C.texto }}>Importar del grupo</h2>
+          <p style={{ margin: '3px 0 0', fontSize: 12, color: C.suave }}>
+            Pegá el mensaje de WhatsApp y revisá antes de confirmar
           </p>
         </div>
+        {opcionActual && (
+          <span style={{ fontSize: 11, padding: '5px 11px', borderRadius: 99, whiteSpace: 'nowrap',
+            background: 'rgba(255,255,255,.08)', color: C.suave }}>
+            {opcionActual.label}
+          </span>
+        )}
       </div>
 
       <textarea
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        rows={7}
-        placeholder={'Resumo do dia 8/9\n9hs a 10hs APWF 1HS Ceci-Igna\n16hs a 18hs APK Debora Facu 2hs\n\nPagamento\nCecí 3,5hs apwf 1.225 R$ crédito stone José'}
-        style={{ width: '100%', padding: 12, borderRadius: 12, border: `1px solid ${NA.border}`,
-          fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+        value={texto} onChange={(e) => setTexto(e.target.value)} rows={8} spellCheck={false}
+        placeholder={'27/08\n\nAulas\nAPK Giuseppe 09:00-11:00 - Hans\nRental wind Renata 10:00-11:00hs\n\nPagamento\nGiuseppe 8h Apk 2.800 R$'}
+        style={{ width: '100%', padding: 14, borderRadius: 14, fontSize: 14, lineHeight: 1.6,
+          border: `1px solid ${C.borde}`, background: 'rgba(0,0,0,.25)', color: C.texto,
+          fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
       />
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         <button onClick={analizar} disabled={!texto.trim()}
-          style={{ background: NA.dark, color: '#fff', border: 'none', borderRadius: 10,
-            padding: '10px 18px', fontSize: 13, fontWeight: 600,
-            cursor: texto.trim() ? 'pointer' : 'not-allowed', opacity: texto.trim() ? 1 : .5 }}>
+          style={{ background: texto.trim() ? C.clase : 'rgba(255,255,255,.1)',
+            color: texto.trim() ? '#06302E' : C.tenue, border: 'none', borderRadius: 11,
+            padding: '11px 20px', fontSize: 14, fontWeight: 600,
+            cursor: texto.trim() ? 'pointer' : 'default' }}>
           Analizar mensaje
         </button>
         {items.length > 0 && (
           <>
-            <button onClick={confirmarTodos} disabled={guardando || pendientes === 0}
-              style={{ background: pendientes ? '#047857' : '#9CA3AF', color: '#fff', border: 'none',
-                borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 600,
-                cursor: pendientes ? 'pointer' : 'not-allowed' }}>
-              Confirmar todo ({pendientes})
+            <button onClick={confirmarTodos} disabled={guardando || !pend}
+              style={{ background: pend ? '#047857' : 'rgba(255,255,255,.08)',
+                color: pend ? '#fff' : C.tenue, border: 'none', borderRadius: 11,
+                padding: '11px 20px', fontSize: 14, fontWeight: 600,
+                cursor: pend ? 'pointer' : 'default' }}>
+              {guardando ? 'Guardando…' : `Confirmar ${pend}`}
             </button>
             <button onClick={() => { setItems([]); setTexto(''); }}
-              style={{ background: '#fff', color: NA.text2, border: `1px solid ${NA.border}`,
-                borderRadius: 10, padding: '10px 18px', fontSize: 13, cursor: 'pointer' }}>
+              style={{ background: 'transparent', color: C.suave, border: `1px solid ${C.borde}`,
+                borderRadius: 11, padding: '11px 20px', fontSize: 14, cursor: 'pointer' }}>
               Limpiar
             </button>
           </>
         )}
       </div>
 
-      {items.length > 0 && (
-        <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {items.map((it) => {
-            const esClase = it.kind === 'CLASE';
-            const ok = it.estado === 'ok';
-            const err = it.estado === 'error';
-            return (
-              <div key={it._id} style={{
-                background: ok ? '#ECFDF5' : err ? '#FEF2F2' : '#fff',
-                border: `1px solid ${ok ? '#A7F3D0' : err ? '#FECACA' : NA.border}`,
-                borderLeft: `4px solid ${esClase ? NA.accent : '#F59E0B'}`,
-                borderRadius: 12, padding: 12, opacity: ok ? .75 : 1,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between',
-                  alignItems: 'center', marginBottom: 8, gap: 8 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.05em',
-                    color: esClase ? NA.darker : '#92400E',
-                    background: esClase ? NA.mid : '#FEF3C7',
-                    padding: '3px 9px', borderRadius: 99 }}>
-                    {esClase ? `CLASE · ${it.code}` : 'INGRESO'}
-                  </span>
-                  <span style={{ fontSize: 10, color: NA.text2, flex: 1,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {it.linea}
-                  </span>
-                  {ok   && <span style={{ fontSize: 11, color: '#047857', fontWeight: 600 }}>✓ guardado</span>}
-                  {err  && <span style={{ fontSize: 11, color: '#B91C1C', fontWeight: 600 }}>error</span>}
-                </div>
-
-                {!ok && (
-                  <>
-                    <div style={{ display: 'grid',
-                      gridTemplateColumns: esClase ? 'repeat(auto-fit,minmax(130px,1fr))' : 'repeat(auto-fit,minmax(140px,1fr))',
-                      gap: 8, marginBottom: 10 }}>
-                      <div>
-                        <label style={lbl}>Fecha</label>
-                        <input type="date" value={it.fecha || ''} style={inp}
-                          onChange={(e) => cambiar(it._id, 'fecha', e.target.value)} />
-                      </div>
-                      <div>
-                        <label style={lbl}>{esClase ? 'Alumno' : 'Detalle'}</label>
-                        <input type="text" value={it.alumno || ''} style={inp}
-                          onChange={(e) => cambiar(it._id, 'alumno', e.target.value)} />
-                      </div>
-
-                      {esClase ? (
-                        <>
-                          <div>
-                            <label style={lbl}>Hora</label>
-                            <input type="time" value={it.hora || ''} style={inp}
-                              onChange={(e) => cambiar(it._id, 'hora', e.target.value)} />
-                          </div>
-                          <div>
-                            <label style={lbl}>Horas</label>
-                            <input type="number" step="0.5" value={it.horas ?? ''} style={inp}
-                              onChange={(e) => cambiar(it._id, 'horas', parseFloat(e.target.value))} />
-                          </div>
-                          <div>
-                            <label style={lbl}>Tipo</label>
-                            <select value={it.code} style={inp}
-                              onChange={(e) => cambiar(it._id, 'code', e.target.value)}>
-                              {['APK','ASPK','APWF','ASPWF','APWS','ASPWS','RENTAL'].map((c) =>
-                                <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label style={lbl}>Instructor</label>
-                            <select value={it.instructorId || ''} style={inp}
-                              onChange={(e) => cambiar(it._id, 'instructorId', e.target.value ? Number(e.target.value) : null)}>
-                              <option value="">— sin asignar —</option>
-                              {instructores.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-                            </select>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <label style={lbl}>Monto</label>
-                            <input type="number" step="0.01" value={it.monto ?? ''} style={inp}
-                              onChange={(e) => cambiar(it._id, 'monto', parseFloat(e.target.value))} />
-                          </div>
-                          <div>
-                            <label style={lbl}>Canal de cobro</label>
-                            <select value={it.moneda || 'BRL'} style={inp}
-                              onChange={(e) => cambiar(it._id, 'moneda', e.target.value)}>
-                              <option value="BRL">BRL genérico</option>
-                              <option value="R$_STONE_JOSE">R$ Stone José</option>
-                              <option value="R$_STONE_IGNA">R$ Stone Igna</option>
-                              <option value="R$_EFECTIVO">R$ Efectivo</option>
-                              <option value="EUR_WIZE_IGNA">€ Wize Igna</option>
-                              <option value="USD_EFECTIVO">USD Efectivo</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label style={lbl}>Asignado a</label>
-                            <select value={it.asignadoA || ''} style={inp}
-                              onChange={(e) => cambiar(it._id, 'asignadoA', e.target.value || null)}>
-                              <option value="">— decidir después —</option>
-                              <option value="IGNA">Igna (16/8/5)</option>
-                              <option value="JOSE">Jose (8/16/5)</option>
-                              <option value="AMBOS">Ambos (12,5/12,5/5)</option>
-                              <option value="ALE">Ausentes (10/10/5)</option>
-                            </select>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => confirmarUno(it)} disabled={guardando}
-                        style={{ background: NA.dark, color: '#fff', border: 'none', borderRadius: 8,
-                          padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                        {err ? 'Reintentar' : 'Confirmar'}
-                      </button>
-                      <button onClick={() => descartar(it._id)}
-                        style={{ background: '#fff', color: '#B91C1C', border: '1px solid #FECACA',
-                          borderRadius: 8, padding: '7px 16px', fontSize: 12, cursor: 'pointer' }}>
-                        Descartar
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {listos > 0 && (
+        <p style={{ fontSize: 12, color: C.ok, margin: '12px 0 0' }}>
+          {listos} {listos === 1 ? 'guardado' : 'guardados'}{pend > 0 && ` · quedan ${pend}`}
+        </p>
       )}
 
-      {items.length > 0 && (
-        <p style={{ fontSize: 11, color: NA.text2, marginTop: 14, lineHeight: 1.5 }}>
-          Las clases se crean en el Monitor como PENDIENTE, listas para confirmar y liquidar al
-          instructor. Los ingresos con asignación reparten automáticamente en las cuentas de
-          Igna, José y Hans; si dejás “decidir después”, quedan en Pendientes de Estadísticas.
-        </p>
+      {clases.length > 0 && (
+        <Seccion titulo="Clases" cantidad={clases.length} color={C.clase}
+          pie="Se crean en el Monitor como pendientes, listas para liquidar al instructor.">
+          {clases.map((it) => (
+            <Tarjeta key={it._id} it={it} color={C.clase} inp={inp}
+              onCambiar={cambiar} onDescartar={descartar} onConfirmar={confirmarUno} guardando={guardando}>
+              <Campo label="Hora">
+                <input type="time" value={it.hora || ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'hora', e.target.value)} />
+              </Campo>
+              <Campo label="Salida">
+                <input type="time" value={it.horaSalida || ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'horaSalida', e.target.value)} />
+              </Campo>
+              <Campo label="Horas">
+                <input type="number" step="0.5" value={it.horas ?? ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'horas', e.target.value === '' ? null : parseFloat(e.target.value))} />
+              </Campo>
+              <Campo label="Tipo">
+                <select value={it.code || ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'code', e.target.value)}>
+                  <option value="" style={{ color: '#111' }}>— elegir —</option>
+                  {['APK','ASPK','APWF','ASPWF','APWS','ASPWS','RENTAL','OTRO'].map((c) =>
+                    <option key={c} value={c} style={{ color: '#111' }}>{c}</option>)}
+                </select>
+              </Campo>
+              <Campo label="Instructor" ancho>
+                <select value={it.instructorId || ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'instructorId', e.target.value ? Number(e.target.value) : null)}>
+                  <option value="" style={{ color: '#111' }}>— sin asignar —</option>
+                  {usuarios.map((u) =>
+                    <option key={u.id} value={u.id} style={{ color: '#111' }}>{u.nombre}</option>)}
+                </select>
+              </Campo>
+            </Tarjeta>
+          ))}
+        </Seccion>
+      )}
+
+      {pagos.length > 0 && (
+        <Seccion titulo="Pagos" cantidad={pagos.length} color={C.pago}
+          pie="Al confirmar, la asignación reparte en las cuentas de Igna, José y Hans.">
+          {pagos.map((it) => (
+            <Tarjeta key={it._id} it={it} color={C.pago} inp={inp}
+              onCambiar={cambiar} onDescartar={descartar} onConfirmar={confirmarUno} guardando={guardando}>
+              <Campo label="Monto">
+                <input type="number" step="0.01" value={it.monto ?? ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'monto', e.target.value === '' ? null : parseFloat(e.target.value))} />
+              </Campo>
+              <Campo label="Canal de cobro">
+                <select value={it.moneda || 'BRL'} style={inp}
+                  onChange={(e) => cambiar(it._id, 'moneda', e.target.value)}>
+                  {[['BRL','BRL genérico'], ['R$_STONE_JOSE','R$ Stone José'],
+                    ['R$_STONE_IGNA','R$ Stone Igna'], ['R$_EFECTIVO','R$ Efectivo'],
+                    ['EUR_WIZE_IGNA','€ Wize Igna'], ['USD_EFECTIVO','USD Efectivo']]
+                    .map(([v, t]) => <option key={v} value={v} style={{ color: '#111' }}>{t}</option>)}
+                </select>
+              </Campo>
+              <Campo label="Asignado a" ancho>
+                <select value={it.asignadoA || ''} style={inp}
+                  onChange={(e) => cambiar(it._id, 'asignadoA', e.target.value || null)}>
+                  <option value=""      style={{ color: '#111' }}>— decidir después —</option>
+                  <option value="IGNA"  style={{ color: '#111' }}>Igna · 16 / 8 / 5</option>
+                  <option value="JOSE"  style={{ color: '#111' }}>José · 8 / 16 / 5</option>
+                  <option value="AMBOS" style={{ color: '#111' }}>Ambos · 12,5 / 12,5 / 5</option>
+                  <option value="ALE"   style={{ color: '#111' }}>Ausentes · 10 / 10 / 5</option>
+                </select>
+              </Campo>
+            </Tarjeta>
+          ))}
+        </Seccion>
       )}
     </div>
   );
