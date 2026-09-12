@@ -9,6 +9,7 @@ import Egreso from './Egreso';
 import Pasivos from './Pasivos';
 import Monitor from './Monitor';
 import PresenciaWidget from './PresenciaWidget';
+import ImportarMensaje from './ImportarMensaje';
 import { usePresencia } from '../hooks/usePresencia';
 
 // ── Paleta Náutica Atins ───────────────────────────────────────────────────
@@ -226,6 +227,7 @@ const Secretaria = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <MenuCard icon="ti-device-desktop" title="Monitor"    sub="Estados"      color={NA.darker}  onClick={() => setView('MONITOR')} />
           <MenuCard icon="ti-calendar-plus"  title="Agendar"    sub="Nueva clase"  color={NA.dark}    onClick={() => setView('CALENDARIO')} />
+          <MenuCard icon="ti-message-2-down" title="Importar"   sub="Del grupo"    color="#7C3AED"    onClick={() => setView('IMPORTAR')} />
           {isAdmin && (
             <MenuCard icon="ti-receipt-2"    title="Pasivos"    sub="Deudas"       color="#92400E"    onClick={() => setView('PASIVOS')} />
           )}
@@ -506,6 +508,14 @@ const Secretaria = () => {
         )}
         setView={(v) => setView(v || 'INICIO')}
       />
+    );
+  }
+
+  if (view === 'IMPORTAR') {
+    return (
+      <div style={{ minHeight: '100vh', paddingBottom: 40 }}>
+        <ImportarMensaje onClose={() => setView('INICIO')} />
+      </div>
     );
   }
 
