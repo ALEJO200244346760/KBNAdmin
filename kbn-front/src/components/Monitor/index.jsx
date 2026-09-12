@@ -88,6 +88,26 @@ const Monitor = () => {
   const ingresos = useMemo(() => clases.filter(c => c.tipoTransaccion === 'INGRESO'), [clases]);
   const egresos  = useMemo(() => clases.filter(c => c.tipoTransaccion === 'EGRESO'),  [clases]);
 
+  // Para el selector de instructor: solo gente que da clases, con el nombre
+  // completo y ordenado. Deja afuera admin y la cuenta de la escuela.
+  const instructoresSelect = useMemo(() => {
+    const EXCLUIR = ['admin', 'nautica', 'nautica atins'];
+    return (usuarios || [])
+      .filter(u => {
+        const rol = (u.rol?.nombre || '').toUpperCase();
+        const nom = `${u.nombre || ''}`.trim().toLowerCase();
+        if (EXCLUIR.includes(nom)) return false;
+        // Si el rol está cargado, solo instructores; si no, no filtramos por rol
+        return rol ? rol === 'INSTRUCTOR' : true;
+      })
+      .map(u => ({
+        id: u.id,
+        nombre: `${u.nombre || ''} ${u.apellido || ''}`.replace(/\s+/g, ' ').trim(),
+      }))
+      .filter(u => u.nombre)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [usuarios]);
+
   const instructores = useMemo(() => {
     const set = new Set();
     agenda.forEach(a => a.nombreInstructor && set.add(a.nombreInstructor));
@@ -623,7 +643,7 @@ const Monitor = () => {
         onDragHora={onDragHora}
         eliminarClase={eliminarClase}
         onSaveClase={onSaveClase}
-        instructores={usuarios}
+        instructores={instructoresSelect}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>

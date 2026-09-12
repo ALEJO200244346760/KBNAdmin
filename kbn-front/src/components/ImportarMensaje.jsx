@@ -383,7 +383,15 @@ export default function ImportarMensaje({ onClose, onImportado }) {
   useEffect(() => {
     // /usuario es el listado que ya usa el Monitor. El de admin no existe.
     api.get('/usuario')
-      .then((r) => setUsuarios((r.data || []).map((u) => {
+      .then((r) => setUsuarios((r.data || [])
+        // Fuera la cuenta de sistema y la de la escuela: no dan clases
+        .filter((u) => {
+          const rol = (u.rol?.nombre || '').toUpperCase();
+          const nom = `${u.nombre || ''}`.trim().toLowerCase();
+          if (['admin', 'nautica', 'nautica atins'].includes(nom)) return false;
+          return rol ? rol === 'INSTRUCTOR' : true;
+        })
+        .map((u) => {
         const nombre = `${u.nombre || ''} ${u.apellido || ''}`.replace(/\s+/g, ' ').trim();
         const pila   = (u.nombre || '').trim();
         // Apodos: el nombre entero y los primeros 4 y 3 caracteres, para que
@@ -393,7 +401,8 @@ export default function ImportarMensaje({ onClose, onImportado }) {
         ].filter((x) => x && x.length >= 3))]
           .sort((a, b) => b.length - a.length);   // el más largo primero
         return { id: u.id, nombre, aliases };
-      })))
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))))
       .catch((e) => { console.error('[Importar] no se pudo traer usuarios:', e); setUsuarios([]); });
   }, []);
 
