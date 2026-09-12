@@ -3,12 +3,13 @@ import { NA, fmt, esPasado, HOY, labelMon, Tag } from './MonitorShared';
 import { useAuth } from '../../context/AuthContext';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-const HORA_INICIO = 9;
-const HORA_FIN    = 18;
-const HORAS_TOTAL = HORA_FIN - HORA_INICIO;
-const PX_H        = 80; // px por hora
-const TIMELINE_H  = HORAS_TOTAL * PX_H;
-const LABEL_W     = 44; // ancho columna de horas
+// Rango por defecto. Si hay clases fuera de este horario, el timeline se
+// estira para incluirlas: antes se quedaban invisibles y el contador decía
+// más clases de las que se veían.
+const HORA_DEF_INI = 9;
+const HORA_DEF_FIN = 18;
+const PX_H         = 80; // px por hora
+const LABEL_W      = 44; // ancho columna de horas
 
 const COLOR = {
   APK:   { bg:'#D1FAE5', bdr:'#059669', txt:'#064E3B' },
@@ -33,29 +34,84 @@ const colClase = (tipoAula, estado) => {
 const PRIO = { APK:0, ASPK:1, APWF:2, ASPWF:3, APWS:4, ASPWS:5, RENTAL:8, OTRO:9 };
 
 const toMin  = (h) => { if (!h) return null; const [hh,mm] = String(h).substring(0,5).split(':').map(Number); return hh*60+(mm||0); };
-const toPx   = (min) => Math.max(0, ((min - HORA_INICIO*60)/60)*PX_H);
-const toH    = (ini, fin) => Math.max(32, ((Math.min(fin, HORA_FIN*60) - ini)/60)*PX_H - 2);
+const toPx   = (min, hIni) => Math.max(0, ((min - hIni*60)/60)*PX_H);
+const toH    = (ini, fin, hFin) => Math.max(32, ((Math.min(fin, hFin*60) - ini)/60)*PX_H - 2);
 const hhMM   = (s) => String(s||'').substring(0,5);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DRAWER — panel deslizante desde abajo con detalle de clase
 // ══════════════════════════════════════════════════════════════════════════════
+const inpD = {
+  width:'100%', padding:'11px 12px', borderRadius:10,
+  border:'0.5px solid rgba(255,255,255,.15)', fontSize:15,
+  color:'rgba(255,255,255,.92)', background:'rgba(255,255,255,.08)',
+  fontFamily:'inherit', boxSizing:'border-box',
+};
+const lblD = {
+  fontSize:10, color:'rgba(255,255,255,.45)', display:'block',
+  marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em',
+};
+
 const ClaseDrawer = ({
   clase, cobrado, ingresoVinc, puedeAdmin, onClose,
   cambiarEstado, abrirEditClase, abrirIngreso,
-  liquidarClase, duplicarClase, eliminarClase, onSaveHoraEntrada,
+  liquidarClase, duplicarClase, eliminarClase, onSaveClase, instructores,
 }) => {
   const col    = colClase(clase.tipoAula, clase.estado);
   const pasada = esPasado(String(clase.fecha));
-  const [hora, setHora]     = useState(hhMM(clase.hora));
-  const [saving, setSaving] = useState(false);
 
-  const guardarHora = async () => {
-    if (!hora || !onSaveHoraEntrada) return;
+  // Valores originales, para saber qué cambió y poder deshacer
+  const orig = {
+    hora:     hhMM(clase.hora),
+    horaSal:  hhMM(clase.horaSalida),
+    horas:    clase.horas != null ? String(clase.horas) : '',
+    tipo:     clase.tipoAula || 'OTRO',
+    instr:    clase.instructorId != null ? String(clase.instructorId) : '',
+  };
+
+  const [hora,    setHora]    = useState(orig.hora);
+  const [horaSal, setHoraSal] = useState(orig.horaSal);
+  const [horasEd, setHorasEd] = useState(orig.horas);
+  const [tipoEd,  setTipoEd]  = useState(orig.tipo);
+  const [instrEd, setInstrEd] = useState(orig.instr);
+  const [saving,  setSaving]  = useState(false);
+  const [errorEd, setErrorEd] = useState(null);
+
+  const hayCambios =
+    hora !== orig.hora || horaSal !== orig.horaSal ||
+    horasEd !== orig.horas || tipoEd !== orig.tipo || instrEd !== orig.instr;
+
+  const resetEdicion = () => {
+    setHora(orig.hora); setHoraSal(orig.horaSal); setHorasEd(orig.horas);
+    setTipoEd(orig.tipo); setInstrEd(orig.instr); setErrorEd(null);
+  };
+
+  // Solo manda los campos que realmente cambiaron
+  const guardarCambios = async () => {
+    if (!hayCambios || !onSaveClase) return;
+    setErrorEd(null);
+
+    if (hora && horaSal && hora >= horaSal) {
+      setErrorEd('La hora de salida tiene que ser posterior a la de entrada.');
+      return;
+    }
+
+    const payload = {};
+    if (hora    !== orig.hora)    payload.hora        = hora ? `${hora}:00` : null;
+    if (horaSal !== orig.horaSal) payload.horaSalida  = horaSal ? `${horaSal}:00` : null;
+    if (horasEd !== orig.horas)   payload.horas       = horasEd === '' ? null : parseFloat(horasEd);
+    if (tipoEd  !== orig.tipo)    payload.tipoAula    = tipoEd;
+    if (instrEd !== orig.instr)   payload.instructorId = instrEd === '' ? null : Number(instrEd);
+
     setSaving(true);
-    await onSaveHoraEntrada(clase.id, hora);
-    setSaving(false);
-    onClose();
+    try {
+      await onSaveClase(clase.id, payload);
+      onClose();
+    } catch (e) {
+      setErrorEd('No se pudo guardar. Probá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const BtnAccion = ({ icon, label, bg='#fff', bdr=NA.border, color=NA.text, onClick }) => (
@@ -150,19 +206,71 @@ const ClaseDrawer = ({
             </div>
           )}
 
-          {/* Editar hora de entrada */}
+          {/* ── Edición rápida: hora, duración, tipo e instructor ── */}
           <div style={{ background:'rgba(255,255,255,.04)', borderRadius:14, padding:'14px 16px' }}>
-            <p style={{ margin:'0 0 10px', fontSize:11, color:'rgba(255,255,255,.5)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
-              Hora de entrada
-            </p>
-            <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-              <input type="time" value={hora} onChange={e => setHora(e.target.value)}
-                style={{ flex:1, padding:'12px 14px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:16, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', fontFamily:'inherit' }}/>
-              <button onClick={guardarHora} disabled={!hora || saving}
-                style={{ padding:'12px 20px', borderRadius:10, border:'none', background: hora ? NA.dark : NA.border, color:'#fff', fontSize:14, fontWeight:600, cursor: hora ? 'pointer' : 'default' }}>
-                {saving ? '...' : 'Guardar'}
-              </button>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <p style={{ margin:0, fontSize:11, color:'rgba(255,255,255,.5)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
+                Editar clase
+              </p>
+              {hayCambios && <span style={{ fontSize:10, color:'#FBBF24' }}>● sin guardar</span>}
             </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+              <div>
+                <label style={lblD}>Entrada</label>
+                <input type="time" value={hora} onChange={e => setHora(e.target.value)} style={inpD}/>
+              </div>
+              <div>
+                <label style={lblD}>Salida</label>
+                <input type="time" value={horaSal} onChange={e => setHoraSal(e.target.value)} style={inpD}/>
+              </div>
+              <div>
+                <label style={lblD}>Horas</label>
+                <input type="number" step="0.5" min="0" value={horasEd}
+                  onChange={e => setHorasEd(e.target.value)} style={inpD}/>
+              </div>
+              <div>
+                <label style={lblD}>Tipo</label>
+                <select value={tipoEd} onChange={e => setTipoEd(e.target.value)} style={inpD}>
+                  {['APK','ASPK','APWF','ASPWF','APWS','ASPWS','RENTAL','OTRO'].map(t =>
+                    <option key={t} value={t} style={{ color:'#111' }}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {puedeAdmin && (
+              <div style={{ marginBottom:10 }}>
+                <label style={lblD}>Instructor</label>
+                <select value={instrEd} onChange={e => setInstrEd(e.target.value)} style={inpD}>
+                  <option value="" style={{ color:'#111' }}>— sin asignar —</option>
+                  {(instructores||[]).map(i =>
+                    <option key={i.id} value={i.id} style={{ color:'#111' }}>{i.nombre}</option>)}
+                </select>
+                <p style={{ margin:'4px 0 0', fontSize:10, color:'rgba(255,255,255,.4)' }}>
+                  Al cambiarlo se le notifica y la clase vuelve a PENDIENTE.
+                </p>
+              </div>
+            )}
+
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={guardarCambios} disabled={!hayCambios || saving}
+                style={{ flex:1, padding:'12px', borderRadius:10, border:'none',
+                  background: hayCambios ? '#047857' : 'rgba(255,255,255,.1)',
+                  color:'#fff', fontSize:14, fontWeight:600,
+                  cursor: hayCambios ? 'pointer' : 'default' }}>
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+              {hayCambios && (
+                <button onClick={resetEdicion} disabled={saving}
+                  style={{ padding:'12px 16px', borderRadius:10, border:'1px solid rgba(255,255,255,.15)',
+                    background:'transparent', color:'rgba(255,255,255,.7)', fontSize:13, cursor:'pointer' }}>
+                  Deshacer
+                </button>
+              )}
+            </div>
+            {errorEd && (
+              <p style={{ margin:'8px 0 0', fontSize:12, color:'#FCA5A5' }}>{errorEd}</p>
+            )}
           </div>
 
           {/* Botones secundarios */}
@@ -200,7 +308,7 @@ const MonitorDia = ({
   tieneCobro, ingresoDeClase,
   cambiarEstado, abrirEditClase, abrirIngreso, abrirAgendar,
   liquidarClase, duplicarClase, navDia, onDragHora,
-  eliminarClase, onSaveHoraEntrada,
+  eliminarClase, onSaveClase, instructores,
 }) => {
   const [claseSelec, setClaseSelec]   = useState(null);
   const [modoMover,  setModoMover]    = useState(false); // modo drag activado explícitamente
@@ -227,6 +335,22 @@ const MonitorDia = ({
     .filter(a => toMin(a.hora) !== null)
     .sort((a,b) => { const d=toMin(a.hora)-toMin(b.hora); return d!==0?d:(PRIO[a.tipoAula]??6)-(PRIO[b.tipoAula]??6); });
   const sinPos = clasesActivas.filter(a => toMin(a.hora) === null);
+
+  // ── Rango horario que realmente hace falta mostrar ────────────────────────
+  // Arranca del rango por defecto y se estira si alguna clase cae fuera, así
+  // ninguna queda escondida arriba o debajo del contenedor.
+  let hIni = HORA_DEF_INI, hFin = HORA_DEF_FIN;
+  conPos.forEach(a => {
+    const ini = toMin(a.hora);
+    const fin = a.horaSalida ? toMin(a.horaSalida)
+                             : ini + Math.min(parseFloat(a.horas)||1, 8)*60;
+    hIni = Math.min(hIni, Math.floor(ini/60));
+    hFin = Math.max(hFin, Math.ceil(fin/60));
+  });
+  hIni = Math.max(0, hIni);
+  hFin = Math.min(24, Math.max(hFin, hIni+1));
+  const horasTotal = hFin - hIni;
+  const timelineH  = horasTotal * PX_H;
 
   // Asignar columna a cada clase
   const asignacion = []; // [{clase, col, totalCols}] — totalCols se llena después
@@ -265,9 +389,9 @@ const MonitorDia = ({
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
     const rect    = timelineRef.current.getBoundingClientRect();
     const yRel    = clientY - rect.top;
-    const min     = HORA_INICIO*60 + (yRel/PX_H)*60;
+    const min     = hIni*60 + (yRel/PX_H)*60;
     const snapped = Math.round(min/15)*15;
-    const hh      = Math.max(HORA_INICIO, Math.min(HORA_FIN-1, Math.floor(snapped/60)));
+    const hh      = Math.max(hIni, Math.min(hFin-1, Math.floor(snapped/60)));
     const mm      = snapped%60;
     const nueva   = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
     if (onDragHora && nueva !== hhMM(dragRef.current.hora)) onDragHora(dragRef.current.id, nueva);
@@ -357,9 +481,9 @@ const MonitorDia = ({
         <div style={{ display:'flex' }}>
 
           {/* Labels de horas */}
-          <div style={{ width:LABEL_W, flexShrink:0, position:'relative', height:TIMELINE_H+20 }}>
-            {Array.from({ length:HORAS_TOTAL+1 }, (_,i) => {
-              const hora = HORA_INICIO+i;
+          <div style={{ width:LABEL_W, flexShrink:0, position:'relative', height:timelineH+20 }}>
+            {Array.from({ length:horasTotal+1 }, (_,i) => {
+              const hora = hIni+i;
               return (
                 <div key={hora} style={{ position:'absolute', top:i*PX_H+10, width:'100%', display:'flex', alignItems:'center', gap:4 }}>
                   <span style={{ fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:500, width:'100%', textAlign:'right', paddingRight:8 }}>
@@ -372,17 +496,17 @@ const MonitorDia = ({
 
           {/* Área de bloques */}
           <div ref={timelineRef}
-            style={{ flex:1, position:'relative', height:TIMELINE_H+20, borderLeft:`0.5px solid ${NA.border}` }}>
+            style={{ flex:1, position:'relative', height:timelineH+20, borderLeft:`0.5px solid ${NA.border}` }}>
 
             {/* Líneas horizontales */}
-            {Array.from({ length:HORAS_TOTAL+1 }, (_,i) => (
+            {Array.from({ length:horasTotal+1 }, (_,i) => (
               <div key={i} style={{ position:'absolute', left:0, right:0, top:i*PX_H+10,
                 borderTop: i===0 ? `1px solid ${NA.border}` : `0.5px solid ${NA.border}40`, zIndex:1 }}/>
             ))}
 
             {/* Botones + por hora */}
-            {abrirAgendar && Array.from({ length:HORAS_TOTAL }, (_,i) => {
-              const hora = HORA_INICIO+i;
+            {abrirAgendar && Array.from({ length:horasTotal }, (_,i) => {
+              const hora = hIni+i;
               return (
                 <button key={hora}
                   onClick={() => abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
@@ -400,8 +524,8 @@ const MonitorDia = ({
             {/* Línea "ahora" */}
             {diaSelec === HOY && (() => {
               const n = new Date(); const min = n.getHours()*60+n.getMinutes();
-              if (min < HORA_INICIO*60 || min > HORA_FIN*60) return null;
-              const top = toPx(min)+10;
+              if (min < hIni*60 || min > hFin*60) return null;
+              const top = toPx(min, hIni)+10;
               return (
                 <div style={{ position:'absolute', left:0, right:0, top, height:2, background:'#EF4444', zIndex:10 }}>
                   <div style={{ width:10, height:10, borderRadius:'50%', background:'#EF4444', marginTop:-4, marginLeft:-2 }}/>
@@ -415,8 +539,8 @@ const MonitorDia = ({
               const finMin = clase.horaSalida
                 ? toMin(clase.horaSalida)
                 : ini + Math.min(parseFloat(clase.horas)||1, 8)*60;
-              const top = toPx(ini)+10;
-              const h   = toH(ini, finMin);
+              const top = toPx(ini, hIni)+10;
+              const h   = toH(ini, finMin, hFin);
               const c   = colClase(clase.tipoAula, clase.estado);
               const cob = tieneCobro(clase);
 
@@ -600,7 +724,8 @@ const MonitorDia = ({
           liquidarClase={liquidarClase}
           duplicarClase={duplicarClase}
           eliminarClase={eliminarClase}
-          onSaveHoraEntrada={onSaveHoraEntrada}
+          onSaveClase={onSaveClase}
+          instructores={instructores}
         />
       )}
     </div>

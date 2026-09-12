@@ -400,12 +400,15 @@ const Monitor = () => {
     } catch (e) { alert('No se pudo eliminar.'); }
   };
 
-  // ── Guardar hora de entrada rápida desde el drawer ─────────────────────────
-  const onSaveHoraEntrada = async (id, hora) => {
-    try {
-      const res = await api.patch(`/api/agenda/${id}`, { hora });
-      setAgenda(p => p.map(a => a.id === id ? res.data : a));
-    } catch (e) { alert('No se pudo guardar.'); }
+  // ── Guardar cambios de la clase desde el drawer ───────────────────────────
+  // Recibe solo los campos que cambiaron: hora, horaSalida, horas, tipoAula
+  // o instructorId. Lanza el error para que el drawer lo muestre en contexto
+  // en vez de un alert suelto.
+  const onSaveClase = async (id, payload) => {
+    if (!payload || Object.keys(payload).length === 0) return;
+    const res = await api.patch(`/api/agenda/${id}`, payload);
+    setAgenda(p => p.map(a => (a.id === id ? res.data : a)));
+    return res.data;
   };
 
   // Solo secretaria/admin. Acumula horas en el pasivo del instructor
@@ -619,7 +622,8 @@ const Monitor = () => {
         navDia={navDia}
         onDragHora={onDragHora}
         eliminarClase={eliminarClase}
-        onSaveHoraEntrada={onSaveHoraEntrada}
+        onSaveClase={onSaveClase}
+        instructores={usuarios}
       />
 
       <MonitorResumen mes={mes} resumen={resumen}/>
