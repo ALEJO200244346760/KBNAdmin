@@ -58,7 +58,8 @@ const CANALES = [
   [/\bd[oó]lar\w*\b|\busd\b/i,     'USD_EFECTIVO',  'Efectivo'],
 ];
 
-const RE_RANGO       = /(\d{1,2})\s*[:.]?\s*(\d{2})?\s*:?\s*(?:-|–|—|\ba\b|hasta)\s*(?:(\d{1,2})\s*[:.]?\s*(\d{2})?)?/i;
+// Acepta "9hs a 10hs", "11:20-12:20", "10:00:-11:00", "12:30-"
+const RE_RANGO       = /(\d{1,2})\s*[:.]?\s*(\d{2})?\s*(?:hs?|hrs?)?\s*:?\s*(?:-|–|—|\ba\b|hasta)\s*(?:(\d{1,2})\s*[:.]?\s*(\d{2})?)?/i;
 const RE_HORA_SUELTA = /(?:^|\s)(\d{1,2})\s*[:.]?(\d{2})?\s*hs?\b/i;
 // "09:00" suelto, sin "hs" ni rango — típico de "APK Giuseppe 09:00 Hans 2hs"
 const RE_HORA_RELOJ  = /(?:^|\s)(\d{1,2})[:.](\d{2})\b/;
@@ -130,8 +131,8 @@ function parseClase(lineaOriginal, fecha, instructores) {
   // Solo es rango si hay guion o "a" entre dos horas. "09:00 Hans 2hs" no lo es.
   // Un rango real lleva guion o " a " entre las dos horas. Un espacio no
   // alcanza: en "09:00 2hs" el 2 es la duración, no la hora de salida.
-  const tieneSeparador = /\d\s*[:.]?\s*\d*\s*(?:-|–|—|hasta|\sa\s)\s*\d/i.test(linea)
-                      || /\d\s*[:.]?\s*\d*\s*[-–—]\s*$/.test(linea.trim());
+  const tieneSeparador = /\d\s*[:.]?\s*\d*\s*(?:hs?|hrs?)?\s*(?:-|–|—|hasta|\sa\s)\s*\d/i.test(linea)
+                      || /\d\s*[:.]?\s*\d*\s*(?:hs?)?\s*[-–—]\s*$/.test(linea.trim());
   const r = tieneSeparador ? RE_RANGO.exec(linea) : null;
   if (r && r[1] != null) {
     usoRango = true;
@@ -384,13 +385,9 @@ export default function ImportarMensaje({ onClose, onImportado }) {
     // /usuario es el listado que ya usa el Monitor. El de admin no existe.
     api.get('/usuario')
       .then((r) => setUsuarios((r.data || [])
-        // Fuera la cuenta de sistema y la de la escuela: no dan clases
-        .filter((u) => {
-          const rol = (u.rol?.nombre || '').toUpperCase();
-          const nom = `${u.nombre || ''}`.trim().toLowerCase();
-          if (['admin', 'nautica', 'nautica atins'].includes(nom)) return false;
-          return rol ? rol === 'INSTRUCTOR' : true;
-        })
+        // Todos los usuarios: cualquiera puede quedar a cargo de una clase.
+        // Solo se saca la cuenta de sistema.
+        .filter((u) => `${u.nombre || ''}`.trim().toLowerCase() !== 'admin')
         .map((u) => {
         const nombre = `${u.nombre || ''} ${u.apellido || ''}`.replace(/\s+/g, ' ').trim();
         const pila   = (u.nombre || '').trim();

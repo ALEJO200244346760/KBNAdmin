@@ -91,15 +91,10 @@ const Monitor = () => {
   // Para el selector de instructor: solo gente que da clases, con el nombre
   // completo y ordenado. Deja afuera admin y la cuenta de la escuela.
   const instructoresSelect = useMemo(() => {
-    const EXCLUIR = ['admin', 'nautica', 'nautica atins'];
+    // Todos los usuarios menos la cuenta de sistema: cualquiera puede quedar
+    // a cargo de una clase, incluida la escuela como freelancer.
     return (usuarios || [])
-      .filter(u => {
-        const rol = (u.rol?.nombre || '').toUpperCase();
-        const nom = `${u.nombre || ''}`.trim().toLowerCase();
-        if (EXCLUIR.includes(nom)) return false;
-        // Si el rol está cargado, solo instructores; si no, no filtramos por rol
-        return rol ? rol === 'INSTRUCTOR' : true;
-      })
+      .filter(u => `${u.nombre || ''}`.trim().toLowerCase() !== 'admin')
       .map(u => ({
         id: u.id,
         nombre: `${u.nombre || ''} ${u.apellido || ''}`.replace(/\s+/g, ' ').trim(),
@@ -316,8 +311,13 @@ const Monitor = () => {
   const cambiarEstado = async (id, estado) => {
     const clase = agenda.find(a => a.id === id);
 
-    // Si admin/secretaria confirman una clase con instructor → liquidar directo
-    if (estado === 'CONFIRMADA' && puedeAdmin && clase?.nombreInstructor) {
+    // Una clase que todavía no ocurrió no se liquida: el instructor estaría
+    // cobrando algo que no dio. Se confirma y queda esperando al día.
+    const hoyStr = new Date().toISOString().slice(0, 10);
+    const yaOcurrio = clase?.fecha ? String(clase.fecha).slice(0, 10) <= hoyStr : true;
+
+    // Admin/secretaria confirman una clase YA DADA con instructor → liquidar
+    if (estado === 'CONFIRMADA' && puedeAdmin && clase?.nombreInstructor && yaOcurrio) {
       try {
         await api.put(`/api/agenda/${id}/estado`, estado, {
           headers: { 'Content-Type': 'text/plain' },

@@ -59,6 +59,8 @@ const ClaseDrawer = ({
 }) => {
   const col    = colClase(clase.tipoAula, clase.estado);
   const pasada = esPasado(String(clase.fecha));
+  // Una clase de mañana no se liquida hoy: el instructor no la dio todavía
+  const esFutura = String(clase.fecha).slice(0, 10) > new Date().toISOString().slice(0, 10);
 
   // Valores originales, para saber qué cambió y poder deshacer
   const orig = {
@@ -195,10 +197,17 @@ const ClaseDrawer = ({
             </div>
           )}
           {clase.estado === 'CONFIRMADA' && puedeAdmin && (
-            <button onClick={() => { liquidarClase(clase); onClose(); }}
-              style={{ width:'100%', padding:'15px', borderRadius:14, border:'none', background:NA.darker, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-              <i className="ti ti-cash" style={{ fontSize:18 }}/> Liquidar clase
-            </button>
+            esFutura ? (
+              <div style={{ padding:'13px 14px', borderRadius:14, background:'rgba(251,191,36,.12)',
+                border:'1px solid rgba(251,191,36,.3)', color:'#FBBF24', fontSize:13, textAlign:'center' }}>
+                Se liquida el día de la clase. Todavía no se dio.
+              </div>
+            ) : (
+              <button onClick={() => { liquidarClase(clase); onClose(); }}
+                style={{ width:'100%', padding:'15px', borderRadius:14, border:'none', background:NA.darker, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                <i className="ti ti-cash" style={{ fontSize:18 }}/> Liquidar clase
+              </button>
+            )
           )}
           {clase.estado === 'FINALIZADA' && (
             <div style={{ padding:'14px', borderRadius:14, background:'#D1FAE5', color:'#065F46', fontSize:15, fontWeight:600, textAlign:'center' }}>
