@@ -436,16 +436,24 @@ export default function ImportarMensaje({ onClose, onImportado }) {
           estado: 'PENDIENTE',
         });
       } else {
+        // Con tarjeta de crédito el banco se queda el 5%: se guarda el NETO,
+        // igual que en la pantalla de Ingreso. Si no, entra el monto entero.
+        const bruto    = Number(it.monto) || 0;
+        const descuento = it.formaPago === 'Tarjeta Crédito' ? bruto * 0.05 : 0;
+        const neto     = Math.round((bruto - descuento) * 100) / 100;
+
         await api.post('/api/clases/guardar', {
           tipoTransaccion: 'INGRESO',
           fecha: it.fecha,
-          actividad: it.actividad,
-          total: String(it.monto || 0),
+          actividad: it.actividad || 'Ingreso',
+          // instructor es obligatorio en la base: sin esto el guardado da 500
+          instructor: opcionActual?.label || 'Importado del grupo',
+          total: String(neto),
           moneda: it.moneda || 'BRL',
-          formaPago: it.formaPago || '',
+          formaPago: it.formaPago || 'Efectivo',
           detalles: it.alumno || '',
           asignadoA: it.asignadoA || null,
-          comision: '0',
+          comision: String(Math.round(descuento * 100) / 100),
         });
       }
       setItems((p) => p.map((x) => (x._id === it._id ? { ...x, estado: 'ok' } : x)));
@@ -595,7 +603,14 @@ export default function ImportarMensaje({ onClose, onImportado }) {
                     .map(([v, t]) => <option key={v} value={v} style={{ color: '#111' }}>{t}</option>)}
                 </select>
               </Campo>
-              <Campo label="Asignado a" ancho>
+              <Campo label="Forma de pago">
+                <select value={it.formaPago || 'Efectivo'} style={inp}
+                  onChange={(e) => cambiar(it._id, 'formaPago', e.target.value)}>
+                  {['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta Crédito', 'Tarjeta Débito']
+                    .map((f) => <option key={f} value={f} style={{ color: '#111' }}>{f}</option>)}
+                </select>
+              </Campo>
+              <Campo label="Asignado a">
                 <select value={it.asignadoA || ''} style={inp}
                   onChange={(e) => cambiar(it._id, 'asignadoA', e.target.value || null)}>
                   <option value=""      style={{ color: '#111' }}>— decidir después —</option>
@@ -605,6 +620,14 @@ export default function ImportarMensaje({ onClose, onImportado }) {
                   <option value="ALE"   style={{ color: '#111' }}>Ausentes · 10 / 10 / 5</option>
                 </select>
               </Campo>
+              {it.formaPago === 'Tarjeta Crédito' && it.monto > 0 && (
+                <div style={{ gridColumn: 'span 4', fontSize: 11, color: C.pago,
+                  background: 'rgba(251,191,36,.1)', padding: '7px 10px', borderRadius: 7 }}>
+                  Tarjeta de crédito: se descuenta 5% del banco.{' '}
+                  {Number(it.monto).toFixed(2)} − {(it.monto * 0.05).toFixed(2)} ={' '}
+                  <strong>{(it.monto * 0.95).toFixed(2)}</strong> a caja
+                </div>
+              )}
             </Tarjeta>
           ))}
         </Seccion>
