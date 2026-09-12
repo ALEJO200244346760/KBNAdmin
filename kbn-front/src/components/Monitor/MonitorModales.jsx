@@ -101,7 +101,7 @@ const FechaGroup = ({ fecha, ingresos, esMismoDia, haySelec, editForm, setEditFo
 // ══════════════════════════════════════════════════════════════════════════════
 export const ModalEditarClase = ({
   editClase, editForm, setEditForm,
-  ingresosDisponiblesEdit, agenda,
+  ingresosDisponiblesEdit, agenda, instructores = [],
   guardandoEdit, guardarEditClase, onClose,
 }) => {
   if (!editClase) return null;
@@ -143,13 +143,34 @@ export const ModalEditarClase = ({
             ))}
           </div>
 
+          {/* Instructor */}
+          <label style={sx.label}>Instructor</label>
+          <select
+            value={editForm.instructorId || ''}
+            onChange={e => setEditForm(p => ({...p, instructorId: e.target.value}))}
+            style={{ width:'100%', padding:'10px 12px', borderRadius:10,
+              border:'0.5px solid rgba(255,255,255,.1)', fontSize:14, marginBottom:12,
+              color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)',
+              boxSizing:'border-box', fontFamily:'inherit' }}>
+            <option value="" style={{ color:'#111' }}>— sin asignar —</option>
+            {instructores.map(i => (
+              <option key={i.id} value={i.id} style={{ color:'#111' }}>{i.nombre}</option>
+            ))}
+          </select>
+          {editForm.instructorId !== (editClase.instructorId != null ? String(editClase.instructorId) : '') && (
+            <p style={{ margin:'-6px 0 12px', fontSize:11, color:'#FBBF24' }}>
+              Al guardar se le avisa y la clase vuelve a pendiente.
+            </p>
+          )}
+
           {/* Horarios */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:12 }}>
             <div>
               <label style={sx.label}>Hora entrada</label>
-              <input type="time" readOnly
-                value={editClase.hora?.substring(0,5) || ''}
-                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:14, background:'#f9fafb', color:'#9ca3af', boxSizing:'border-box' }}/>
+              <input type="time"
+                value={editForm.hora || ''}
+                onChange={e => setEditForm(p => ({...p, hora: e.target.value}))}
+                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`0.5px solid rgba(255,255,255,.1)`, fontSize:14, color:'rgba(255,255,255,.9)', background:'rgba(255,255,255,.07)', boxSizing:'border-box' }}/>
             </div>
             <div>
               <label style={sx.label}>Hora salida</label>

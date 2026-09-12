@@ -227,6 +227,9 @@ public class AgendaController {
 
     // 5. Actualizar campos de la clase (tipoAula, horaSalida, horas, lugar, etc.)
     public static class ActualizarClaseRequest {
+        // Distingue "no vino el campo" de "vino con null" (desasignar)
+        private transient boolean instructorIdPresente = false;
+        public boolean tieneInstructorId() { return instructorIdPresente; }
         private String tipoAula;
         private String hora;        // hora de inicio (HH:mm) — para drag & drop
         private String horaSalida;
@@ -266,7 +269,7 @@ public class AgendaController {
         public Long getIngresoId() { return ingresoId; }
         public void setIngresoId(Long ingresoId) { this.ingresoId = ingresoId; }
         public Long getInstructorId() { return instructorId; }
-        public void setInstructorId(Long id) { this.instructorId = id; }
+        public void setInstructorId(Long id) { this.instructorIdPresente = true; this.instructorId = id; }
     }
 
     @PatchMapping("/{id}")
@@ -295,20 +298,32 @@ public class AgendaController {
                 agenda.setIngresoId(req.getIngresoId());
             }
 
-            // ── Asignar/cambiar instructor y mandar push ─────────────────────
+            // ── Asignar, cambiar o quitar instructor ─────────────────────────
+            // El front manda instructorId SOLO cuando cambió. Si manda null
+            // explícito es para desasignar; antes eso se ignoraba y no había
+            // forma de dejar una clase sin instructor.
             Long instructorAnteriorId = agenda.getInstructorId();
-            boolean instructorCambio = req.getInstructorId() != null
-                    && !req.getInstructorId().equals(instructorAnteriorId);
+            boolean vieneInstructor   = req.tieneInstructorId();
+            boolean instructorCambio  = false;
 
-            if (instructorCambio) {
-                Optional<Usuario> instrOpt = usuarioRepository.findById(req.getInstructorId());
-                if (instrOpt.isPresent()) {
-                    Usuario instr = instrOpt.get();
-                    agenda.setInstructorId(req.getInstructorId());
-                    agenda.setNombreInstructor(instr.getNombre() + " " + instr.getApellido());
-                    // Si el estado era PENDIENTE con otro instructor, resetear a PENDIENTE
-                    // para que el nuevo instructor lo vea como asignación nueva.
-                    agenda.setEstado("PENDIENTE");
+            if (vieneInstructor) {
+                Long nuevoId = req.getInstructorId();
+                if (nuevoId == null) {
+                    if (instructorAnteriorId != null) {
+                        agenda.setInstructorId(null);
+                        agenda.setNombreInstructor(null);
+                        agenda.setEstado("PENDIENTE");
+                    }
+                } else if (!nuevoId.equals(instructorAnteriorId)) {
+                    Optional<Usuario> instrOpt = usuarioRepository.findById(nuevoId);
+                    if (instrOpt.isPresent()) {
+                        Usuario instr = instrOpt.get();
+                        agenda.setInstructorId(nuevoId);
+                        agenda.setNombreInstructor(instr.getNombre() + " " + instr.getApellido());
+                        // El nuevo instructor tiene que verla como asignación nueva
+                        agenda.setEstado("PENDIENTE");
+                        instructorCambio = true;
+                    }
                 }
             }
 

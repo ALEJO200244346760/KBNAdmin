@@ -351,6 +351,8 @@ const Monitor = () => {
     setEditClase(clase);
     setEditForm({
       tipoAula:       clase.tipoAula    || '',
+      hora:           clase.hora        ? clase.hora.substring(0, 5) : '',
+      instructorId:   clase.instructorId != null ? String(clase.instructorId) : '',
       horaSalida:     clase.horaSalida  ? clase.horaSalida.substring(0, 5) : '',
       horas:          clase.horas       || '',
       lugar:          clase.lugar       || '',
@@ -364,6 +366,12 @@ const Monitor = () => {
   // ── Guardar edición de clase ────────────────────────────────────────────────
   const guardarEditClase = async () => {
     if (guardandoEditRef.current) return;
+    // La salida tiene que ser posterior a la entrada, si no las horas quedan
+    // negativas y el bloque se dibuja mal en el timeline.
+    if (editForm.hora && editForm.horaSalida && editForm.hora >= editForm.horaSalida) {
+      alert('La hora de salida tiene que ser posterior a la de entrada.');
+      return;
+    }
     guardandoEditRef.current = true;
     setGuardandoEdit(true);
     try {
@@ -372,15 +380,29 @@ const Monitor = () => {
         : null;
       const payload = {
         tipoAula:   editForm.tipoAula   || null,
-        horaSalida: editForm.horaSalida || null,
+        hora:       editForm.hora       ? `${editForm.hora}:00` : null,
+        horaSalida: editForm.horaSalida ? `${editForm.horaSalida}:00` : null,
         horas:      editForm.horas      ? parseFloat(editForm.horas)  : null,
         lugar:      editForm.lugar      || null,
         tarifa:     editForm.tarifa     ? parseFloat(editForm.tarifa) : null,
-        cobrada:    !!ingresoIdNum,
-        ingresoId:  ingresoIdNum || null,
         // Si notificar=true, resetea a PENDIENTE para que el instructor lo vea como nuevo
         estado:     editForm.notificar ? 'PENDIENTE' : null,
       };
+
+      // Instructor: solo si cambió, así no se dispara un push al pedo
+      const instrOriginal = editClase.instructorId != null ? String(editClase.instructorId) : '';
+      if (editForm.instructorId !== instrOriginal) {
+        payload.instructorId = editForm.instructorId ? Number(editForm.instructorId) : null;
+      }
+
+      // El cobro solo se toca si de verdad cambió la selección. Mandar
+      // `cobrada` siempre hacía que el backend pisara ingresoId y una clase
+      // ya cobrada se desvinculara al guardar cualquier otro campo.
+      const ingresoOriginal = editClase.ingresoId != null ? String(editClase.ingresoId) : '';
+      if (String(editForm.ingresoIdSelec || '') !== ingresoOriginal) {
+        payload.cobrada   = !!ingresoIdNum;
+        payload.ingresoId = ingresoIdNum || null;
+      }
       const res = await api.patch(`/api/agenda/${editClase.id}`, payload);
       setAgenda(p => p.map(a => a.id === editClase.id ? res.data : a));
       setEditClase(null);
@@ -652,6 +674,7 @@ const Monitor = () => {
         editClase={editClase}
         editForm={editForm} setEditForm={setEditForm}
         ingresosDisponiblesEdit={ingresosDisponiblesEdit}
+        instructores={instructoresSelect}
         agenda={agenda}
         guardandoEdit={guardandoEdit}
         guardarEditClase={guardarEditClase}
