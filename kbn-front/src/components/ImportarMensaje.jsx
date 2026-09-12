@@ -77,11 +77,31 @@ const num = (s) => {
   return isNaN(v) ? null : v;
 };
 
+// Apodos que usan en el grupo. Sirven de respaldo si la lista de usuarios
+// no cargó, y se cruzan con los nombres reales para asignar el id.
+const APODOS = {
+  igna:  ['igna', 'ignacio'],
+  facu:  ['facu', 'facundo', 'facu.'],
+  jose:  ['jose', 'josé', 'jose.'],
+  hans:  ['hans'],
+  ale:   ['ale', 'alejo'],
+};
+
 function detectarInstructor(txt, instructores) {
+  const pega = (a) => new RegExp('(^|[\\s\\-–])' + a.replace(/\./g, '\\.') + '([\\s\\-–.,!]|$)', 'i').test(txt);
+
+  // 1) por los nombres reales de los usuarios
   for (const ins of instructores) {
-    for (const a of (ins.aliases || [])) {
-      if (new RegExp('(^|[\\s\\-–])' + a + '([\\s\\-–.,!]|$)', 'i').test(txt)) return { ins, alias: a };
-    }
+    for (const a of (ins.aliases || [])) if (pega(a)) return { ins, alias: a };
+  }
+  // 2) por los apodos del grupo, buscando a quién corresponden
+  for (const [clave, lista] of Object.entries(APODOS)) {
+    const hit = lista.find(pega);
+    if (!hit) continue;
+    const ins = instructores.find((u) =>
+      u.nombre.toLowerCase().replace(/[áéíóú]/g, (m) => 'aeiou'['áéíóú'.indexOf(m)])
+        .startsWith(clave.slice(0, 3)));
+    return { ins: ins || null, alias: hit };
   }
   return { ins: null, alias: null };
 }
@@ -100,7 +120,10 @@ function detectarTipo(linea) {
   return null;
 }
 
-function parseClase(linea, fecha, instructores) {
+function parseClase(lineaOriginal, fecha, instructores) {
+  // Sacar viñetas del principio: "-9hs APK…" hacía que el guion se leyera
+  // como separador de rango y la hora saliera mal.
+  const linea = lineaOriginal.replace(/^[\s\-–—•*·]+/, '');
   const tipo = detectarTipo(linea);
 
   let hIni = null, hFin = null, usoRango = false;
@@ -153,7 +176,11 @@ function parseClase(linea, fecha, instructores) {
   if (usoRango) al = al.replace(RE_RANGO, ' ');
   al = al.replace(RE_HORA_RELOJ, ' ').replace(RE_HORA_SUELTA, ' ').replace(RE_HORAS_DUR, ' ');
   if (alias) al = al.replace(new RegExp('(^|[\\s\\-–])' + alias + '([\\s\\-–.,!]|$)', 'ig'), ' ');
-  al = al.replace(/\b(hs|h)\b/ig, ' ').replace(/[-–—:]+/g, ' ')
+  al = al.replace(/\d+\s*hs?\b/ig, ' ')          // "1HS", "2hs" residuales
+         .replace(/\b(hs|h)\b/ig, ' ')
+         .replace(/^\s*a\s+/i, ' ')                // la "a" de "9hs a 10hs"
+         .replace(/\s+a\s+(?=$)/i, ' ')
+         .replace(/[-–—:]+/g, ' ')
          .replace(/\s{2,}/g, ' ').trim().replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, '');
 
   // Texto libre del tipo "No pago porq mañana alquila!" va a nota, no al nombre
@@ -166,7 +193,7 @@ function parseClase(linea, fecha, instructores) {
   return {
     kind: 'CLASE', code: tipo ? tipo.code : null, actividad: tipo ? tipo.act : null,
     fecha, hora: hIni, horaSalida: hFin, horas, alumno: al || null, nota,
-    instructorId: ins ? ins.id : null, linea: linea.trim(),
+    instructorId: ins ? ins.id : null, linea: lineaOriginal.trim(),
   };
 }
 
@@ -354,14 +381,20 @@ export default function ImportarMensaje({ onClose, onImportado }) {
   const asignadoDefault = asignadoAuto === 'AUSENTES' ? 'ALE' : asignadoAuto;
 
   useEffect(() => {
-    api.get('/api/admin/usuarios')
+    // /usuario es el listado que ya usa el Monitor. El de admin no existe.
+    api.get('/usuario')
       .then((r) => setUsuarios((r.data || []).map((u) => {
-        const nombre = `${u.nombre || ''} ${u.apellido || ''}`.trim();
-        const pila = (u.nombre || '').trim();
-        const aliases = [...new Set([pila, pila.slice(0, 4)].filter((x) => x && x.length >= 3))];
+        const nombre = `${u.nombre || ''} ${u.apellido || ''}`.replace(/\s+/g, ' ').trim();
+        const pila   = (u.nombre || '').trim();
+        // Apodos: el nombre entero y los primeros 4 y 3 caracteres, para que
+        // "Facu"/"Facu." peguen con Facundo e "Igna" con Ignacio.
+        const aliases = [...new Set([
+          pila, pila.slice(0, 4), pila.slice(0, 3),
+        ].filter((x) => x && x.length >= 3))]
+          .sort((a, b) => b.length - a.length);   // el más largo primero
         return { id: u.id, nombre, aliases };
       })))
-      .catch(() => setUsuarios([]));
+      .catch((e) => { console.error('[Importar] no se pudo traer usuarios:', e); setUsuarios([]); });
   }, []);
 
   const analizar = () => {
