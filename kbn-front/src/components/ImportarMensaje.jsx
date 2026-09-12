@@ -60,6 +60,8 @@ const CANALES = [
 
 const RE_RANGO       = /(\d{1,2})\s*[:.]?\s*(\d{2})?\s*:?\s*(?:-|–|—|\ba\b|hasta)\s*(?:(\d{1,2})\s*[:.]?\s*(\d{2})?)?/i;
 const RE_HORA_SUELTA = /(?:^|\s)(\d{1,2})\s*[:.]?(\d{2})?\s*hs?\b/i;
+// "09:00" suelto, sin "hs" ni rango — típico de "APK Giuseppe 09:00 Hans 2hs"
+const RE_HORA_RELOJ  = /(?:^|\s)(\d{1,2})[:.](\d{2})\b/;
 const RE_HORAS_DUR   = /(\d+(?:[.,]\d+)?)\s*h(?:s|rs)?\b/i;
 const RE_FECHA       = /\[?(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?/;
 const RE_MONTO       = /(?:R\$\s*)(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{1,2})?)\b|(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{1,2})?)\s*R\$/gi;
@@ -101,14 +103,24 @@ function detectarTipo(linea) {
 function parseClase(linea, fecha, instructores) {
   const tipo = detectarTipo(linea);
 
-  let hIni = null, hFin = null;
-  const r = RE_RANGO.exec(linea);
+  let hIni = null, hFin = null, usoRango = false;
+  // Solo es rango si hay guion o "a" entre dos horas. "09:00 Hans 2hs" no lo es.
+  // Un rango real lleva guion o " a " entre las dos horas. Un espacio no
+  // alcanza: en "09:00 2hs" el 2 es la duración, no la hora de salida.
+  const tieneSeparador = /\d\s*[:.]?\s*\d*\s*(?:-|–|—|hasta|\sa\s)\s*\d/i.test(linea)
+                      || /\d\s*[:.]?\s*\d*\s*[-–—]\s*$/.test(linea.trim());
+  const r = tieneSeparador ? RE_RANGO.exec(linea) : null;
   if (r && r[1] != null) {
+    usoRango = true;
     hIni = `${pad(Math.min(23, +r[1]))}:${pad(r[2] ? +r[2] : 0)}`;
     if (r[3] != null) hFin = `${pad(Math.min(23, +r[3]))}:${pad(r[4] ? +r[4] : 0)}`;
   } else {
-    const s = RE_HORA_SUELTA.exec(linea);
-    if (s) hIni = `${pad(Math.min(23, +s[1]))}:${pad(s[2] ? +s[2] : 0)}`;
+    const reloj = RE_HORA_RELOJ.exec(linea);
+    if (reloj) hIni = `${pad(Math.min(23, +reloj[1]))}:${pad(+reloj[2])}`;
+    else {
+      const s = RE_HORA_SUELTA.exec(linea);
+      if (s) hIni = `${pad(Math.min(23, +s[1]))}:${pad(s[2] ? +s[2] : 0)}`;
+    }
   }
   const { ins, alias } = detectarInstructor(linea, instructores);
   if (!hIni && !tipo) return null;
@@ -120,13 +132,26 @@ function parseClase(linea, fecha, instructores) {
     if (b > a) horas = Math.round(((b - a) / 60) * 100) / 100;
   }
   if (horas == null) {
-    const d = RE_HORAS_DUR.exec(linea.replace(RE_RANGO, ' '));
+    let base = usoRango ? linea.replace(RE_RANGO, ' ') : linea;
+    // No confundir la hora de inicio con la duración: en "9hs Hans 2hs"
+    // el 9 es la hora y el 2 son las horas de clase.
+    if (hIni) {
+      const hh = +hIni.split(':')[0];
+      base = base.replace(new RegExp('(^|\\s)' + hh + '\\s*[:.]?(00)?\\s*hs?\\b', 'i'), ' ');
+    }
+    const d = RE_HORAS_DUR.exec(base);
     if (d) { const v = num(d[1]); if (v != null && v > 0 && v <= 8) horas = v; }
+  }
+  // Con entrada y duración se deduce la salida
+  if (hIni && !hFin && horas) {
+    const t = +hIni.split(':')[0] * 60 + +hIni.split(':')[1] + horas * 60;
+    if (t < 24 * 60) hFin = `${pad(Math.floor(t / 60))}:${pad(Math.round(t % 60))}`;
   }
 
   let al = linea;
   if (tipo) al = al.replace(tipo.match, ' ');
-  al = al.replace(RE_RANGO, ' ').replace(RE_HORA_SUELTA, ' ').replace(RE_HORAS_DUR, ' ');
+  if (usoRango) al = al.replace(RE_RANGO, ' ');
+  al = al.replace(RE_HORA_RELOJ, ' ').replace(RE_HORA_SUELTA, ' ').replace(RE_HORAS_DUR, ' ');
   if (alias) al = al.replace(new RegExp('(^|[\\s\\-–])' + alias + '([\\s\\-–.,!]|$)', 'ig'), ' ');
   al = al.replace(/\b(hs|h)\b/ig, ' ').replace(/[-–—:]+/g, ' ')
          .replace(/\s{2,}/g, ' ').trim().replace(/^[\s\-–:,.]+|[\s\-–:,.]+$/g, '');
