@@ -390,7 +390,8 @@ const MonitorDia = ({
     };
   }, [horasTotal, sinPos.length]);
 
-  const pxH = Math.round(Math.min(PX_H_MAX, Math.max(PX_H_MIN, (altoLibre - 20) / horasTotal)));
+  // -34: el espacio que ocupa el rótulo de la última hora
+  const pxH = Math.floor(Math.min(PX_H_MAX, Math.max(PX_H_MIN, (altoLibre - 34) / horasTotal)));
   const timelineH = horasTotal * pxH;
 
   // Asignar columna a cada clase
@@ -522,7 +523,7 @@ const MonitorDia = ({
         <div style={{ display:'flex' }}>
 
           {/* Labels de horas */}
-          <div style={{ width:LABEL_W, flexShrink:0, position:'relative', height:timelineH+20 }}>
+          <div style={{ width:LABEL_W, flexShrink:0, position:'relative', height:timelineH+34 }}>
             {Array.from({ length:horasTotal+1 }, (_,i) => {
               const hora = hIni+i;
               return (
@@ -537,7 +538,7 @@ const MonitorDia = ({
 
           {/* Área de bloques */}
           <div ref={timelineRef}
-            style={{ flex:1, position:'relative', height:timelineH+20, borderLeft:`0.5px solid ${NA.border}` }}>
+            style={{ flex:1, position:'relative', height:timelineH+34, borderLeft:`0.5px solid ${NA.border}` }}>
 
             {/* Líneas horizontales */}
             {Array.from({ length:horasTotal+1 }, (_,i) => (

@@ -11,10 +11,11 @@
 
     <!-- Color de la barra de estado. Coincide con el fondo oscuro de la app. -->
     <meta name="theme-color" content="#0a0e0d" />
+    <meta name="color-scheme" content="dark" />
 
     <!-- iOS: pantalla completa al abrir desde el ícono de inicio -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="KBN Admin" />
     <link rel="apple-touch-icon" href="/logo.png" />
 
@@ -24,12 +25,27 @@
     <style>
       /* El fondo oscuro tiene que llegar hasta los bordes físicos, si no
          se ve blanco detrás del notch y al hacer scroll con rebote. */
-      html, body {
+      html {
+        background: #0a0e0d;
+        color-scheme: dark;            /* el navegador deja de usar blanco */
+      }
+      body {
         margin: 0;
         padding: 0;
         background: #0a0e0d;
         min-height: 100%;
         overscroll-behavior-y: none;   /* sin rebote elástico en iOS */
+      }
+      /* Pinta la franja del notch con el fondo de la app, por si el
+         navegador no respeta theme-color (pasa en algunas versiones). */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: env(safe-area-inset-top);
+        background: #0a0e0d;
+        z-index: 9999;
+        pointer-events: none;
       }
       #root {
         min-height: 100vh;
