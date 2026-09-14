@@ -11,6 +11,7 @@ import {
   Title
 } from 'chart.js';
 import api from '../axiosConfig';
+import { CATEGORIAS_EGRESO } from './Egreso';
 import { useAuth } from '../context/AuthContext';
 import ReportesEstadisticasGraficos from './ReportesEstadisticasGraficos';
 import PresenciaWidget from './PresenciaWidget';
@@ -218,6 +219,15 @@ const ReporteEstadisticas = () => {
     const set = new Set(allData.map(i => i.instructor).filter(Boolean));
     return Array.from(set);
   }, [allData]);
+
+  // Categorías de egreso: las fijas más las que ya aparecen cargadas
+  const categoriasEgreso = useMemo(() => {
+    const usadas = (datos || [])
+      .filter((x) => String(x.tipoTransaccion).toUpperCase() === 'EGRESO')
+      .map((x) => (x.actividad || '').trim())
+      .filter((x) => x && x !== 'Clases' && !CATEGORIAS_EGRESO.includes(x));
+    return [...CATEGORIAS_EGRESO, ...[...new Set(usadas)].sort()];
+  }, [datos]);
 
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;
@@ -592,11 +602,16 @@ const ReporteEstadisticas = () => {
               <select name="actividad" value={filtros.actividad} onChange={handleFiltroChange}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: `0.5px solid ${NA.border}`, background: NA.light, color: NA.text, fontSize: 13 }}>
                 <option value="">Todas</option>
-                <option value="Clase de Kite">Clase de Kite</option>
-                <option value="Clase de Wing">Clase de Wing</option>
-                <option value="Clase de Windsurf">Clase de Windsurf</option>
-                <option value="Rental">Rental</option>
-                <option value="Otro">Otro</option>
+                <optgroup label="Ingresos">
+                  <option value="Clase de Kite">Clase de Kite</option>
+                  <option value="Clase de Wing">Clase de Wing</option>
+                  <option value="Clase de Windsurf">Clase de Windsurf</option>
+                  <option value="Rental">Rental</option>
+                  <option value="Otro">Otro</option>
+                </optgroup>
+                <optgroup label="Egresos">
+                  {categoriasEgreso.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </optgroup>
               </select>
             </div>
             <div>
@@ -738,7 +753,18 @@ const ReporteEstadisticas = () => {
                       <span style={{ fontWeight: 500, color: NA.text, fontSize: 14 }}>{item.fecha}</span>
                       <span style={{ color: '#B91C1C', fontWeight: 500, fontSize: 15 }}>-{formatCurrency(monto)} <span style={{ fontSize: 11, color: NA.text2 }}>{labelMoneda(item.moneda)}</span></span>
                     </div>
-                    <div style={{ fontSize: 13, color: NA.text2, marginTop: 3 }}>{item.detalles || 'Egreso general'}</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                      {item.actividad && item.actividad !== 'Clases' ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B',
+                          background: '#FEE2E2', padding: '2px 9px', borderRadius: 99 }}>
+                          {item.actividad}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: '#B45309', background: '#FEF3C7',
+                          padding: '2px 9px', borderRadius: 99 }}>Sin clasificar</span>
+                      )}
+                      <span style={{ fontSize: 13, color: NA.text2 }}>{item.detalles || 'Egreso general'}</span>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => toggleDetails(item.id)}
@@ -846,9 +872,19 @@ const ReporteEstadisticas = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
-                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Actividad</label>
-                  <input type="text" value={editForm.actividad} onChange={(e) => handleEditFieldChange('actividad', e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
+                  <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>
+                    {editItem.tipoTransaccion === 'EGRESO' ? 'Clasificación' : 'Actividad'}
+                  </label>
+                  {editItem.tipoTransaccion === 'EGRESO' ? (
+                    <select value={editForm.actividad || ''} onChange={(e) => handleEditFieldChange('actividad', e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box', background: '#fff' }}>
+                      <option value="">Sin clasificar</option>
+                      {categoriasEgreso.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" value={editForm.actividad} onChange={(e) => handleEditFieldChange('actividad', e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, fontSize: 14, boxSizing: 'border-box' }} />
+                  )}
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5 }}>Canal de cobro</label>

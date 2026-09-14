@@ -232,7 +232,8 @@ const Secretaria = () => {
             <MenuCard icon="ti-receipt-2"    title="Pasivos"    sub="Deudas"       color="#92400E"    onClick={() => setView('PASIVOS')} />
           )}
           <MenuCard icon="ti-cash"           title="Ingreso"    sub="Caja"         color={NA.primary} onClick={() => setView('INGRESO')} />
-          <MenuCard icon="ti-minus"          title="Egreso"     sub="Gastos"       color="#c23a3a"    onClick={() => setView('EGRESO')} />
+          <MenuCard icon="ti-minus"          title="Egreso"     sub="Gastos"       color="#c23a3a"
+            onClick={() => { setFinanceData(d => ({ ...d, tipoTransaccion: 'EGRESO', actividad: '', instructor: '' })); setView('EGRESO'); }} />
         </div>
       </div>
     );
@@ -497,15 +498,17 @@ const Secretaria = () => {
         handleChange={e => setFinanceData({ ...financeData, [e.target.name]: e.target.value })}
         handleSubmit={handleFinanceSubmit}
         axiosConfig={axiosConfig}
-        InstructorField={() => (
-          <InstructorSelector
-            label="Instructor relacionado (opcional)"
-            name="instructor"
-            isFinance={true}
-            value={financeData.instructor}
-            onChange={e => setFinanceData({ ...financeData, instructor: e.target.value })}
-          />
-        )}
+        {...(view === 'INGRESO' ? {
+          InstructorField: () => (
+            <InstructorSelector
+              label="Instructor relacionado (opcional)"
+              name="instructor"
+              isFinance={true}
+              value={financeData.instructor}
+              onChange={e => setFinanceData({ ...financeData, instructor: e.target.value })}
+            />
+          ),
+        } : {})}
         setView={(v) => setView(v || 'INICIO')}
       />
     );

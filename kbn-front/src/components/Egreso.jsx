@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import api from '../axiosConfig';
 
 // ── Paleta Náutica Atins (variante rosa/rojo para egresos) ──────────────────
 const NA = {
@@ -34,6 +35,25 @@ const MONEDAS = [
   { value: 'CLP', label: 'Pesos Chilenos (CLP)' },
 ];
 
+// Clasificación de egresos. Si hace falta una nueva, se escribe en el
+// momento y queda disponible: las categorías usadas se leen de los egresos
+// ya cargados, así no hace falta tocar el código para sumar una.
+export const CATEGORIAS_EGRESO = [
+  'Salário Administración',
+  'Salário Vigia',
+  'Equipos Nauticos',
+  'Alquiler',
+  'Honorarios Instructores',
+  'Comisiones Parcerias',
+  'Comisiones Cartão',
+  'Mejoras',
+  'Mantenimiento',
+  'Internet',
+  'Energia',
+  'Água & Amenities',
+  'Otros',
+];
+
 const sx = {
   label: { fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5, fontWeight: 500 },
   input: {
@@ -55,8 +75,25 @@ const Field = ({ label, children }) => (
   </div>
 );
 
-const Egreso = ({ formData, handleChange, handleSubmit, InstructorField, setView }) => {
+const Egreso = ({ formData, handleChange, handleSubmit, setView }) => {
   const [guardando, setGuardando] = useState(false);
+  const [nuevaCat, setNuevaCat]   = useState('');
+  const [extras, setExtras]       = useState([]);
+
+  // Categorías = las fijas + las que ya se usaron en egresos anteriores
+  useEffect(() => {
+    api.get('/api/clases/listar')
+      .then((r) => {
+        const usadas = (r.data || [])
+          .filter((x) => String(x.tipoTransaccion).toUpperCase() === 'EGRESO')
+          .map((x) => (x.actividad || '').trim())
+          .filter((x) => x && x !== 'Clases' && !CATEGORIAS_EGRESO.includes(x));
+        setExtras([...new Set(usadas)].sort());
+      })
+      .catch(() => setExtras([]));
+  }, []);
+
+  const categorias = [...CATEGORIAS_EGRESO, ...extras];
   // Guard síncrono contra doble-tap con mal wifi (ver nota en Ingreso.jsx).
   const enviandoRef = useRef(false);
 
@@ -179,9 +216,37 @@ const Egreso = ({ formData, handleChange, handleSubmit, InstructorField, setView
             </Field>
           )}
 
-          <Field label="Instructor relacionado (opcional)">
-            <InstructorField />
+          <Field label="Clasificación">
+            <select
+              name="actividad"
+              value={formData.actividad || ''}
+              onChange={handleChange}
+              required
+              style={sx.input} onFocus={focusOn} onBlur={focusOff}
+            >
+              <option value="">Elegir categoría…</option>
+              {categorias.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+              <option value="__nueva__">+ Agregar categoría nueva…</option>
+            </select>
           </Field>
+
+          {formData.actividad === '__nueva__' && (
+            <Field label="Nombre de la categoría nueva">
+              <input
+                type="text" value={nuevaCat} autoFocus
+                onChange={(e) => setNuevaCat(e.target.value)}
+                onBlur={() => {
+                  const v = nuevaCat.trim();
+                  if (v) handleChange({ target: { name: 'actividad', value: v } });
+                }}
+                placeholder="Ej: Combustible lancha"
+                style={sx.input} onFocus={focusOn}
+              />
+              <p style={{ fontSize: 11, color: NA.text2, margin: '5px 0 0' }}>
+                Queda disponible para los próximos egresos.
+              </p>
+            </Field>
+          )}
 
           <Field label="Concepto">
             <textarea
