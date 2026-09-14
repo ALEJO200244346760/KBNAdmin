@@ -404,8 +404,12 @@ const Monitor = () => {
         payload.ingresoId = ingresoIdNum || null;
       }
       const res = await api.patch(`/api/agenda/${editClase.id}`, payload);
-      setAgenda(p => p.map(a => a.id === editClase.id ? res.data : a));
+      // Si la clase ya estaba acreditada y cambió instructor u horas, el
+      // backend deshace la liquidación y devuelve { clase, aviso }.
+      const claseAct = res.data?.clase || res.data;
+      setAgenda(p => p.map(a => a.id === editClase.id ? claseAct : a));
       setEditClase(null);
+      if (res.data?.aviso) alert(res.data.aviso);
     } catch (e) {
       alert('No se pudo guardar.');
     } finally {
@@ -449,8 +453,12 @@ const Monitor = () => {
   const onSaveClase = async (id, payload) => {
     if (!payload || Object.keys(payload).length === 0) return;
     const res = await api.patch(`/api/agenda/${id}`, payload);
-    setAgenda(p => p.map(a => (a.id === id ? res.data : a)));
-    return res.data;
+    // Si se editó una clase ya acreditada, el backend deshace la liquidación
+    // y devuelve { clase, aviso } en vez de la clase sola.
+    const clase = res.data?.clase || res.data;
+    setAgenda(p => p.map(a => (a.id === id ? clase : a)));
+    if (res.data?.aviso) alert(res.data.aviso);
+    return clase;
   };
 
   // Solo secretaria/admin. Acumula horas en el pasivo del instructor

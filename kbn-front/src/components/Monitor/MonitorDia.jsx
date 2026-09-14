@@ -184,7 +184,7 @@ const ClaseDrawer = ({
         <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:12 }}>
 
           {/* Acciones principales */}
-          {clase.estado === 'PENDIENTE' && (
+          {(clase.estado === 'PENDIENTE' || clase.estado === 'RECHAZADA') && (
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={() => { cambiarEstado(clase.id,'CONFIRMADA'); onClose(); }}
                 style={{ flex:1, padding:'15px', borderRadius:14, border:'none', background:'#D1FAE5', color:'#065F46', fontSize:15, fontWeight:700, cursor:'pointer' }}>
@@ -196,22 +196,19 @@ const ClaseDrawer = ({
               </button>
             </div>
           )}
-          {clase.estado === 'CONFIRMADA' && puedeAdmin && (
-            esFutura ? (
-              <div style={{ padding:'13px 14px', borderRadius:14, background:'rgba(251,191,36,.12)',
-                border:'1px solid rgba(251,191,36,.3)', color:'#FBBF24', fontSize:13, textAlign:'center' }}>
-                Se liquida el día de la clase. Todavía no se dio.
-              </div>
-            ) : (
-              <button onClick={() => { liquidarClase(clase); onClose(); }}
-                style={{ width:'100%', padding:'15px', borderRadius:14, border:'none', background:NA.darker, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                <i className="ti ti-cash" style={{ fontSize:18 }}/> Liquidar clase
-              </button>
-            )
+          {clase.estado === 'CONFIRMADA' && (
+            <div style={{ padding:'13px 14px', borderRadius:14, textAlign:'center',
+              background: esFutura ? 'rgba(255,255,255,.06)' : 'rgba(52,211,153,.12)',
+              border: `1px solid ${esFutura ? 'rgba(255,255,255,.12)' : 'rgba(52,211,153,.3)'}`,
+              color: esFutura ? 'rgba(255,255,255,.6)' : '#34D399', fontSize:13 }}>
+              {esFutura
+                ? 'Confirmada. Se le acredita al instructor el día de la clase.'
+                : 'Confirmada y acreditada al instructor.'}
+            </div>
           )}
           {clase.estado === 'FINALIZADA' && (
             <div style={{ padding:'14px', borderRadius:14, background:'#D1FAE5', color:'#065F46', fontSize:15, fontWeight:600, textAlign:'center' }}>
-              ✓ Clase liquidada
+              ✓ Acreditada al instructor
             </div>
           )}
 

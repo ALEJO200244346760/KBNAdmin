@@ -137,6 +137,39 @@ public class AgendaController {
     // 4b. LIQUIDAR clase — solo secretaria/admin lo llama después de revisar el día.
     //     Acumula en el pasivo del instructor las horas correspondientes.
     //     Marca la clase como FINALIZADA para que no se pueda liquidar dos veces.
+    /**
+     * Deshace la liquidación de una clase: borra el movimiento que se le había
+     * acreditado al instructor y recalcula el saldo de su tarjeta.
+     *
+     * Se usa cuando se edita el instructor o las horas de una clase ya
+     * liquidada: lo acreditado quedó mal y hay que rehacerlo.
+     */
+    private int revertirLiquidacion(Long agendaId) {
+        if (agendaId == null) return 0;
+        List<PagoPasivo> previos = pagoPasivoRepository.findByOrigenAgendaId(agendaId);
+        if (previos.isEmpty()) return 0;
+
+        int borrados = 0;
+        for (PagoPasivo mov : previos) {
+            Pasivo pasivo = mov.getPasivo();
+            if (pasivo == null) continue;
+            // Con cascade + orphanRemoval, sacarlo de la colección del padre
+            // es lo que dispara el DELETE real.
+            final Long movId = mov.getId();
+            int antes = pasivo.getHistorialPagos().size();
+            pasivo.getHistorialPagos().removeIf(x -> movId.equals(x.getId()));
+            borrados += antes - pasivo.getHistorialPagos().size();
+
+            double total = 0;
+            for (PagoPasivo p : pasivo.getHistorialPagos()) {
+                total += p.getMontoPagado() != null ? p.getMontoPagado() : 0;
+            }
+            pasivo.setMontoTotal(Math.round(total * 100.0) / 100.0);
+            pasivoRepository.save(pasivo);
+        }
+        return borrados;
+    }
+
     @PostMapping("/{id}/liquidar")
     public ResponseEntity<?> liquidarClase(@PathVariable Long id) {
         return agendaRepository.findById(id).map(agenda -> {
@@ -205,6 +238,7 @@ public class AgendaController {
             registro.setFecha(agenda.getFecha() != null ? agenda.getFecha() : LocalDate.now());
             registro.setNota(nota);
             registro.setMoneda("BRL");
+            registro.setOrigenAgendaId(agenda.getId());   // para poder revertirla
             registro.setPasivo(pasivo);
 
             pagoPasivoRepository.save(registro);
@@ -278,6 +312,12 @@ public class AgendaController {
             @RequestBody ActualizarClaseRequest req
     ) {
         return agendaRepository.findById(id).map(agenda -> {
+            // Valores previos: si la clase ya estaba liquidada y cambia el
+            // instructor o las horas, lo acreditado quedó mal y hay que rehacerlo.
+            final Double horasAntes   = agenda.getHoras();
+            final Long   instrAntes   = agenda.getInstructorId();
+            final boolean yaLiquidada = "FINALIZADA".equals(agenda.getEstado());
+
             if (req.getTipoAula()         != null) agenda.setTipoAula(req.getTipoAula());
             if (req.getHora()             != null) {
                 try { agenda.setHora(java.time.LocalTime.parse(req.getHora())); } catch (Exception ignored) {}
@@ -329,6 +369,27 @@ public class AgendaController {
 
             Agenda saved = agendaRepository.save(agenda);
 
+            // ── Rehacer la liquidación si cambió algo que la afecta ──────────
+            boolean cambioHoras = horasAntes == null
+                    ? saved.getHoras() != null
+                    : !horasAntes.equals(saved.getHoras());
+            boolean cambioInstr = instrAntes == null
+                    ? saved.getInstructorId() != null
+                    : !instrAntes.equals(saved.getInstructorId());
+
+            String avisoLiquidacion = null;
+            if (yaLiquidada && (cambioHoras || cambioInstr)) {
+                int revertidos = revertirLiquidacion(saved.getId());
+                if (revertidos > 0) {
+                    // Queda para volver a liquidar con los datos corregidos
+                    saved.setEstado("CONFIRMADA");
+                    saved = agendaRepository.save(saved);
+                    avisoLiquidacion = "Se deshizo la liquidación anterior ("
+                            + (cambioInstr ? "cambió el instructor" : "cambiaron las horas")
+                            + "). Volvé a liquidar la clase.";
+                }
+            }
+
             // Push al instructor si cambió o si el toggle "notificar" vino activo
             // (cuando estado=PENDIENTE llega del front con notificar=true)
             boolean debeNotificar = instructorCambio
@@ -350,6 +411,12 @@ public class AgendaController {
                 }
             }
 
+            if (avisoLiquidacion != null) {
+                java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+                resp.put("clase", saved);
+                resp.put("aviso", avisoLiquidacion);
+                return ResponseEntity.ok(resp);
+            }
             return ResponseEntity.ok(saved);
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -383,7 +450,12 @@ public class AgendaController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarClase(@PathVariable Long id) {
         return agendaRepository.findById(id)
-                .map(a -> { agendaRepository.delete(a); return ResponseEntity.ok().build(); })
+                .map(a -> {
+                    // Si estaba liquidada, devolver al instructor lo acreditado
+                    revertirLiquidacion(a.getId());
+                    agendaRepository.delete(a);
+                    return ResponseEntity.ok().build();
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

@@ -24,6 +24,10 @@ public class PagoPasivo {
     // Permite resincronizar el reparto cuando el ingreso se edita o se borra.
     private Long origenIngresoId;
 
+    // Id de la clase (Agenda) que generó esta liquidación al instructor.
+    // Permite revertirla si después se edita el instructor o las horas.
+    private Long origenAgendaId;
+
     @ManyToOne
     @JoinColumn(name = "pasivo_id")
     @JsonBackReference // ESTO ES VITAL
