@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { NA, fmt, esPasado, HOY, labelMon, Tag } from './MonitorShared';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,7 +8,10 @@ import { useAuth } from '../../context/AuthContext';
 // más clases de las que se veían.
 const HORA_DEF_INI = 9;
 const HORA_DEF_FIN = 18;
-const PX_H         = 80; // px por hora
+// Alto por hora: se calcula según la pantalla para que el día entre completo
+// sin scrollear. Entre estos dos límites, para que siga siendo legible.
+const PX_H_MIN     = 38;
+const PX_H_MAX     = 80;
 const LABEL_W      = 44; // ancho columna de horas
 
 const COLOR = {
@@ -34,8 +37,8 @@ const colClase = (tipoAula, estado) => {
 const PRIO = { APK:0, ASPK:1, APWF:2, ASPWF:3, APWS:4, ASPWS:5, RENTAL:8, OTRO:9 };
 
 const toMin  = (h) => { if (!h) return null; const [hh,mm] = String(h).substring(0,5).split(':').map(Number); return hh*60+(mm||0); };
-const toPx   = (min, hIni) => Math.max(0, ((min - hIni*60)/60)*PX_H);
-const toH    = (ini, fin, hFin) => Math.max(32, ((Math.min(fin, hFin*60) - ini)/60)*PX_H - 2);
+const toPx   = (min, hIni, ph) => Math.max(0, ((min - hIni*60)/60)*ph);
+const toH    = (ini, fin, hFin, ph) => Math.max(26, ((Math.min(fin, hFin*60) - ini)/60)*ph - 2);
 const hhMM   = (s) => String(s||'').substring(0,5);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -356,7 +359,30 @@ const MonitorDia = ({
   hIni = Math.max(0, hIni);
   hFin = Math.min(24, Math.max(hFin, hIni+1));
   const horasTotal = hFin - hIni;
-  const timelineH  = horasTotal * PX_H;
+
+  // Alto por hora ajustado a la pantalla: el día tiene que entrar completo.
+  // Se mide el alto libre debajo del encabezado y se reparte entre las horas.
+  const [altoLibre, setAltoLibre] = useState(() =>
+    typeof window !== 'undefined' ? window.innerHeight : 800);
+  const cabeceraRef = useRef(null);
+
+  useEffect(() => {
+    const medir = () => {
+      const top = cabeceraRef.current?.getBoundingClientRect().bottom ?? 220;
+      // 24px de respiro abajo para que el último bloque no quede pegado
+      setAltoLibre(Math.max(240, window.innerHeight - top - 24));
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    window.addEventListener('orientationchange', medir);
+    return () => {
+      window.removeEventListener('resize', medir);
+      window.removeEventListener('orientationchange', medir);
+    };
+  }, [horasTotal, sinPos.length]);
+
+  const pxH = Math.round(Math.min(PX_H_MAX, Math.max(PX_H_MIN, (altoLibre - 20) / horasTotal)));
+  const timelineH = horasTotal * pxH;
 
   // Asignar columna a cada clase
   const asignacion = []; // [{clase, col, totalCols}] — totalCols se llena después
@@ -395,7 +421,7 @@ const MonitorDia = ({
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
     const rect    = timelineRef.current.getBoundingClientRect();
     const yRel    = clientY - rect.top;
-    const min     = hIni*60 + (yRel/PX_H)*60;
+    const min     = hIni*60 + (yRel/pxH)*60;
     const snapped = Math.round(min/15)*15;
     const hh      = Math.max(hIni, Math.min(hFin-1, Math.floor(snapped/60)));
     const mm      = snapped%60;
@@ -462,8 +488,8 @@ const MonitorDia = ({
           </div>
         </div>
 
-        {/* Chips stats */}
-        <div style={{ display:'flex', gap:6, marginTop:12, flexWrap:'wrap' }}>
+        {/* Chips stats — marca el fin de la cabecera para medir el alto libre */}
+        <div ref={cabeceraRef} style={{ display:'flex', gap:6, marginTop:12, flexWrap:'wrap' }}>
           <Chip icon="ti-check"  val={clasesCobradas} label="cobradas" c="#065F46" bg="#D1FAE5"/>
           {clasesActivas.length - clasesCobradas > 0 && pasado && (
             <Chip icon="ti-alert-triangle" val={clasesActivas.length-clasesCobradas} label="sin cobro" c="#9A3412" bg="#FFF7ED"/>
@@ -491,7 +517,7 @@ const MonitorDia = ({
             {Array.from({ length:horasTotal+1 }, (_,i) => {
               const hora = hIni+i;
               return (
-                <div key={hora} style={{ position:'absolute', top:i*PX_H+10, width:'100%', display:'flex', alignItems:'center', gap:4 }}>
+                <div key={hora} style={{ position:'absolute', top:i*pxH+10, width:'100%', display:'flex', alignItems:'center', gap:4 }}>
                   <span style={{ fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:500, width:'100%', textAlign:'right', paddingRight:8 }}>
                     {hora}:00
                   </span>
@@ -506,7 +532,7 @@ const MonitorDia = ({
 
             {/* Líneas horizontales */}
             {Array.from({ length:horasTotal+1 }, (_,i) => (
-              <div key={i} style={{ position:'absolute', left:0, right:0, top:i*PX_H+10,
+              <div key={i} style={{ position:'absolute', left:0, right:0, top:i*pxH+10,
                 borderTop: i===0 ? `1px solid ${NA.border}` : `0.5px solid ${NA.border}40`, zIndex:1 }}/>
             ))}
 
@@ -516,7 +542,7 @@ const MonitorDia = ({
               return (
                 <button key={hora}
                   onClick={() => abrirAgendar(diaSelec, `${String(hora).padStart(2,'0')}:00`)}
-                  style={{ position:'absolute', right:4, top:i*PX_H+14, width:20, height:20, borderRadius:6,
+                  style={{ position:'absolute', right:4, top:i*pxH+14, width:20, height:20, borderRadius:6,
                     border:`0.5px dashed ${NA.border}`, background:'transparent', color:NA.border,
                     cursor:'pointer', zIndex:2, display:'flex', alignItems:'center', justifyContent:'center',
                     transition:'all .15s' }}
@@ -531,7 +557,7 @@ const MonitorDia = ({
             {diaSelec === HOY && (() => {
               const n = new Date(); const min = n.getHours()*60+n.getMinutes();
               if (min < hIni*60 || min > hFin*60) return null;
-              const top = toPx(min, hIni)+10;
+              const top = toPx(min, hIni, pxH)+10;
               return (
                 <div style={{ position:'absolute', left:0, right:0, top, height:2, background:'#EF4444', zIndex:10 }}>
                   <div style={{ width:10, height:10, borderRadius:'50%', background:'#EF4444', marginTop:-4, marginLeft:-2 }}/>
@@ -545,8 +571,8 @@ const MonitorDia = ({
               const finMin = clase.horaSalida
                 ? toMin(clase.horaSalida)
                 : ini + Math.min(parseFloat(clase.horas)||1, 8)*60;
-              const top = toPx(ini, hIni)+10;
-              const h   = toH(ini, finMin, hFin);
+              const top = toPx(ini, hIni, pxH)+10;
+              const h   = toH(ini, finMin, hFin, pxH);
               const c   = colClase(clase.tipoAula, clase.estado);
               const cob = tieneCobro(clase);
 

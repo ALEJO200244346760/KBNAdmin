@@ -118,7 +118,8 @@ const MonitorCalendario = ({
     </div>
 
     {/* ── LEYENDA ── */}
-    <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:14 }}>
+    {/* marginTop: en mobile el header es fijo y la leyenda le quedaba debajo */}
+    <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginTop:10, marginBottom:14 }}>
       {[['#EA580C','Sin cobro'],['#0F6E56','Clase'],['#059669','Ingreso'],['#DC2626','Egreso']].map(([c,l]) => (
         <span key={l} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'rgba(255,255,255,.5)' }}>
           <span style={{ width:8, height:8, borderRadius:'50%', background:c, display:'inline-block' }}/>{l}
