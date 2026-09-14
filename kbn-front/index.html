@@ -1,11 +1,46 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- viewport-fit=cover: la app ocupa también la zona del notch y la barra
+         inferior. Sin esto queda una franja blanca arriba en el celular. -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+
+    <!-- Color de la barra de estado. Coincide con el fondo oscuro de la app. -->
+    <meta name="theme-color" content="#0a0e0d" />
+
+    <!-- iOS: pantalla completa al abrir desde el ícono de inicio -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="KBN Admin" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+
     <title>KBN Admin</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+
+    <style>
+      /* El fondo oscuro tiene que llegar hasta los bordes físicos, si no
+         se ve blanco detrás del notch y al hacer scroll con rebote. */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #0a0e0d;
+        min-height: 100%;
+        overscroll-behavior-y: none;   /* sin rebote elástico en iOS */
+      }
+      #root {
+        min-height: 100vh;
+        min-height: 100dvh;            /* alto real, descontando barras */
+        background: #0a0e0d;
+        /* Respeta el notch y la barra de gestos */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        box-sizing: border-box;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

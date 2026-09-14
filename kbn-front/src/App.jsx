@@ -141,6 +141,17 @@ function BgSwitcher() {
       ? 'linear-gradient(160deg, #0a0e0d 0%, #0d1a18 50%, #0a1215 100%)'
       : isLight ? '#f0faf7' : '#0a0e0d';
     document.body.style.minHeight = '100dvh';
+
+    // La barra de estado del celular tiene que acompañar el fondo de la
+    // pantalla; si no, queda una franja blanca arriba del header.
+    const color = isLight ? '#f0faf7' : '#0a0e0d';
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', color);
   }, [pathname]);
   return null;
 }

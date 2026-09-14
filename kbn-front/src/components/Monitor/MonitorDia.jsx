@@ -367,15 +367,24 @@ const MonitorDia = ({
   const cabeceraRef = useRef(null);
 
   useEffect(() => {
+    // El timeline no es lo único en pantalla: arriba está el calendario del
+    // mes y abajo el resumen. Se mide el alto que ocupa la cabecera del día
+    // dentro del viewport y se le da al timeline lo que queda, sin pasarse.
     const medir = () => {
-      const top = cabeceraRef.current?.getBoundingClientRect().bottom ?? 220;
-      // 24px de respiro abajo para que el último bloque no quede pegado
-      setAltoLibre(Math.max(240, window.innerHeight - top - 24));
+      const rect = cabeceraRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const disponible = window.innerHeight - rect.bottom - 24;
+      // Si la cabecera quedó fuera de vista (scrolleado), usar una fracción
+      // estable del viewport en vez de un número negativo.
+      const base = disponible > 200 ? disponible : window.innerHeight * 0.55;
+      setAltoLibre(Math.max(260, Math.min(base, window.innerHeight * 0.72)));
     };
     medir();
+    const t = setTimeout(medir, 120);          // tras pintar el calendario
     window.addEventListener('resize', medir);
     window.addEventListener('orientationchange', medir);
     return () => {
+      clearTimeout(t);
       window.removeEventListener('resize', medir);
       window.removeEventListener('orientationchange', medir);
     };
