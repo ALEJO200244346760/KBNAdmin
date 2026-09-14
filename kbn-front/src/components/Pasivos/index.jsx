@@ -250,51 +250,68 @@ const Pasivos = ({ axiosConfig, setView }) => {
           {setView && (
             <button
               onClick={() => setView('INICIO')}
-              style={{ width: 36, height: 36, borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+              style={{ width: 36, height: 36, borderRadius: 10, border: 'none',
+                boxShadow: '0 0 0 1px rgba(255,255,255,.1)', background: 'rgba(255,255,255,.05)',
+                color: 'rgba(255,255,255,.7)', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
               aria-label="Volver"
             >
               <i className="ti ti-arrow-left" style={{ fontSize: 17 }} aria-hidden="true" />
             </button>
           )}
           <div>
-            <h1 style={{ fontSize: 19, fontWeight: 500, color: NA.text, margin: 0 }}>Cuentas corrientes</h1>
-            <p style={{ fontSize: 12, color: NA.text2, margin: '2px 0 0' }}>Deudas, adelantos e instructores</p>
+            <h1 style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,.92)',
+              margin: 0, letterSpacing: '-.015em' }}>Cuentas corrientes</h1>
+            <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.45)', margin: '3px 0 0' }}>
+              Lo que se le debe a cada uno
+            </p>
           </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: NA.dark, color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px',
+            background: '#2ECFC4', color: '#06302E', border: 'none', borderRadius: 10,
+            fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
           <i className="ti ti-plus" style={{ fontSize: 16 }} aria-hidden="true" />
           Nueva cuenta
         </button>
       </div>
 
       {/* ── Leyenda ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      {/* Puntos de color sin píldora: la información es el color, la cápsula
+          alrededor solo agregaba peso visual. */}
+      <div style={{ display: 'flex', gap: 18, marginBottom: 22, flexWrap: 'wrap', alignItems: 'center' }}>
         {[
-          { color: '#B91C1C', bg: '#FEF2F2', label: 'Les debemos' },
-          { color: NA.dark,   bg: NA.light,  label: 'Nos deben'   },
-          { color: '#6b7280', bg: '#f9fafb', label: 'Saldado'     },
+          { color: '#F98A8A',              label: 'Les debemos' },
+          { color: '#2ECFC4',              label: 'Nos deben'   },
+          { color: 'rgba(255,255,255,.4)', label: 'Saldado'     },
         ].map((l) => (
-          <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, background: l.bg, color: l.color, fontSize: 11, fontWeight: 500, padding: '4px 12px', borderRadius: 99 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: l.color }} />
+          <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: l.color }} />
             {l.label}
           </span>
         ))}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EEF2FF', color: '#4338CA', fontSize: 11, fontWeight: 500, padding: '4px 12px', borderRadius: 99 }}>
-          <i className="ti ti-school" style={{ fontSize: 13 }} aria-hidden="true" />
-          Instructor = tarifa automática
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(255,255,255,.32)' }}>
+          <i className="ti ti-school" style={{ fontSize: 14 }} aria-hidden="true" />
+          Los instructores cobran por tarifa
         </span>
       </div>
 
       {/* ── Grid de tarjetas ── */}
       {pasivos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: NA.text2, background: '#fff', borderRadius: 16, border: `0.5px solid ${NA.border}` }}>
-          <i className="ti ti-wallet-off" style={{ fontSize: 32, opacity: 0.4 }} aria-hidden="true" />
-          <p style={{ fontSize: 14, margin: '10px 0 0' }}>Todavía no hay cuentas corrientes creadas.</p>
+        <div style={{ textAlign: 'center', padding: '64px 20px', color: 'rgba(255,255,255,.4)',
+          background: 'rgba(255,255,255,.03)', borderRadius: 18,
+          boxShadow: '0 0 0 1px rgba(255,255,255,.07)' }}>
+          <i className="ti ti-wallet-off" style={{ fontSize: 30, opacity: .45 }} aria-hidden="true" />
+          <p style={{ fontSize: 14, margin: '12px 0 4px', color: 'rgba(255,255,255,.7)' }}>
+            Todavía no hay cuentas corrientes
+          </p>
+          <p style={{ fontSize: 12.5, margin: 0 }}>
+            Creá una para llevar las deudas y adelantos de cada instructor.
+          </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
           {pasivos.map((p) => (
             <PasivosCard
               key={p.id}
