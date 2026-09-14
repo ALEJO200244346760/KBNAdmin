@@ -1,5 +1,5 @@
 import React from 'react';
-import { NA, sx, focusOn, focusOff, TX_CONFIG, MONEDAS_CAJA, Field, TextInput, Select } from './PasivosShared';
+import { NA, sx, focusOn, focusOff, TX_CONFIG, MONEDAS_CAJA, Field, TextInput, Select , T } from './PasivosShared';
 
 // ── ModalTransaccion ────────────────────────────────────────────────────────
 // NUEVA_DEUDA: solo acumula deuda interna, no sale plata → sin selector de caja.
@@ -21,7 +21,7 @@ const ModalTransaccion = ({ transactionType, selectedPasivo, transactionData, se
             <i className={`ti ${cfg.icon}`} style={{ fontSize: 22 }} aria-hidden="true" />
           </div>
           <h2 style={{ fontSize: 17, fontWeight: 500, color: cfg.color, margin: 0 }}>{cfg.title}</h2>
-          <p style={{ fontSize: 12, color: NA.text2, margin: '4px 0 0' }}>{selectedPasivo.titulo}</p>
+          <p style={{ fontSize: 12, color: T.medio, margin: '4px 0 0' }}>{selectedPasivo.titulo}</p>
         </div>
 
         <form onSubmit={onSubmit}>
@@ -54,7 +54,7 @@ const ModalTransaccion = ({ transactionType, selectedPasivo, transactionData, se
                     : <option key={m.value} value={m.value}>{m.label}</option>
                 )}
               </select>
-              <p style={{ fontSize: 11, color: NA.text2, margin: '5px 0 0' }}>
+              <p style={{ fontSize: 11, color: T.medio, margin: '5px 0 0' }}>
                 Se va a registrar como egreso en esa caja para que el pozo quede cuadrado.
               </p>
             </Field>
@@ -88,11 +88,11 @@ const ModalTransaccion = ({ transactionType, selectedPasivo, transactionData, se
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             <button type="button" onClick={onClose}
-              style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+              style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', boxShadow: `inset 0 0 0 1px ${T.linea}`, background: 'transparent', color: T.medio, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
               Cancelar
             </button>
             <button type="submit" disabled={guardando}
-              style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardando ? '#d1d5db' : cfg.color, color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardando ? 'default' : 'pointer' }}>
+              style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardando ? 'rgba(255,255,255,.12)' : cfg.color, color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardando ? 'default' : 'pointer' }}>
               {guardando ? 'Confirmando...' : 'Confirmar'}
             </button>
           </div>

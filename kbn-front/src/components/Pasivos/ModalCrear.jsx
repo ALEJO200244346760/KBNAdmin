@@ -1,11 +1,11 @@
 import React from 'react';
-import { NA, sx, focusOn, focusOff, Field, TextInput, Select } from './PasivosShared';
+import { NA, sx, focusOn, focusOff, Field, TextInput, Select , T } from './PasivosShared';
 
 const ModalCrear = ({ newPasivo, setNewPasivo, onSubmit, onClose, guardando }) => (
   <div style={sx.overlay} onClick={onClose}>
     <div style={sx.modal} onClick={(e) => e.stopPropagation()}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: NA.text, margin: '0 0 4px', textAlign: 'center' }}>Nueva cuenta corriente</h2>
-      <p style={{ fontSize: 12, color: NA.text2, textAlign: 'center', margin: '0 0 20px' }}>Registrá una deuda, adelanto o cuenta de instructor</p>
+      <h2 style={{ fontSize: 18, fontWeight: 500, color: T.texto, margin: '0 0 4px', textAlign: 'center' }}>Nueva cuenta corriente</h2>
+      <p style={{ fontSize: 12, color: T.medio, textAlign: 'center', margin: '0 0 20px' }}>Registrá una deuda, adelanto o cuenta de instructor</p>
 
       <form onSubmit={onSubmit}>
         {/* ── Tipo de cuenta ── */}
@@ -17,9 +17,9 @@ const ModalCrear = ({ newPasivo, setNewPasivo, onSubmit, onClose, guardando }) =
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   padding: '11px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  border: `1.5px solid ${newPasivo.esInstructor === opt.v ? NA.dark : NA.border}`,
-                  background: newPasivo.esInstructor === opt.v ? NA.dark : '#fff',
-                  color: newPasivo.esInstructor === opt.v ? '#fff' : NA.text2,
+                  border: `1.5px solid ${newPasivo.esInstructor === opt.v ? T.favor : T.linea}`,
+                  background: newPasivo.esInstructor === opt.v ? T.favor : 'transparent',
+                  color: newPasivo.esInstructor === opt.v ? '#06302E' : T.medio,
                 }}>
                 <i className={`ti ${opt.i}`} style={{ fontSize: 15 }} aria-hidden="true" />
                 {opt.l}
@@ -108,18 +108,18 @@ const ModalCrear = ({ newPasivo, setNewPasivo, onSubmit, onClose, guardando }) =
         )}
 
         {newPasivo.esInstructor && (
-          <div style={{ background: '#f9fafb', color: '#6b7280', fontSize: 12, padding: '10px 14px', borderRadius: 10, marginBottom: 14 }}>
+          <div style={{ background: T.superficie, color: '#6b7280', fontSize: 12, padding: '10px 14px', borderRadius: 10, marginBottom: 14 }}>
             El saldo arranca en 0. Cada clase registrada acumulará la deuda automáticamente.
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button type="button" onClick={onClose}
-            style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', boxShadow: `inset 0 0 0 1px ${T.linea}`, background: 'transparent', color: T.medio, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             Cancelar
           </button>
           <button type="submit" disabled={guardando}
-            style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardando ? NA.mid : NA.dark, color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardando ? 'default' : 'pointer' }}>
+            style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardando ? 'rgba(46,207,196,.4)' : T.favor, color: '#06302E', fontSize: 13, fontWeight: 500, cursor: guardando ? 'default' : 'pointer' }}>
             {guardando ? 'Creando...' : 'Crear cuenta'}
           </button>
         </div>

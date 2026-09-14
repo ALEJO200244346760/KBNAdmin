@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { NA, sx, labelCaja } from './PasivosShared';
+import { NA, sx, labelCaja , T } from './PasivosShared';
 
 // Normaliza la fecha a string "YYYY-MM-DD" venga como venga del backend
 const aClave = (f) => {
@@ -48,7 +48,7 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 500, color: NA.text, margin: 0 }}>{selectedPasivo.titulo}</h2>
+          <h2 style={{ fontSize: 17, fontWeight: 500, color: T.texto, margin: 0, fontWeight: 600 }}>{selectedPasivo.titulo}</h2>
           <button onClick={onClose}
             style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: '#f3f4f6', color: '#6b7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <i className="ti ti-x" style={{ fontSize: 15 }} aria-hidden="true" />
@@ -74,14 +74,14 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 0 10px' }}>
-          <p style={{ fontSize: 12, color: NA.text2, margin: 0 }}>Historial de movimientos</p>
-          <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{grupos.length} día{grupos.length !== 1 ? 's' : ''}</p>
+          <p style={{ fontSize: 12, color: T.medio, margin: 0 }}>Historial de movimientos</p>
+          <p style={{ fontSize: 11, color: T.tenue, margin: 0 }}>{grupos.length} día{grupos.length !== 1 ? 's' : ''}</p>
         </div>
 
         {/* Lista por día */}
         <div style={{ maxHeight: 420, overflowY: 'auto', marginBottom: 18 }}>
           {grupos.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: T.tenue, fontSize: 13 }}>
               Sin movimientos registrados.
             </div>
           )}
@@ -104,12 +104,12 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
                 <div
                   onClick={() => toggle(clave)}
                   style={{
-                    padding: '11px 14px', cursor: 'pointer', background: open ? NA.light : '#f9fafb',
+                    padding: '11px 14px', cursor: 'pointer', background: open ? 'rgba(46,207,196,.1)' : T.superficie,
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
                   }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: NA.darker }}>{aLabel(clave)}</span>
-                    <span style={{ fontSize: 11, color: NA.text2 }}>{movs.length} mov.</span>
+                    <span style={{ fontSize: 11, color: T.tenue }}>{movs.length} mov.</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {subtotales.map(([mon, val]) => (
@@ -117,7 +117,7 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
                         {val < 0 ? '-' : '+'}R$ {Math.abs(val).toFixed(2)}
                       </span>
                     ))}
-                    <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 14, color: NA.text2 }} />
+                    <i className={`ti ti-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 14, color: T.tenue }} />
                   </div>
                 </div>
 
@@ -129,16 +129,16 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
 
                   return (
                     <div key={mov.id} style={{
-                      padding: '11px 14px', borderTop: `1px solid ${NA.border}`, background: '#fff',
+                      padding: '11px 14px', borderTop: `1px solid ${T.linea}`, background: 'transparent',
                       borderLeft: `3px solid ${esPositivo ? NA.dark : '#B91C1C'}`,
                       display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 13, color: NA.text, margin: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>
+                        <p style={{ fontSize: 13, color: T.texto, margin: 0, lineHeight: 1.45, wordBreak: 'break-word' }}>
                           {mov.nota || 'Movimiento'}
                         </p>
                         {mov.moneda && (
-                          <p style={{ fontSize: 10, color: '#9ca3af', margin: '3px 0 0' }}>{labelCaja(mov.moneda)}</p>
+                          <p style={{ fontSize: 10.5, color: T.tenue, margin: '4px 0 0' }}>{labelCaja(mov.moneda)}</p>
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -163,7 +163,7 @@ const ModalHistorial = ({ selectedPasivo, eliminandoMovIds, onDeleteMovimiento, 
         </div>
 
         <button onClick={onClose}
-          style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: NA.darker, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+          style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: T.superficie2, color: T.texto, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
           Cerrar
         </button>
       </div>

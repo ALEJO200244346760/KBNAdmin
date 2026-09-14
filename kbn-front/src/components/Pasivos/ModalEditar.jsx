@@ -1,5 +1,5 @@
 import React from 'react';
-import { NA, sx, focusOn, focusOff, Field, TextInput } from './PasivosShared';
+import { NA, sx, focusOn, focusOff, Field, TextInput , T } from './PasivosShared';
 
 const ModalEditar = ({ editPasivo, setEditPasivo, editDecoded, setEditDecoded, onSubmit, onClose, guardando }) => (
   <div style={sx.overlay} onClick={onClose}>
@@ -16,9 +16,9 @@ const ModalEditar = ({ editPasivo, setEditPasivo, editDecoded, setEditDecoded, o
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   padding: '11px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  border: `1.5px solid ${editDecoded.esInstructor === opt.v ? '#92400E' : NA.border}`,
-                  background: editDecoded.esInstructor === opt.v ? '#92400E' : '#fff',
-                  color: editDecoded.esInstructor === opt.v ? '#fff' : NA.text2,
+                  border: `1.5px solid ${editDecoded.esInstructor === opt.v ? '#FBBF24' : T.linea}`,
+                  background: editDecoded.esInstructor === opt.v ? '#FBBF24' : 'transparent',
+                  color: editDecoded.esInstructor === opt.v ? '#3A2A05' : T.medio,
                 }}>
                 <i className={`ti ${opt.i}`} style={{ fontSize: 15 }} aria-hidden="true" />
                 {opt.l}
@@ -63,11 +63,11 @@ const ModalEditar = ({ editPasivo, setEditPasivo, editDecoded, setEditDecoded, o
 
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button type="button" onClick={onClose}
-            style={{ flex: 1, padding: '12px', borderRadius: 10, border: `0.5px solid ${NA.border}`, background: '#fff', color: NA.text2, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', boxShadow: `inset 0 0 0 1px ${T.linea}`, background: 'transparent', color: T.medio, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             Cancelar
           </button>
           <button type="submit" disabled={guardando}
-            style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardando ? '#fcd9a8' : '#92400E', color: '#fff', fontSize: 13, fontWeight: 500, cursor: guardando ? 'default' : 'pointer' }}>
+            style={{ flex: 2, padding: '12px', borderRadius: 10, border: 'none', background: guardando ? 'rgba(251,191,36,.4)' : '#FBBF24', color: '#3A2A05', fontSize: 13, fontWeight: 500, cursor: guardando ? 'default' : 'pointer' }}>
             {guardando ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
