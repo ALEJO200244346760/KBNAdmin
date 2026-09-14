@@ -1,5 +1,20 @@
 import React from 'react';
-import { NA, sx, focusOn, focusOff, Field, TextInput , T } from './PasivosShared';
+import { NA, sx, focusOn, focusOff, Field, TextInput} from './PasivosShared';
+
+// Tokens del tema oscuro. Se definen acá para que este archivo no dependa
+// del orden en que se suban los cambios.
+const T = {
+  superficie:  'rgba(255,255,255,.045)',
+  superficie2: 'rgba(255,255,255,.07)',
+  linea:       'rgba(255,255,255,.09)',
+  texto:       'rgba(255,255,255,.92)',
+  medio:       'rgba(255,255,255,.55)',
+  tenue:       'rgba(255,255,255,.32)',
+  deben:       '#F98A8A',
+  favor:       '#2ECFC4',
+  fondoModal:  '#11201E',
+};
+
 
 const ModalEditar = ({ editPasivo, setEditPasivo, editDecoded, setEditDecoded, onSubmit, onClose, guardando }) => (
   <div style={sx.overlay} onClick={onClose}>

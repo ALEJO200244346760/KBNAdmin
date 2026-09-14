@@ -15,28 +15,46 @@ export const NA = {
 };
 
 // ── Estilos reutilizables ───────────────────────────────────────────────────
+// ── Tokens del tema oscuro ──────────────────────────────────────────────────
+// Los mismos que usan las tarjetas y el resto de la app.
+export const T = {
+  superficie:  'rgba(255,255,255,.045)',
+  superficie2: 'rgba(255,255,255,.07)',
+  linea:       'rgba(255,255,255,.09)',
+  texto:       'rgba(255,255,255,.92)',
+  medio:       'rgba(255,255,255,.55)',
+  tenue:       'rgba(255,255,255,.32)',
+  deben:       '#F98A8A',
+  favor:       '#2ECFC4',
+  fondoModal:  '#11201E',
+};
+
 export const sx = {
-  label: { fontSize: 11, color: NA.text2, display: 'block', marginBottom: 5, fontWeight: 500 },
+  label: { fontSize: 11.5, color: T.tenue, display: 'block', marginBottom: 6 },
   input: {
     width: '100%', padding: '11px 13px', borderRadius: 10,
-    border: `0.5px solid ${NA.border}`, background: '#fff',
-    color: NA.text, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
-    transition: 'border-color .15s, box-shadow .15s',
+    border: 'none', boxShadow: `inset 0 0 0 1px ${T.linea}`,
+    background: 'rgba(255,255,255,.05)',
+    color: T.texto, fontSize: 15, fontFamily: 'inherit', boxSizing: 'border-box',
+    transition: 'box-shadow .15s',
   },
-  field: { marginBottom: 14 },
+  field: { marginBottom: 16 },
   overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(8,80,65,.45)', backdropFilter: 'blur(4px)',
+    position: 'fixed', inset: 0, background: 'rgba(4,10,9,.7)', backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16,
   },
   modal: {
-    background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440,
+    background: T.fondoModal, borderRadius: 20, padding: 26, width: '100%', maxWidth: 440,
     maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box',
+    boxShadow: `0 0 0 1px ${T.linea}, 0 24px 60px rgba(0,0,0,.5)`,
+    color: T.texto,
   },
 };
 
 // ── Focus handlers ──────────────────────────────────────────────────────────
-export const focusOn  = (e) => { e.target.style.borderColor = NA.primary; e.target.style.boxShadow = `0 0 0 3px ${NA.light}`; };
-export const focusOff = (e) => { e.target.style.borderColor = NA.border;  e.target.style.boxShadow = 'none'; };
+export const focusOn  = (e) => { e.target.style.boxShadow = `inset 0 0 0 1px ${T.favor}, 0 0 0 3px rgba(46,207,196,.15)`; };
+export const focusOff = (e) => { e.target.style.boxShadow = `inset 0 0 0 1px ${T.linea}`; };
 
 // ── Prefix para tarifa de instructor en descripción ─────────────────────────
 export const TARIFA_PREFIX = '__tarifa__:';
@@ -59,9 +77,9 @@ export const decodeTarifa = (descripcionRaw) => {
 
 // ── Estado visual del saldo ─────────────────────────────────────────────────
 export const getEstado = (balance) => {
-  if (balance < -0.01) return { color: '#B91C1C', bg: '#FEF2F2', border: '#FECACA', label: 'Les debemos', icon: 'ti-arrow-up-right' };
-  if (balance >  0.01) return { color: NA.dark,   bg: NA.light,  border: NA.mid,    label: 'Nos deben',  icon: 'ti-arrow-down-left' };
-  return                       { color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb', label: 'Saldado',    icon: 'ti-check' };
+  if (balance < -0.01) return { color: '#F98A8A', bg: 'rgba(249,138,138,.12)', border: 'rgba(249,138,138,.3)', label: 'Les debemos', icon: 'ti-arrow-up-right' };
+  if (balance >  0.01) return { color: '#2ECFC4', bg: 'rgba(46,207,196,.12)',  border: 'rgba(46,207,196,.3)',  label: 'Nos deben',   icon: 'ti-arrow-down-left' };
+  return                       { color: 'rgba(255,255,255,.4)', bg: 'rgba(255,255,255,.05)', border: 'rgba(255,255,255,.1)', label: 'Saldado', icon: 'ti-check' };
 };
 
 // ── Config de los 3 tipos de transacción ───────────────────────────────────

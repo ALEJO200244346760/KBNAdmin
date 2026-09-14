@@ -1,5 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { NA, sx, labelCaja , T } from './PasivosShared';
+import { NA, sx, labelCaja} from './PasivosShared';
+
+// Tokens del tema oscuro. Se definen acá para que este archivo no dependa
+// del orden en que se suban los cambios.
+const T = {
+  superficie:  'rgba(255,255,255,.045)',
+  superficie2: 'rgba(255,255,255,.07)',
+  linea:       'rgba(255,255,255,.09)',
+  texto:       'rgba(255,255,255,.92)',
+  medio:       'rgba(255,255,255,.55)',
+  tenue:       'rgba(255,255,255,.32)',
+  deben:       '#F98A8A',
+  favor:       '#2ECFC4',
+  fondoModal:  '#11201E',
+};
+
 
 // Normaliza la fecha a string "YYYY-MM-DD" venga como venga del backend
 const aClave = (f) => {
