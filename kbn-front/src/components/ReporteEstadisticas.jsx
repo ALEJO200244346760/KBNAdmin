@@ -222,12 +222,11 @@ const ReporteEstadisticas = () => {
 
   // Categorías de egreso: las fijas más las que ya aparecen cargadas
   const categoriasEgreso = useMemo(() => {
-    const usadas = (datos || [])
-      .filter((x) => String(x.tipoTransaccion).toUpperCase() === 'EGRESO')
+    const usadas = (egresos || [])
       .map((x) => (x.actividad || '').trim())
       .filter((x) => x && x !== 'Clases' && !CATEGORIAS_EGRESO.includes(x));
     return [...CATEGORIAS_EGRESO, ...[...new Set(usadas)].sort()];
-  }, [datos]);
+  }, [egresos]);
 
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;
